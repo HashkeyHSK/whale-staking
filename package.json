@@ -1,0 +1,32 @@
+{
+  "name": "staking",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.8",
+    "@nomicfoundation/hardhat-ethers": "^3.0.8",
+    "@nomicfoundation/hardhat-ignition-ethers": "^0.15.9",
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.12",
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.0.12",
+    "@openzeppelin/contracts-upgradeable": "^5.1.0",
+    "@openzeppelin/hardhat-upgrades": "^3.7.0",
+    "@typechain/ethers-v6": "^0.5.1",
+    "@typechain/hardhat": "^9.1.0",
+    "@types/mocha": "^10.0.10",
+    "chai": "^4.5.0",
+    "dotenv": "^16.4.7",
+    "hardhat": "^2.22.17",
+    "hardhat-gas-reporter": "^1.0.10",
+    "solidity-coverage": "^0.8.14",
+    "typechain": "^8.3.2",
+    "typescript": "^5.7.3"
+  }
+}
