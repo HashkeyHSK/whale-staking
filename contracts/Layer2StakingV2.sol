@@ -95,10 +95,11 @@ contract Layer2StakingV2 is
     }
 
     /**
-     * @dev Initializes the contract with default settings
+     * @dev Initializes the contract with custom settings
      * Sets up initial staking parameters and enables whitelist-only mode
+     * @param _minStakeAmount Minimum stake amount (in wei)
      */
-    function initialize() external initializer {
+    function initialize(uint256 _minStakeAmount) external initializer {
         __ReentrancyGuard_init();
         __Pausable_init();
         __Ownable_init(msg.sender);
@@ -108,6 +109,11 @@ contract Layer2StakingV2 is
         // Set initial values
         stakeEndTime = type(uint256).max;    // No initial end time
         onlyWhitelistCanStake = true;        // Start in whitelist-only mode
+        
+        // Set custom minimum stake amount if provided, otherwise use default
+        if (_minStakeAmount > 0) {
+            minStakeAmount = _minStakeAmount;
+        }
     }
 
     /**

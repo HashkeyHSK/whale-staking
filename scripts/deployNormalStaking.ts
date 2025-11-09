@@ -22,16 +22,19 @@ async function main() {
   const stakingLibAddress = await stakingLib.getAddress();
   console.log("\n✅ StakingLib 部署成功:", stakingLibAddress);
 
-  // 部署 Layer2StakingV2
+  // 部署 Layer2StakingV2，设置最小质押金额为 1 HSK
+  const minStakeAmount = ethers.parseEther("1");
   const Layer2StakingV2 = await ethers.getContractFactory("Layer2StakingV2", {
     libraries: {
       StakingLib: stakingLibAddress,
     },
   });
 
+  console.log(`\n初始化参数: 最小质押金额 = ${ethers.formatEther(minStakeAmount)} HSK`);
+  
   const staking = await upgrades.deployProxy(
     Layer2StakingV2,
-    [],
+    [minStakeAmount],  // 在部署时直接设置最小质押金额
     {
       kind: 'uups',
       initializer: 'initialize',
@@ -42,18 +45,12 @@ async function main() {
   await staking.waitForDeployment();
   const proxyAddress = await staking.getAddress();
   console.log("✅ 普通 Staking 代理合约部署成功:", proxyAddress);
+  console.log("✅ 最小质押金额已在部署时设置完成");
 
   // 配置普通 Staking 产品参数
   console.log("\n配置普通 Staking 产品参数...");
-  
-  // 1. 设置最小质押金额：1 HSK
-  const minStakeAmount = ethers.parseEther("1");
-  console.log(`设置最小质押金额: ${ethers.formatEther(minStakeAmount)} HSK`);
-  const setMinTx = await staking.setMinStakeAmount(minStakeAmount);
-  await setMinTx.wait();
-  console.log("✅ 最小质押金额设置完成");
 
-  // 2. 配置锁定期选项（8% APY）
+  // 1. 配置锁定期选项（8% APY）
   // 注意：最新版本仅保留 365 天锁定期，以下步骤确保链上存在该配置
   console.log("\n配置锁定期选项（年化 8%）...");
   
@@ -73,20 +70,20 @@ async function main() {
     }
   }
 
-  // 3. 设置最大总质押量（可根据需要调整）
+  // 2. 设置最大总质押量（可根据需要调整）
   const maxTotalStake = ethers.parseEther("10000000"); // 1000万 HSK
   console.log(`\n设置最大总质押量: ${ethers.formatEther(maxTotalStake)} HSK`);
   const setMaxTx = await staking.setMaxTotalStake(maxTotalStake);
   await setMaxTx.wait();
   console.log("✅ 最大总质押量设置完成");
 
-  // 4. 关闭白名单模式（普通用户可自由质押）
+  // 3. 关闭白名单模式（普通用户可自由质押）
   console.log("\n关闭白名单模式（允许所有用户质押）...");
   const setWhitelistTx = await staking.setWhitelistOnlyMode(false);
   await setWhitelistTx.wait();
   console.log("✅ 白名单模式已关闭");
 
-  // 5. 验证配置
+  // 4. 验证配置
   console.log("\n==========================================");
   console.log("配置验证");
   console.log("==========================================");

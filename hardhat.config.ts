@@ -21,15 +21,15 @@ const config: HardhatUserConfig = {
   },
   networks: {
     hashkeyTestnet: {
-      url: "hhttps://testnet.hsk.xyz",
-      accounts: [process.env.PRIVATE_KEY!!],
+      url: "https://testnet.hsk.xyz",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       chainId: 133,
       gasPrice: 20000000000,
       timeout: 1000000,
     },
     hashkeyMainnet: {
       url: "https://mainnet.hsk.xyz",
-      accounts: [process.env.PRIVATE_KEY!!],
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       chainId: 177,
       gasPrice: "auto",
     },
