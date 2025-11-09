@@ -21,7 +21,7 @@ const config: HardhatUserConfig = {
   },
   networks: {
     hashkeyTestnet: {
-      url: "https://hashkeychain-testnet.alt.technology",
+      url: "hhttps://testnet.hsk.xyz",
       accounts: [process.env.PRIVATE_KEY!!],
       chainId: 133,
       gasPrice: 20000000000,
@@ -44,14 +44,6 @@ const config: HardhatUserConfig = {
       hashkeyMainnet: 'your API key'
     },
     customChains: [
-      {
-        network: "hashkeyTestnet",
-        chainId: 133,
-        urls: {
-          apiURL: "https://hashkeychain-testnet-explorer.alt.technology/api",
-          browserURL: "https://hashkeychain-testnet-explorer.alt.technology/"
-        }
-      },
       {
         network: "hashkeyMainnet",
         chainId: 177,

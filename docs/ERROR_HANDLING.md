@@ -1,0 +1,369 @@
+# 常见错误处理指南
+
+本文档列出了使用 Whale Staking 合约时可能遇到的常见错误及其解决方法。
+
+## 用户操作错误
+
+### 1. "Insufficient stake amount" - 质押金额不足
+
+**错误信息**：
+```
+Error: Insufficient stake amount
+```
+
+**原因**：
+- 质押金额小于最小质押金额要求
+
+**解决方法**：
+- 检查最小质押金额要求：
+  - 普通 Staking：1 HSK
+  - Premium Staking：500,000 HSK
+- 确保发送的金额 >= 最小质押金额
+
+**示例**：
+```typescript
+// ❌ 错误：质押金额不足
+await staking.stake(365 * 24 * 60 * 60, { value: ethers.parseEther("0.5") });
+
+// ✅ 正确：满足最小质押金额
+await staking.stake(365 * 24 * 60 * 60, { value: ethers.parseEther("1") });
+```
+
+---
+
+### 2. "Exceeds maximum total stake" - 超过最大总质押量
+
+**错误信息**：
+```
+Error: Exceeds maximum total stake
+```
+
+**原因**：
+- 当前总质押量 + 本次质押金额 > 最大总质押量
+
+**解决方法**：
+- 查询当前总质押量：`await staking.totalStaked()`
+- 查询最大总质押量：`await staking.maxTotalStake()`
+- 减少质押金额或等待其他用户解除质押
+
+**示例**：
+```typescript
+const totalStaked = await staking.totalStaked();
+const maxTotalStake = await staking.maxTotalStake();
+const available = maxTotalStake - totalStaked;
+console.log(`可质押额度: ${ethers.formatEther(available)} HSK`);
+```
+
+---
+
+### 3. "Not whitelisted" - 未在白名单中
+
+**错误信息**：
+```
+Error: Not whitelisted
+```
+
+**原因**：
+- 合约启用了白名单模式
+- 当前地址不在白名单中
+
+**解决方法**：
+- 检查白名单模式状态：`await staking.onlyWhitelistCanStake()`
+- 如果是 Premium Staking，需要联系管理员添加到白名单
+- 使用脚本检查白名单状态：
+  ```bash
+  npx hardhat run scripts/checkWhitelist.ts --network <network> \
+    -- --contract <CONTRACT_ADDRESS> --user <USER_ADDRESS>
+  ```
+
+---
+
+### 4. "Still locked" - 锁定期未结束
+
+**错误信息**：
+```
+Error: Still locked
+```
+
+**原因**：
+- 尝试在锁定期结束前解除质押
+- 当前时间 < 解锁时间 - 15分钟
+
+**解决方法**：
+- 查询质押位置信息，确认解锁时间
+- 等待锁定期结束（或提前15分钟）
+- 锁定期内只能提取奖励，不能解除质押
+
+**示例**：
+```typescript
+const positions = await staking.getUserPositions(userAddress);
+const position = positions[0];
+const unlockTime = position.stakedAt + position.lockPeriod;
+const currentTime = Math.floor(Date.now() / 1000);
+const timeRemaining = unlockTime - currentTime;
+
+if (timeRemaining > 900) { // 15分钟 = 900秒
+  console.log(`还需等待 ${timeRemaining} 秒才能解除质押`);
+}
+```
+
+---
+
+### 5. "Position not found" - 质押位置不存在
+
+**错误信息**：
+```
+Error: Position not found
+```
+
+**原因**：
+- 提供的 `positionId` 不存在
+- 质押位置不属于当前用户
+
+**解决方法**：
+- 查询用户的所有质押位置：`await staking.getUserPositions(userAddress)`
+- 确认 `positionId` 是否正确
+- 确认是否为位置所有者
+
+---
+
+### 6. "Already unstaked" - 已解除质押
+
+**错误信息**：
+```
+Error: Already unstaked
+```
+
+**原因**：
+- 该质押位置已经解除质押
+
+**解决方法**：
+- 查询质押位置状态：`position.isUnstaked`
+- 使用其他有效的 `positionId`
+
+---
+
+### 7. "Insufficient reward pool" - 奖励池余额不足
+
+**错误信息**：
+```
+Error: Insufficient reward pool
+```
+
+**原因**：
+- 奖励池余额不足以支付预期奖励
+- 新质押时，合约会检查奖励池是否充足
+
+**解决方法**：
+- 联系管理员充值奖励池
+- 查询奖励池余额：`await staking.rewardPoolBalance()`
+- 等待管理员充值后再尝试质押
+
+---
+
+### 8. "Blacklisted" - 地址被列入黑名单
+
+**错误信息**：
+```
+Error: Blacklisted
+```
+
+**原因**：
+- 当前地址被列入黑名单
+
+**解决方法**：
+- 联系管理员了解原因
+- 等待管理员移除黑名单
+
+---
+
+## 管理员操作错误
+
+### 9. "Invalid period" - 无效的锁定期
+
+**错误信息**：
+```
+Error: Invalid period
+```
+
+**原因**：
+- 锁定期不在允许范围内（1天 - 730天）
+- 锁定期格式错误
+
+**解决方法**：
+- 确保锁定期在 86400 秒（1天）到 63072000 秒（730天）之间
+- 使用正确的秒数格式
+
+**示例**：
+```typescript
+// ❌ 错误：锁定期太短
+await staking.addLockOption(3600, 800); // 1小时，无效
+
+// ✅ 正确：锁定期在有效范围内
+await staking.addLockOption(365 * 24 * 60 * 60, 800); // 365天
+```
+
+---
+
+### 10. "Lock option already exists" - 锁定期选项已存在
+
+**错误信息**：
+```
+Error: Lock option already exists
+```
+
+**原因**：
+- 尝试添加已存在的锁定期选项
+
+**解决方法**：
+- 查询现有锁定期选项：`await staking.getLockOptions()`
+- 使用不同的锁定期，或使用 `updateLockOption()` 更新现有选项
+
+---
+
+### 11. "Only owner" - 仅所有者可操作
+
+**错误信息**：
+```
+Error: Only owner
+```
+
+**原因**：
+- 尝试执行只有 Owner 才能执行的操作（如升级合约）
+- 当前账户不是 Owner
+
+**解决方法**：
+- 确认当前账户是否为 Owner
+- 使用 Owner 账户执行操作
+
+---
+
+### 12. "Only admin" - 仅管理员可操作
+
+**错误信息**：
+```
+Error: Only admin
+```
+
+**原因**：
+- 尝试执行只有 Admin 才能执行的操作
+- 当前账户不是 Admin
+
+**解决方法**：
+- 确认当前账户是否为 Admin
+- 使用 Admin 账户执行操作
+
+---
+
+## 紧急模式相关
+
+### 13. "Emergency mode not enabled" - 紧急模式未启用
+
+**错误信息**：
+```
+Error: Emergency mode not enabled
+```
+
+**原因**：
+- 尝试使用紧急提取，但紧急模式未启用
+
+**解决方法**：
+- 管理员需要先启用紧急模式：`await staking.enableEmergencyMode()`
+- 普通用户无法启用紧急模式
+
+---
+
+## 通用错误处理
+
+### 14. "Transfer failed" - 转账失败
+
+**错误信息**：
+```
+Error: Transfer failed
+```
+
+**原因**：
+- 合约向用户转账时失败
+- 可能是接收地址问题或 Gas 不足
+
+**解决方法**：
+- 检查接收地址是否有效
+- 确保有足够的 Gas
+- 重试操作
+
+---
+
+### 15. "Contract paused" - 合约已暂停
+
+**错误信息**：
+```
+Error: Contract paused
+```
+
+**原因**：
+- 合约被管理员暂停
+- 暂停时，质押和奖励提取功能被禁用
+
+**解决方法**：
+- 等待管理员解除暂停
+- 解除质押功能不受暂停影响
+
+---
+
+## 调试技巧
+
+### 查询合约状态
+
+```typescript
+// 查询总质押量
+const totalStaked = await staking.totalStaked();
+console.log(`总质押量: ${ethers.formatEther(totalStaked)} HSK`);
+
+// 查询奖励池余额
+const rewardPool = await staking.rewardPoolBalance();
+console.log(`奖励池余额: ${ethers.formatEther(rewardPool)} HSK`);
+
+// 查询白名单模式
+const whitelistMode = await staking.onlyWhitelistCanStake();
+console.log(`白名单模式: ${whitelistMode ? '启用' : '关闭'}`);
+
+// 查询紧急模式
+const emergencyMode = await staking.emergencyMode();
+console.log(`紧急模式: ${emergencyMode ? '启用' : '关闭'}`);
+
+// 查询用户质押位置
+const positions = await staking.getUserPositions(userAddress);
+console.log(`用户质押位置数: ${positions.length}`);
+```
+
+### 使用脚本检查
+
+```bash
+# 检查用户质押情况
+npx hardhat run scripts/checkStakes.ts --network <network> \
+  -- --contract <CONTRACT_ADDRESS> --user <USER_ADDRESS>
+
+# 检查白名单状态
+npx hardhat run scripts/checkWhitelist.ts --network <network> \
+  -- --contract <CONTRACT_ADDRESS> --user <USER_ADDRESS>
+
+# 检查锁定期选项
+npx hardhat run scripts/checkLockPeriods.ts --network <network> \
+  -- --contract <CONTRACT_ADDRESS>
+```
+
+---
+
+## 联系支持
+
+如果遇到本文档未涵盖的错误，请：
+
+1. 检查合约事件日志，获取详细错误信息
+2. 查询合约状态，确认配置是否正确
+3. 联系开发团队或管理员
+
+---
+
+**文档版本**: 1.0.0  
+**最后更新**: 2026-11
+

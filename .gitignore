@@ -1,0 +1,107 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Hardhat files
+cache/
+artifacts/
+typechain/
+typechain-types/
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# Hardhat Ignition default directory for deployments
+ignition/deployments/chain-*
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*~
+
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# IDE - IntelliJ IDEA / WebStorm
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# IDE - Vim
+*.swp
+*.swo
+*~
+
+# IDE - Emacs
+*~
+\#*\#
+.\#*
+
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+.temp/
+
+# Build outputs (if any)
+dist/
+build/
+
+# Gas reports
+gas-report.txt
+
+# Hardhat network artifacts
+.openzeppelin/
+
+# ABI exports (if generated)
+abi/
+*.abi.json
+
+# Local deployment addresses
+deployments/
+deployments.local.json
+
+# Test artifacts
+test-results/
+coverage/
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Package manager lock files
+# Using pnpm, so ignore npm and yarn lock files
+package-lock.json
+yarn.lock
+# Keep pnpm-lock.yaml (don't ignore it)
+
