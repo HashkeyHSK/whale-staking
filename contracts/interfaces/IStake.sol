@@ -50,13 +50,6 @@ interface IStaking {
      */
     function pendingReward(uint256 positionId) external view returns (uint256 reward);
 
-    /**
-     * @dev Get all staking positions for a user
-     * @param user User address to check positions for
-     * @return Array of staking positions
-     */
-    function getUserPositions(address user) external view returns (Position[] memory);
-
     event PositionCreated(
         address indexed user,
         uint256 indexed positionId,

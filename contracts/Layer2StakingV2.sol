@@ -2,7 +2,6 @@
 pragma solidity ^0.8.27;
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 import "./StakingStorage.sol";
 import "./libraries/StakingLib.sol";
@@ -14,7 +13,7 @@ import "./interfaces/IStake.sol";
  * Implements staking functionality with fixed 365-day lock period
  * Supports two product tiers: Normal (8% APY) and Premium (16% APY)
  * Features include:
- * - Upgradeable proxy pattern (UUPS)
+ * - Upgradeable proxy pattern (Transparent Proxy)
  * - Whitelist system for Premium tier
  * - Emergency withdrawal mechanism
  * - Automatic reward calculation and distribution
@@ -24,8 +23,7 @@ contract Layer2StakingV2 is
     IStaking, 
     StakingStorage, 
     ReentrancyGuardUpgradeable, 
-    PausableUpgradeable, 
-    UUPSUpgradeable 
+    PausableUpgradeable 
 {
     // Events for tracking contract state changes
     event Received(address indexed sender, uint256 amount);
@@ -78,7 +76,6 @@ contract Layer2StakingV2 is
     function initialize(uint256 _minStakeAmount, uint256 _rewardRate) external initializer {
         __ReentrancyGuard_init();
         __Pausable_init();
-        __UUPSUpgradeable_init();
         __StakingStorage_init(msg.sender, _rewardRate);
         
         // Set custom minimum stake amount if provided, otherwise use default from StakingStorage
@@ -259,14 +256,6 @@ contract Layer2StakingV2 is
         }
         
         return _calculatePendingReward(positions[posIndex]);
-    }
-
-    // ========== VIEW FUNCTIONS ==========
-
-    function getUserPositions(
-        address user
-    ) external view override returns (Position[] memory) {
-        return userPositions[user];
     }
 
     // ========== ADMIN FUNCTIONS ==========
