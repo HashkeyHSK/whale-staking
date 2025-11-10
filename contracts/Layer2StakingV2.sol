@@ -2,7 +2,6 @@
 pragma solidity ^0.8.27;
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 import "./StakingStorage.sol";
@@ -26,7 +25,6 @@ contract Layer2StakingV2 is
     StakingStorage, 
     ReentrancyGuardUpgradeable, 
     PausableUpgradeable, 
-    OwnableUpgradeable,
     UUPSUpgradeable 
 {
     // Events for tracking contract state changes
@@ -36,7 +34,6 @@ contract Layer2StakingV2 is
     event StakeEndTimeUpdated(uint256 oldEndTime, uint256 newEndTime);
     event MinStakeAmountUpdated(uint256 oldAmount, uint256 newAmount);
     event EmergencyModeEnabled(address indexed admin, uint256 timestamp);
-    event AdminTransferCancelled(address indexed canceledAdmin);
     event WhitelistModeChanged(bool oldMode, bool newMode);
 
     // Custom errors for better gas efficiency and clearer error messages
@@ -74,9 +71,6 @@ contract Layer2StakingV2 is
         _;
     }
 
-    // Historical total staked amount tracking
-    uint256 public historicalTotalStaked;
-
     // Constants
     uint256 private constant UPGRADE_COOLDOWN = 1 days; // Cooldown period between upgrades
     uint256 public lastUpgradeTime;
@@ -96,7 +90,6 @@ contract Layer2StakingV2 is
     function initialize(uint256 _minStakeAmount, uint256 _rewardRate) external initializer {
         __ReentrancyGuard_init();
         __Pausable_init();
-        __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
         __StakingStorage_init(msg.sender, _rewardRate);
         
@@ -207,8 +200,6 @@ contract Layer2StakingV2 is
         userTotalStaked[msg.sender] += amount;
         totalStaked += amount;
 
-        historicalTotalStaked += amount;
-
         emit PositionCreated(
             msg.sender,
             positionId,
@@ -288,73 +279,6 @@ contract Layer2StakingV2 is
         address user
     ) external view override returns (Position[] memory) {
         return userPositions[user];
-    }
-
-    function getUserPositionCount(
-        address user
-    ) external view override returns (uint256) {
-        return userPositions[user].length;
-    }
-
-    function getRewardRate() external view returns (uint256) {
-        return rewardRate;
-    }
-
-    function getLockPeriod() external pure returns (uint256) {
-        return LOCK_PERIOD;
-    }
-    
-    function getTotalStaked() external view override returns (uint256) {
-        return totalStaked;
-    }
-
-    function getHistoricalTotalStaked() external view returns (uint256) {
-        return historicalTotalStaked;
-    }
-
-    function remainingStakeCapacity() external view returns (uint256) {
-        return totalStaked >= maxTotalStake ? 0 : maxTotalStake - totalStaked;
-    }
-
-    function getStakingProgress() external view returns (
-        uint256 total,
-        uint256 current,
-        uint256 remaining,
-        uint256 progressPercentage
-    ) {
-        total = maxTotalStake;
-        current = totalStaked;
-        remaining = totalStaked >= maxTotalStake ? 0 : maxTotalStake - totalStaked;
-        
-        // Add safe math to prevent overflow
-        if (total == 0) {
-            progressPercentage = 0;
-        } else {
-            progressPercentage = (current * 10000) / total;
-        }
-        
-        return (total, current, remaining, progressPercentage);
-    }
-
-    /**
-     * @dev Returns the timestamp when a position was staked
-     * @param positionId The ID of the staking position
-     * @return The timestamp when the position was staked
-     */
-    function getStakeTime(uint256 positionId) external view returns (uint256) {
-        // Verify position ownership
-        if (positionOwner[positionId] != msg.sender) revert PositionNotFound();
-        
-        // Use position index map for O(1) lookup
-        uint256 posIndex = positionIndexMap[positionId];
-        Position[] memory positions = userPositions[msg.sender];
-        
-        // Verify the position belongs to the user and is valid
-        if (posIndex >= positions.length || positions[posIndex].positionId != positionId) {
-            revert PositionNotFound();
-        }
-        
-        return positions[posIndex].stakedAt;
     }
 
     function version() public pure override returns (string memory) {
@@ -505,16 +429,6 @@ contract Layer2StakingV2 is
         emit AdminTransferCompleted(oldAdmin, admin);
     }
 
-    /**
-     * @dev Cancels a pending admin transfer
-     * Only callable by the current admin
-     */
-    function cancelAdminTransfer() external onlyAdmin {
-        require(pendingAdmin != address(0), "No pending admin");
-        address canceledAdmin = pendingAdmin;
-        pendingAdmin = address(0);
-        emit AdminTransferCancelled(canceledAdmin);
-    }
     
     // ========== WHITELIST FUNCTIONS ==========
 
@@ -551,20 +465,6 @@ contract Layer2StakingV2 is
         }
     }
 
-    function checkWhitelistBatch(address[] calldata users) 
-        external 
-        view 
-        returns (bool[] memory results) 
-    {
-        require(users.length <= 100, "Batch too large");
-        results = new bool[](users.length);
-        for (uint256 i = 0; i < users.length;) {
-            results[i] = whitelisted[users[i]];
-            unchecked { ++i; }
-        }
-        return results;
-    }
-
     /**
      * @dev Toggles whitelist-only mode
      * @param enabled True to enable whitelist-only mode, false to disable
@@ -581,11 +481,6 @@ contract Layer2StakingV2 is
     function updateRewardPool() external payable onlyAdmin {
         rewardPoolBalance += msg.value;
         emit RewardPoolUpdated(rewardPoolBalance);
-    }
-
-    // Add function to check reward pool sufficiency
-    function checkRewardPoolSufficiency() external view returns (bool, uint256) {
-        return (rewardPoolBalance >= totalPendingRewards, totalPendingRewards);
     }
 
     // Internal function to calculate pending reward

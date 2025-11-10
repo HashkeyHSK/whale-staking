@@ -57,19 +57,6 @@ interface IStaking {
      */
     function getUserPositions(address user) external view returns (Position[] memory);
 
-    /**
-     * @dev Get the number of staking positions for a user
-     * @param user User address to check
-     * @return count Number of staking positions
-     */
-    function getUserPositionCount(address user) external view returns (uint256 count);
-
-    function getRewardRate() external view returns (uint256 rate);
-
-    function getLockPeriod() external pure returns (uint256 period);
-
-    function getTotalStaked() external view returns (uint256 amount);
-
     function version() external pure returns (string memory);
 
     event PositionCreated(
