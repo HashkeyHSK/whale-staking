@@ -270,15 +270,16 @@ contract Layer2StakingV2 is
         // Verify position ownership
         if (positionOwner[positionId] != msg.sender) return 0;
         
+        // Use position index map for O(1) lookup
+        uint256 posIndex = positionIndexMap[positionId];
         Position[] memory positions = userPositions[msg.sender];
         
-        for (uint256 i = 0; i < positions.length; i++) {
-            if (positions[i].positionId == positionId) {
-                return _calculatePendingReward(positions[i]);
-            }
+        // Verify the position belongs to the user and is valid
+        if (posIndex >= positions.length || positions[posIndex].positionId != positionId) {
+            return 0;
         }
         
-        return 0;
+        return _calculatePendingReward(positions[posIndex]);
     }
 
     // ========== VIEW FUNCTIONS ==========
@@ -344,13 +345,16 @@ contract Layer2StakingV2 is
         // Verify position ownership
         if (positionOwner[positionId] != msg.sender) revert PositionNotFound();
         
+        // Use position index map for O(1) lookup
+        uint256 posIndex = positionIndexMap[positionId];
         Position[] memory positions = userPositions[msg.sender];
-        for (uint256 i = 0; i < positions.length; i++) {
-            if (positions[i].positionId == positionId) {
-                return positions[i].stakedAt;
-            }
+        
+        // Verify the position belongs to the user and is valid
+        if (posIndex >= positions.length || positions[posIndex].positionId != positionId) {
+            revert PositionNotFound();
         }
-        revert PositionNotFound();
+        
+        return positions[posIndex].stakedAt;
     }
 
     function version() public pure override returns (string memory) {

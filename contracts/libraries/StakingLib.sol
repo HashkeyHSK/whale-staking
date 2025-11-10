@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.27;
 
-import "@openzeppelin/contracts/utils/math/Math.sol";
 import "../interfaces/IStake.sol";
 
 /**

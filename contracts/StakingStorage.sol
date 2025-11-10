@@ -48,7 +48,7 @@ abstract contract StakingStorage is Initializable {
     mapping(uint256 => uint256) internal positionIndexMap;
     
     // Gap for future storage variables (reserves 50 slots for upgrades)
-    uint256[49] private __gap;
+    uint256[50] private __gap;
 
     // Add event for admin changes
     event AdminTransferInitiated(address indexed currentAdmin, address indexed pendingAdmin);
@@ -83,13 +83,4 @@ abstract contract StakingStorage is Initializable {
         stakeEndTime = type(uint256).max;    // No initial end time
         onlyWhitelistCanStake = true;        // Start in whitelist-only mode
     }
-}
-
-/**
- * @title StakingStorageV2
- * @dev Reserved storage space for future upgrades
- */
-abstract contract StakingStorageV2 is StakingStorage {
-    // Reserved storage slots for future versions
-    uint256[50] private __gap_v2;
 }
