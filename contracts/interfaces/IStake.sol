@@ -84,10 +84,4 @@ interface IStaking {
     );
 
     event MaxTotalStakeUpdated(uint256 oldLimit, uint256 newLimit);
-
-    event ContractUpgraded(
-        string indexed version,
-        address indexed implementation,
-        uint256 timestamp
-    );
 }

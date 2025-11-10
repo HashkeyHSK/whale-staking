@@ -11,10 +11,10 @@ import "./interfaces/IStake.sol";
  * @title Layer2StakingV2
  * @dev Main staking contract for Layer2 network - Version 2
  * Implements staking functionality with fixed 365-day lock period
- * Supports two product tiers: Normal (8% APY) and Premium (16% APY)
+ * Reward rate is configurable at deployment (e.g., 800 for 8% APY, 1600 for 16% APY)
  * Features include:
  * - Upgradeable proxy pattern (Transparent Proxy)
- * - Whitelist system for Premium tier
+ * - Whitelist system for access control
  * - Emergency withdrawal mechanism
  * - Automatic reward calculation and distribution
  * - Pause functionality
@@ -35,7 +35,6 @@ contract Layer2StakingV2 is
     event WhitelistModeChanged(bool oldMode, bool newMode);
 
     // Custom errors for better gas efficiency and clearer error messages
-    error InvalidAmount();
     error AlreadyUnstaked();
     error StillLocked();
     error NoReward();
@@ -203,10 +202,7 @@ contract Layer2StakingV2 is
         Position storage position = userPositions[msg.sender][posIndex];
         
         if (position.isUnstaked) revert AlreadyUnstaked();
-        require(
-            block.timestamp >= position.stakedAt + LOCK_PERIOD,
-            "Still locked"
-        );
+        if (block.timestamp < position.stakedAt + LOCK_PERIOD) revert StillLocked();
 
         uint256 reward = _updateReward(msg.sender, posIndex);
         uint256 amount = position.amount;
@@ -237,6 +233,8 @@ contract Layer2StakingV2 is
 
         return reward;
     }
+
+    // ========== VIEW FUNCTIONS ==========
 
     function pendingReward(
         uint256 positionId
