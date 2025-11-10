@@ -4,11 +4,11 @@ pragma solidity ^0.8.27;
 interface IStaking {
     /**
      * @dev Position structure for staking
+     * Note: lockPeriod is always 365 days (constant LOCK_PERIOD)
      */
     struct Position {
         uint256 positionId;      // Position ID
         uint256 amount;          // Staked amount
-        uint256 lockPeriod;      // Lock period in seconds
         uint256 stakedAt;        // Timestamp when staked
         uint256 lastRewardAt;    // Last reward claim timestamp
         uint256 rewardRate;      // Reward rate in basis points
@@ -16,7 +16,8 @@ interface IStaking {
     }
 
     /**
-     * @dev Lock option structure
+     * @dev Lock option structure (deprecated - kept for backward compatibility)
+     * @notice This structure is no longer used in V2 (fixed 365-day period)
      */
     struct LockOption {
         uint256 period;          // Lock period
@@ -24,11 +25,10 @@ interface IStaking {
     }
 
     /**
-     * @dev Stake native token to create a new staking position
-     * @param lockPeriod Lock period in seconds
+     * @dev Stake native token to create a new staking position with fixed 365-day lock period
      * @return positionId ID of the newly created staking position
      */
-    function stake(uint256 lockPeriod) external payable returns (uint256 positionId);
+    function stake() external payable returns (uint256 positionId);
 
     /**
      * @dev Unstake from a specific position
@@ -64,9 +64,9 @@ interface IStaking {
      */
     function getUserPositionCount(address user) external view returns (uint256 count);
 
-    function getLockOptions() external view returns (LockOption[] memory);
+    function getRewardRate() external view returns (uint256 rate);
 
-    function getRewardRate(uint256 lockPeriod) external view returns (uint256 rate);
+    function getLockPeriod() external pure returns (uint256 period);
 
     function getTotalStaked() external view returns (uint256 amount);
 
@@ -91,12 +91,6 @@ interface IStaking {
         address indexed user,
         uint256 indexed positionId,
         uint256 amount,
-        uint256 timestamp
-    );
-
-    event LockOptionAdded(
-        uint256 period,
-        uint256 rewardRate,
         uint256 timestamp
     );
 

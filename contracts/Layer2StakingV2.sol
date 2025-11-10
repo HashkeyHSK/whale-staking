@@ -12,12 +12,14 @@ import "./interfaces/IStake.sol";
 /**
  * @title Layer2StakingV2
  * @dev Main staking contract for Layer2 network - Version 2
- * Implements staking functionality with multiple lock periods and reward rates
+ * Implements staking functionality with fixed 365-day lock period
+ * Supports two product tiers: Normal (8% APY) and Premium (16% APY)
  * Features include:
- * - Upgradeable proxy pattern
- * - Whitelist system
- * - Emergency withdrawal
- * - Reward calculation and distribution
+ * - Upgradeable proxy pattern (UUPS)
+ * - Whitelist system for Premium tier
+ * - Emergency withdrawal mechanism
+ * - Automatic reward calculation and distribution
+ * - Pause functionality
  */
 contract Layer2StakingV2 is 
     IStaking, 
@@ -30,12 +32,9 @@ contract Layer2StakingV2 is
     // Events for tracking contract state changes
     event Received(address indexed sender, uint256 amount);
     event WhitelistStatusChanged(address indexed user, bool status);
-    event WhitelistBonusRateUpdated(uint256 oldRate, uint256 newRate);
     event StakeStartTimeUpdated(uint256 oldStartTime, uint256 newStartTime);
     event StakeEndTimeUpdated(uint256 oldEndTime, uint256 newEndTime);
-    event LockOptionUpdated(uint256 indexed index, uint256 newPeriod, uint256 newRate);
     event MinStakeAmountUpdated(uint256 oldAmount, uint256 newAmount);
-    event BlacklistStatusChanged(address indexed user, bool isBlacklisted);
     event EmergencyModeEnabled(address indexed admin, uint256 timestamp);
     event AdminTransferCancelled(address indexed canceledAdmin);
     event WhitelistModeChanged(bool oldMode, bool newMode);
@@ -43,25 +42,16 @@ contract Layer2StakingV2 is
     // Custom errors for better gas efficiency and clearer error messages
     error OnlyAdmin();
     error InvalidAmount();
-    error InvalidPeriod();
     error AlreadyUnstaked();
     error StillLocked();
     error NoReward();
-    error InsufficientReward();
     error PositionNotFound();
-    error Blacklisted();
-    error EmergencyOnly();
+    error NotWhitelisted();
     error MaxTotalStakeExceeded();
-    error InvalidMaxStakeLimit();
 
     // Access control modifiers
     modifier onlyAdmin() {
         if (msg.sender != admin) revert OnlyAdmin();
-        _;
-    }
-
-    modifier notBlacklisted() {
-        if (blacklisted[msg.sender]) revert Blacklisted();
         _;
     }
 
@@ -72,8 +62,8 @@ contract Layer2StakingV2 is
 
     // Add whitelist validation modifier
     modifier whitelistCheck() {
-        if (onlyWhitelistCanStake) {
-            require(whitelisted[msg.sender], "Not whitelisted");
+        if (onlyWhitelistCanStake && !whitelisted[msg.sender]) {
+            revert NotWhitelisted();
         }
         _;
     }
@@ -87,8 +77,10 @@ contract Layer2StakingV2 is
     // Historical total staked amount tracking
     uint256 public historicalTotalStaked;
 
-    // Add a mapping to store historical lock periods and their rates
-    mapping(uint256 => uint256) private historicalRates;
+    // Constants
+    uint256 private constant UPGRADE_COOLDOWN = 1 days; // Cooldown period between upgrades
+    uint256 public lastUpgradeTime;
+    string public constant VERSION = "2.0.0";
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -99,66 +91,91 @@ contract Layer2StakingV2 is
      * @dev Initializes the contract with custom settings
      * Sets up initial staking parameters and enables whitelist-only mode
      * @param _minStakeAmount Minimum stake amount (in wei)
+     * @param _rewardRate Annual reward rate in basis points (800 for 8%, 1600 for 16%)
      */
-    function initialize(uint256 _minStakeAmount) external initializer {
+    function initialize(uint256 _minStakeAmount, uint256 _rewardRate) external initializer {
         __ReentrancyGuard_init();
         __Pausable_init();
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
-        __StakingStorage_init(msg.sender);
+        __StakingStorage_init(msg.sender, _rewardRate);
         
-        // Set initial values
-        stakeEndTime = type(uint256).max;    // No initial end time
-        onlyWhitelistCanStake = true;        // Start in whitelist-only mode
-        
-        // Set custom minimum stake amount if provided, otherwise use default
+        // Set custom minimum stake amount if provided, otherwise use default from StakingStorage
         if (_minStakeAmount > 0) {
             minStakeAmount = _minStakeAmount;
         }
+        // Note: stakeEndTime and onlyWhitelistCanStake are already set in __StakingStorage_init
+    }
+
+    // ========== INTERNAL HELPER FUNCTIONS ==========
+
+    /**
+     * @dev Finds the position index for a given position ID
+     * Uses positionIndexMap for O(1) lookup efficiency
+     * @param user User address
+     * @param positionId Position ID to find
+     * @return posIndex Index of the position in the user's positions array
+     */
+    function _findPosition(address user, uint256 positionId) 
+        internal 
+        view 
+        returns (uint256 posIndex) 
+    {
+        // Use the index map for efficient O(1) lookup
+        posIndex = positionIndexMap[positionId];
+        
+        // Verify the position belongs to the user and is valid
+        Position[] storage positions = userPositions[user];
+        if (posIndex >= positions.length || positions[posIndex].positionId != positionId) {
+        revert PositionNotFound();
+        }
+        
+        return posIndex;
     }
 
     /**
-     * @dev Creates a new staking position
-     * @param lockPeriod Duration for which tokens will be locked
+     * @dev Calculates time elapsed for reward calculation, capped at lock period
+     * @param position The staking position
+     * @return timeElapsed Time elapsed since last reward, capped at lock end
+     */
+    function _calculateTimeElapsed(Position memory position) 
+        internal 
+        view 
+        returns (uint256) 
+    {
+        uint256 lockEndTime = position.stakedAt + LOCK_PERIOD;
+        uint256 endTime = block.timestamp < lockEndTime ? block.timestamp : lockEndTime;
+        return endTime - position.lastRewardAt;
+    }
+
+    // ========== PUBLIC STAKING FUNCTIONS ==========
+
+    /**
+     * @dev Creates a new staking position with fixed 365-day lock period
      * @return uint256 ID of the newly created position
      */
-    function stake(
-        uint256 lockPeriod
-    ) external 
+    function stake() external 
         payable 
         nonReentrant 
         whenNotPaused 
-        notBlacklisted 
         whitelistCheck
-        whenNotEmergency  // Add emergency mode check
+        whenNotEmergency
         returns (uint256) 
     {
         require(block.timestamp >= stakeStartTime, "Staking has not started yet");
         require(block.timestamp < stakeEndTime, "Staking period has ended");
-
-        // Add validation for lockPeriod
-        StakingLib.validateAndGetRate(
-            lockPeriod, 
-            lockOptions,
-            historicalRates
-        );
 
         uint256 amount = msg.value;
         amount = StakingLib.validateAndFormatAmount(amount, minStakeAmount);
         
         if (totalStaked + amount > maxTotalStake) revert MaxTotalStakeExceeded();
 
-        // Calculate potential reward for this new stake
-        uint256 rewardRate = StakingLib.validateAndGetRate(
-            lockPeriod, 
-            lockOptions,
-            historicalRates
-        );
+        // Calculate potential reward for this new stake using fixed parameters
         uint256 potentialReward = StakingLib.calculateReward(
             amount,
-            lockPeriod,  // timeElapsed
+            LOCK_PERIOD,
             rewardRate,
-            lockPeriod
+            LOCK_PERIOD
         );
 
         // Check if reward pool can cover this new stake
@@ -174,15 +191,18 @@ contract Layer2StakingV2 is
         Position memory newPosition = Position({
             positionId: positionId,
             amount: amount,
-            lockPeriod: lockPeriod,
             stakedAt: block.timestamp,
             lastRewardAt: block.timestamp,
             rewardRate: rewardRate,
             isUnstaked: false
         });
 
+        // Get the index where this position will be stored
+        uint256 positionIndex = userPositions[msg.sender].length;
         userPositions[msg.sender].push(newPosition);
-        userPositionCount[msg.sender]++;
+        
+        // Update the position index map for efficient lookup
+        positionIndexMap[positionId] = positionIndex;
         positionOwner[positionId] = msg.sender;
         userTotalStaked[msg.sender] += amount;
         totalStaked += amount;
@@ -193,7 +213,7 @@ contract Layer2StakingV2 is
             msg.sender,
             positionId,
             amount,
-            lockPeriod,
+            LOCK_PERIOD,
             block.timestamp
         );
 
@@ -203,26 +223,12 @@ contract Layer2StakingV2 is
     function unstake(
         uint256 positionId
     ) external override nonReentrant validPosition(positionId) {
-        Position[] storage positions = userPositions[msg.sender];
-        Position storage position;
-        uint256 posIndex;
-        bool found = false;
-
-        for (uint256 i = 0; i < positions.length; i++) {
-            if (positions[i].positionId == positionId) {
-                position = positions[i];
-                posIndex = i;
-                found = true;
-                break;
-            }
-        }
-
-        if (!found) revert PositionNotFound();
+        uint256 posIndex = _findPosition(msg.sender, positionId);
+        Position storage position = userPositions[msg.sender][posIndex];
         
-        position = positions[posIndex];
         if (position.isUnstaked) revert AlreadyUnstaked();
         require(
-            block.timestamp + TIME_TOLERANCE >= position.stakedAt + position.lockPeriod,
+            block.timestamp >= position.stakedAt + LOCK_PERIOD,
             "Still locked"
         );
 
@@ -243,24 +249,10 @@ contract Layer2StakingV2 is
 
     function claimReward(
         uint256 positionId
-    ) external override nonReentrant whenNotPaused validPosition(positionId) returns (uint256) {
-        require(!emergencyMode, "Rewards disabled in emergency mode");
-        
-        Position[] storage positions = userPositions[msg.sender];
-        uint256 posIndex;
-        bool found = false;
-
-        for (uint256 i = 0; i < positions.length; i++) {
-            if (positions[i].positionId == positionId) {
-                posIndex = i;
-                found = true;
-                break;
-            }
-        }
-
-        if (!found) revert PositionNotFound();
-        
+    ) external override nonReentrant whenNotPaused whenNotEmergency validPosition(positionId) returns (uint256) {
+        uint256 posIndex = _findPosition(msg.sender, positionId);
         uint256 reward = _updateReward(msg.sender, posIndex);
+        
         if (reward == 0) revert NoReward();
 
         (bool success, ) = msg.sender.call{value: reward}("");
@@ -275,35 +267,21 @@ contract Layer2StakingV2 is
     ) external view override returns (uint256) {
         if (emergencyMode) return 0;
         
+        // Verify position ownership
+        if (positionOwner[positionId] != msg.sender) return 0;
+        
         Position[] memory positions = userPositions[msg.sender];
         
         for (uint256 i = 0; i < positions.length; i++) {
-            Position memory position = positions[i];
-            if (position.positionId == positionId && !position.isUnstaked) {
-                uint256 currentTime = block.timestamp;
-                uint256 lockEndTime = position.stakedAt + position.lockPeriod;
-                
-                // Calculate time elapsed, capped at lock period
-                uint256 timeElapsed;
-                if (currentTime >= lockEndTime) {
-                    timeElapsed = lockEndTime - position.lastRewardAt;
-                    if (timeElapsed == 0) return 0;
-                } else {
-                    timeElapsed = currentTime - position.lastRewardAt;
-                    if (timeElapsed == 0) return 0;
-                }
-
-                return StakingLib.calculateReward(
-                    position.amount,
-                    timeElapsed,
-                    position.rewardRate,
-                    position.lockPeriod
-                );
+            if (positions[i].positionId == positionId) {
+                return _calculatePendingReward(positions[i]);
             }
         }
         
         return 0;
     }
+
+    // ========== VIEW FUNCTIONS ==========
 
     function getUserPositions(
         address user
@@ -311,227 +289,30 @@ contract Layer2StakingV2 is
         return userPositions[user];
     }
 
-
     function getUserPositionCount(
         address user
     ) external view override returns (uint256) {
-        return userPositionCount[user];
+        return userPositions[user].length;
     }
 
-    function getLockOptions() external view override returns (LockOption[] memory) {
-        return lockOptions;
+    function getRewardRate() external view returns (uint256) {
+        return rewardRate;
     }
 
-
-    function getRewardRate(
-        uint256 lockPeriod
-    ) external view override returns (uint256) {
-        return StakingLib.validateAndGetRate(
-            lockPeriod, 
-            lockOptions,
-            historicalRates
-        );
+    function getLockPeriod() external pure returns (uint256) {
+        return LOCK_PERIOD;
     }
-
     
     function getTotalStaked() external view override returns (uint256) {
         return totalStaked;
     }
 
-
-    function addLockOption(
-        uint256 period,
-        uint256 rewardRate
-    ) external onlyAdmin whenNotEmergency {
-        require(StakingLib.isValidLockOption(period, rewardRate), "Invalid lock option");
-        
-        for (uint256 i = 0; i < lockOptions.length; i++) {
-            if (lockOptions[i].period == period) revert InvalidPeriod();
-        }
-
-        lockOptions.push(LockOption({
-            period: period,
-            rewardRate: rewardRate
-        }));
-
-        emit LockOptionAdded(period, rewardRate, block.timestamp);
-    }
-
-    function setMinStakeAmount(uint256 newAmount) external onlyAdmin whenNotEmergency {
-        uint256 oldAmount = minStakeAmount;
-        minStakeAmount = newAmount;
-        emit MinStakeAmountUpdated(oldAmount, newAmount);
-    }
-
-
-    function addToBlacklist(address user) external onlyAdmin {
-        blacklisted[user] = true;
-        emit BlacklistStatusChanged(user, true);
-    }
-
-    function removeFromBlacklist(address user) external onlyAdmin {
-        blacklisted[user] = false;
-        emit BlacklistStatusChanged(user, false);
-    }
-
-
-    function enableEmergencyMode() external onlyAdmin {
-        emergencyMode = true;
-        emit EmergencyModeEnabled(msg.sender, block.timestamp);
-    }
-
-
-    function pause() external onlyAdmin {
-        _pause();
-        emit StakingPaused(msg.sender, block.timestamp);
-    }
-
-
-    function unpause() external onlyAdmin {
-        _unpause();
-        emit StakingUnpaused(msg.sender, block.timestamp);
-    }
-
-
-    function emergencyWithdraw(uint256 positionId) external nonReentrant {
-        require(emergencyMode, "Not in emergency mode");
-        require(positionOwner[positionId] == msg.sender, "Not position owner");
-
-        Position[] storage positions = userPositions[msg.sender];
-        Position storage position;
-        uint256 posIndex;
-        bool found = false;
-
-        for (uint256 i = 0; i < positions.length; i++) {
-            if (positions[i].positionId == positionId && !positions[i].isUnstaked) {
-                position = positions[i];
-                posIndex = i;
-                found = true;
-                break;
-            }
-        }
-
-        require(found, "Position not found or already unstaked");
-
-        uint256 amount = positions[posIndex].amount;
-        positions[posIndex].isUnstaked = true;
-        userTotalStaked[msg.sender] -= amount;
-        totalStaked -= amount;
-
-        // Only transfer principal in emergency mode
-        (bool success, ) = msg.sender.call{value: amount}("");
-        require(success, "Emergency withdraw failed");
-        
-        emit EmergencyWithdrawn(msg.sender, positionId, amount, block.timestamp);
-    }
-
-    function _updateReward(
-        address _staker,
-        uint256 _positionIndex
-    ) internal returns (uint256 reward) {
-        // Return 0 rewards if in emergency mode
-        if (emergencyMode) return 0;
-
-        Position storage position = userPositions[_staker][_positionIndex];
-        if (position.isUnstaked) return 0;
-
-        uint256 currentTime = block.timestamp;
-        uint256 lockEndTime = position.stakedAt + position.lockPeriod;
-        
-        // Calculate time elapsed, capped at lock period
-        uint256 timeElapsed;
-        if (currentTime >= lockEndTime) {
-            // If current time is beyond lock period, only calculate rewards up to lock end
-            timeElapsed = lockEndTime - position.lastRewardAt;
-            if (timeElapsed == 0) return 0;
-        } else {
-            // If still in lock period, calculate rewards normally
-            timeElapsed = currentTime - position.lastRewardAt;
-            if (timeElapsed == 0) return 0;
-        }
-
-        reward = StakingLib.calculateReward(
-            position.amount, 
-            timeElapsed, 
-            position.rewardRate,
-            position.lockPeriod   
-        );
-        
-        // Update reward pool balance
-        if (reward > 0) {
-            require(rewardPoolBalance >= reward, "Insufficient reward pool");
-            rewardPoolBalance -= reward;
-            totalPendingRewards -= reward;
-            emit RewardPoolUpdated(rewardPoolBalance);
-        }
-
-        position.lastRewardAt = currentTime > lockEndTime ? lockEndTime : currentTime;
-    }
-
-
-    function _authorizeUpgrade(address newImplementation) internal override onlyAdmin {
-        require(
-            block.timestamp >= lastUpgradeTime + UPGRADE_COOLDOWN,
-            "Upgrade cooldown not expired"
-        );
-
-        require(newImplementation != address(0), "Invalid implementation");
-        
-        string memory newVersion = IStaking(newImplementation).version();
-        require(
-            keccak256(abi.encodePacked(newVersion)) != 
-            keccak256(abi.encodePacked(VERSION)),
-            "Same version"
-        );
-
-        // 更新最后升级时间
-        lastUpgradeTime = block.timestamp;
-
-        // 发出升级事件
-        emit ContractUpgraded(newVersion, newImplementation, block.timestamp);
-    }
-
-    function version() public pure override returns (string memory) {
-        return VERSION;
-    }
-
-    receive() external payable {
-        emit Received(msg.sender, msg.value);
-    }
-
-    function addToWhitelist(address user) external onlyAdmin {
-        if (!whitelisted[user]) {
-            whitelisted[user] = true;
-            emit WhitelistStatusChanged(user, true);
-        }
-    }
-    
-    function removeFromWhitelist(address user) external onlyAdmin {
-        if (whitelisted[user]) {
-            whitelisted[user] = false;
-            emit WhitelistStatusChanged(user, false);
-        }
-    }
-    
-    function setWhitelistBonusRate(uint256 newRate) external onlyAdmin {
-        require(newRate <= 5000, "Bonus rate too high"); // 最高50%额外APY
-        uint256 oldRate = whitelistBonusRate;
-        whitelistBonusRate = newRate;
-        emit WhitelistBonusRateUpdated(oldRate, newRate);
-    }
-
-    function setMaxTotalStake(uint256 newLimit) external onlyAdmin {
-        require(newLimit >= totalStaked, "New limit below current stake");
-        uint256 oldLimit = maxTotalStake;
-        maxTotalStake = newLimit;
-        emit MaxTotalStakeUpdated(oldLimit, newLimit);
+    function getHistoricalTotalStaked() external view returns (uint256) {
+        return historicalTotalStaked;
     }
 
     function remainingStakeCapacity() external view returns (uint256) {
-        if (totalStaked >= maxTotalStake) {
-            return 0;
-        }
-        return maxTotalStake - totalStaked;
+        return totalStaked >= maxTotalStake ? 0 : maxTotalStake - totalStaked;
     }
 
     function getStakingProgress() external view returns (
@@ -554,7 +335,135 @@ contract Layer2StakingV2 is
         return (total, current, remaining, progressPercentage);
     }
 
+    /**
+     * @dev Returns the timestamp when a position was staked
+     * @param positionId The ID of the staking position
+     * @return The timestamp when the position was staked
+     */
+    function getStakeTime(uint256 positionId) external view returns (uint256) {
+        // Verify position ownership
+        if (positionOwner[positionId] != msg.sender) revert PositionNotFound();
+        
+        Position[] memory positions = userPositions[msg.sender];
+        for (uint256 i = 0; i < positions.length; i++) {
+            if (positions[i].positionId == positionId) {
+                return positions[i].stakedAt;
+            }
+        }
+        revert PositionNotFound();
+    }
+
+    function version() public pure override returns (string memory) {
+        return VERSION;
+    }
+
+    // ========== ADMIN FUNCTIONS ==========
+
+
+    function setMinStakeAmount(uint256 newAmount) external onlyAdmin whenNotEmergency {
+        uint256 oldAmount = minStakeAmount;
+        minStakeAmount = newAmount;
+        emit MinStakeAmountUpdated(oldAmount, newAmount);
+    }
+
+    function enableEmergencyMode() external onlyAdmin {
+        emergencyMode = true;
+        emit EmergencyModeEnabled(msg.sender, block.timestamp);
+    }
+
+    function pause() external onlyAdmin {
+        _pause();
+        emit StakingPaused(msg.sender, block.timestamp);
+    }
+
+
+    function unpause() external onlyAdmin {
+        _unpause();
+        emit StakingUnpaused(msg.sender, block.timestamp);
+    }
+
+
+    function emergencyWithdraw(uint256 positionId) external nonReentrant {
+        require(emergencyMode, "Not in emergency mode");
+        require(positionOwner[positionId] == msg.sender, "Not position owner");
+
+        uint256 posIndex = _findPosition(msg.sender, positionId);
+        Position storage position = userPositions[msg.sender][posIndex];
+        
+        require(!position.isUnstaked, "Position already unstaked");
+
+        uint256 amount = position.amount;
+        
+        // Calculate and deduct the reserved pending reward for this position
+        uint256 reservedReward = StakingLib.calculateReward(
+            position.amount,
+            LOCK_PERIOD,
+            position.rewardRate,
+            LOCK_PERIOD
+        );
+        if (totalPendingRewards >= reservedReward) {
+            totalPendingRewards -= reservedReward;
+        }
+        
+        position.isUnstaked = true;
+        userTotalStaked[msg.sender] -= amount;
+        totalStaked -= amount;
+
+        // Only transfer principal in emergency mode
+        (bool success, ) = msg.sender.call{value: amount}("");
+        require(success, "Emergency withdraw failed");
+        
+        emit EmergencyWithdrawn(msg.sender, positionId, amount, block.timestamp);
+    }
+
+    function _updateReward(
+        address _staker,
+        uint256 _positionIndex
+    ) internal returns (uint256 reward) {
+        // Return 0 rewards if in emergency mode
+        if (emergencyMode) return 0;
+
+        Position storage position = userPositions[_staker][_positionIndex];
+        if (position.isUnstaked) return 0;
+
+        uint256 timeElapsed = _calculateTimeElapsed(position);
+        if (timeElapsed == 0) return 0;
+
+        reward = StakingLib.calculateReward(
+            position.amount, 
+            timeElapsed, 
+            position.rewardRate,
+            LOCK_PERIOD   
+        );
+        
+        // Update reward pool balance
+        if (reward > 0) {
+            require(rewardPoolBalance >= reward, "Insufficient reward pool");
+            rewardPoolBalance -= reward;
+            totalPendingRewards -= reward;
+            emit RewardPoolUpdated(rewardPoolBalance);
+        }
+
+        uint256 currentTime = block.timestamp;
+        uint256 lockEndTime = position.stakedAt + LOCK_PERIOD;
+        position.lastRewardAt = currentTime > lockEndTime ? lockEndTime : currentTime;
+    }
+
+
+    function setMaxTotalStake(uint256 newLimit) external onlyAdmin {
+        require(newLimit > 0, "Limit must be positive");
+        require(newLimit >= totalStaked, "New limit below current stake");
+        require(newLimit <= type(uint128).max, "Limit too large");
+        
+        uint256 oldLimit = maxTotalStake;
+        maxTotalStake = newLimit;
+        emit MaxTotalStakeUpdated(oldLimit, newLimit);
+    }
+
     function setStakeStartTime(uint256 newStartTime) external onlyAdmin {
+        require(newStartTime > 0, "Invalid start time");
+        require(newStartTime < stakeEndTime, "Start time must be before end time");
+        
         uint256 oldStartTime = stakeStartTime;
         stakeStartTime = newStartTime;
         emit StakeStartTimeUpdated(oldStartTime, newStartTime);
@@ -562,64 +471,11 @@ contract Layer2StakingV2 is
 
     function setStakeEndTime(uint256 newEndTime) external onlyAdmin {
         require(newEndTime > block.timestamp, "End time must be in future");
+        require(newEndTime > stakeStartTime, "End time must be after start time");
+        
         uint256 oldEndTime = stakeEndTime;
         stakeEndTime = newEndTime;
         emit StakeEndTimeUpdated(oldEndTime, newEndTime);
-    }
-
-    function getHistoricalTotalStaked() external view returns (uint256) {
-        return historicalTotalStaked;
-    }
-    
-    function addToWhitelistBatch(address[] calldata users) external onlyAdmin {
-        uint256 length = users.length;
-        require(length <= 100, "Batch too large");
-        for (uint256 i = 0; i < length;) {
-            if (!whitelisted[users[i]]) {
-                whitelisted[users[i]] = true;
-                emit WhitelistStatusChanged(users[i], true);
-            }
-            unchecked { ++i; }
-        }
-    }
-
-    function removeFromWhitelistBatch(address[] calldata users) external onlyAdmin {
-        require(users.length <= 100, "Batch too large");
-        for (uint256 i = 0; i < users.length;) {
-            if (whitelisted[users[i]]) {
-                whitelisted[users[i]] = false;
-                emit WhitelistStatusChanged(users[i], false);
-            }
-            unchecked { ++i; }
-        }
-    }
-
-    function checkWhitelistBatch(address[] calldata users) 
-        external 
-        view 
-        returns (bool[] memory results) 
-    {
-        results = new bool[](users.length);
-        for (uint256 i = 0; i < users.length; i++) {
-            results[i] = whitelisted[users[i]];
-        }
-        return results;
-    }
-
-    uint256 private constant TIME_TOLERANCE = 900; 
-    uint256 private constant UPGRADE_COOLDOWN = 1 days;
-    uint256 public lastUpgradeTime;
-    string public constant VERSION = "1.0.1"; // 更新版本号
-
-    // Add a function to check if a lock period is in use
-    function isLockPeriodInUse(uint256 period) internal view returns (bool) {
-        for (uint256 i = 0; i < userPositions[msg.sender].length; i++) {
-            if (!userPositions[msg.sender][i].isUnstaked && 
-                userPositions[msg.sender][i].lockPeriod == period) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /**
@@ -655,69 +511,54 @@ contract Layer2StakingV2 is
         pendingAdmin = address(0);
         emit AdminTransferCancelled(canceledAdmin);
     }
+    
+    // ========== WHITELIST FUNCTIONS ==========
 
-    // Add function to update reward pool balance
-    function updateRewardPool() public payable onlyAdmin {
-        rewardPoolBalance += msg.value;
-        emit RewardPoolUpdated(rewardPoolBalance);
-    }
-
-    // Add function to check reward pool sufficiency
-    function checkRewardPoolSufficiency() public view returns (bool, uint256) {
-        uint256 requiredRewards = calculateTotalPendingRewards();
-        return (rewardPoolBalance >= requiredRewards, requiredRewards);
-    }
-
-    // Internal function to calculate pending reward
-    function _calculatePendingReward(
-        Position memory position
-    ) internal view returns (uint256) {
-        if (position.isUnstaked) return 0;
-        
-        uint256 currentTime = block.timestamp;
-        uint256 lockEndTime = position.stakedAt + position.lockPeriod;
-        
-        // Calculate time elapsed, capped at lock period
-        uint256 timeElapsed;
-        if (currentTime >= lockEndTime) {
-            timeElapsed = lockEndTime - position.lastRewardAt;
-            if (timeElapsed == 0) return 0;
-        } else {
-            timeElapsed = currentTime - position.lastRewardAt;
-            if (timeElapsed == 0) return 0;
+    /**
+     * @dev Sets whitelist status for a single user
+     * @param user User address
+     * @param status True to add to whitelist, false to remove
+     */
+    function setWhitelist(address user, bool status) external onlyAdmin {
+        if (whitelisted[user] != status) {
+            whitelisted[user] = status;
+            emit WhitelistStatusChanged(user, status);
         }
-
-        return StakingLib.calculateReward(
-            position.amount,
-            timeElapsed,
-            position.rewardRate,
-            position.lockPeriod
-        );
     }
 
-    // Calculate total pending rewards for all active positions
-    function calculateTotalPendingRewards() public view returns (uint256 total) {
-        for (uint256 i = 0; i < nextPositionId; i++) {
-            address owner = positionOwner[i];
-            if (owner != address(0)) {
-                Position[] memory positions = userPositions[owner];
-                for (uint256 j = 0; j < positions.length; j++) {
-                    if (!positions[j].isUnstaked) {
-                        total += _calculatePendingReward(positions[j]);
-                    }
-                }
+    /**
+     * @dev Updates whitelist status for multiple users
+     * @param users Array of user addresses
+     * @param status True to add to whitelist, false to remove
+     */
+    function updateWhitelistBatch(address[] calldata users, bool status) 
+        external 
+        onlyAdmin 
+    {
+        uint256 length = users.length;
+        require(length <= 100, "Batch too large");
+        
+        for (uint256 i = 0; i < length;) {
+            if (whitelisted[users[i]] != status) {
+                whitelisted[users[i]] = status;
+                emit WhitelistStatusChanged(users[i], status);
             }
+            unchecked { ++i; }
         }
-        return total;
     }
 
-    function withdrawExcessRewardPool(uint256 amount) external onlyAdmin {
-        uint256 excess = rewardPoolBalance - calculateTotalPendingRewards();     
-        require(amount <= excess, "Cannot withdraw required rewards"); //
-        rewardPoolBalance -= amount;
-        (bool success, ) = msg.sender.call{value: amount}("");
-        require(success, "Withdrawal failed");
-        emit RewardPoolUpdated(rewardPoolBalance);
+    function checkWhitelistBatch(address[] calldata users) 
+        external 
+        view 
+        returns (bool[] memory results) 
+    {
+        require(users.length <= 100, "Batch too large");
+        results = new bool[](users.length);
+        for (uint256 i = 0; i < users.length;) {
+            results[i] = whitelisted[users[i]];
+            unchecked { ++i; }
+        }
+        return results;
     }
 
     /**
@@ -730,18 +571,79 @@ contract Layer2StakingV2 is
         emit WhitelistModeChanged(oldMode, enabled);
     }
 
+    // ========== REWARD POOL FUNCTIONS ==========
+
+    // Add function to update reward pool balance
+    function updateRewardPool() external payable onlyAdmin {
+        rewardPoolBalance += msg.value;
+        emit RewardPoolUpdated(rewardPoolBalance);
+    }
+
+    // Add function to check reward pool sufficiency
+    function checkRewardPoolSufficiency() external view returns (bool, uint256) {
+        return (rewardPoolBalance >= totalPendingRewards, totalPendingRewards);
+    }
+
+    // Internal function to calculate pending reward
+    function _calculatePendingReward(
+        Position memory position
+    ) internal view returns (uint256) {
+        if (position.isUnstaked) return 0;
+        
+        uint256 timeElapsed = _calculateTimeElapsed(position);
+        if (timeElapsed == 0) return 0;
+
+        return StakingLib.calculateReward(
+            position.amount,
+            timeElapsed,
+            position.rewardRate,
+            LOCK_PERIOD
+        );
+    }
+
     /**
-     * @dev Returns the timestamp when a position was staked
-     * @param positionId The ID of the staking position
-     * @return The timestamp when the position was staked
+     * @dev Withdraws excess reward pool balance that is not reserved for pending rewards
+     * @param amount Amount to withdraw
      */
-    function getStakeTime(uint256 positionId) external view returns (uint256) {
-        Position[] memory positions = userPositions[msg.sender];
-        for (uint256 i = 0; i < positions.length; i++) {
-            if (positions[i].positionId == positionId) {
-                return positions[i].stakedAt;
-            }
-        }
-        revert PositionNotFound();
+    function withdrawExcessRewardPool(uint256 amount) external onlyAdmin {
+        require(rewardPoolBalance >= totalPendingRewards, "Insufficient reward pool");
+        uint256 excess = rewardPoolBalance - totalPendingRewards;
+        require(amount <= excess, "Cannot withdraw required rewards");
+        
+        rewardPoolBalance -= amount;
+        (bool success, ) = msg.sender.call{value: amount}("");
+        require(success, "Withdrawal failed");
+        emit RewardPoolUpdated(rewardPoolBalance);
+    }
+
+    // ========== INTERNAL FUNCTIONS ==========
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyAdmin {
+        require(
+            block.timestamp >= lastUpgradeTime + UPGRADE_COOLDOWN,
+            "Upgrade cooldown not expired"
+        );
+
+        require(newImplementation != address(0), "Invalid implementation");
+        
+        string memory newVersion = IStaking(newImplementation).version();
+        require(
+            keccak256(abi.encodePacked(newVersion)) != 
+            keccak256(abi.encodePacked(VERSION)),
+            "Same version"
+        );
+
+        lastUpgradeTime = block.timestamp;
+        emit ContractUpgraded(newVersion, newImplementation, block.timestamp);
+    }
+
+    /**
+     * @dev Receives ETH and automatically adds it to the reward pool
+     * This allows anyone to contribute to the reward pool
+     */
+    receive() external payable {
+        rewardPoolBalance += msg.value;
+        emit Received(msg.sender, msg.value);
+        emit RewardPoolUpdated(rewardPoolBalance);
     }
 } 
