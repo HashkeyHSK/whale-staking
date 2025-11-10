@@ -96,9 +96,9 @@ Error: Still locked
 
 **示例**：
 ```typescript
-const positions = await staking.getUserPositions(userAddress);
-const position = positions[0];
-const unlockTime = position.stakedAt + position.lockPeriod;
+// 注意: userPositions 是 mapping，需要遍历索引
+const position = await staking.userPositions(userAddress, 0);
+const unlockTime = position.stakedAt.add(await staking.LOCK_PERIOD());
 const currentTime = Math.floor(Date.now() / 1000);
 const timeRemaining = unlockTime - currentTime;
 
@@ -121,7 +121,7 @@ Error: Position not found
 - 质押位置不属于当前用户
 
 **解决方法**：
-- 查询用户的所有质押位置：`await staking.getUserPositions(userAddress)`
+- 查询用户的质押位置：`await staking.userPositions(userAddress, index)`（需遍历索引）
 - 确认 `positionId` 是否正确
 - 确认是否为位置所有者
 
@@ -238,20 +238,20 @@ Error: Only owner
 
 ---
 
-### 12. "Only admin" - 仅管理员可操作
+### 12. "OwnableUnauthorizedAccount" - 仅所有者可操作
 
 **错误信息**：
 ```
-Error: Only admin
+Error: OwnableUnauthorizedAccount
 ```
 
 **原因**：
-- 尝试执行只有 Admin 才能执行的操作
-- 当前账户不是 Admin
+- 尝试执行只有 Owner 才能执行的操作
+- 当前账户不是合约所有者
 
 **解决方法**：
-- 确认当前账户是否为 Admin
-- 使用 Admin 账户执行操作
+- 确认当前账户是否为 Owner（使用 `owner()` 函数查询）
+- 使用 Owner 账户执行操作
 
 ---
 
@@ -331,9 +331,18 @@ console.log(`白名单模式: ${whitelistMode ? '启用' : '关闭'}`);
 const emergencyMode = await staking.emergencyMode();
 console.log(`紧急模式: ${emergencyMode ? '启用' : '关闭'}`);
 
-// 查询用户质押位置
-const positions = await staking.getUserPositions(userAddress);
-console.log(`用户质押位置数: ${positions.length}`);
+// 查询用户质押位置（需要遍历索引）
+// 注意: userPositions 是 mapping，需要通过索引逐个查询
+let positionCount = 0;
+try {
+  while (true) {
+    await staking.userPositions(userAddress, positionCount);
+    positionCount++;
+  }
+} catch (e) {
+  // 当索引超出范围时会抛出异常
+}
+console.log(`用户质押位置数: ${positionCount}`);
 ```
 
 ### 使用脚本检查

@@ -268,9 +268,10 @@
 
 **A:** 通过合约函数查询。
 
-- 使用 `getUserPositions(address)` 查询所有质押位置
+- 使用 `userPositions(address, uint256)` 查询单个质押位置（需要遍历索引）
 - 使用 `pendingReward(positionId)` 查询待提取奖励
 - 可以通过前端界面或调用合约函数查询
+- **注意**: `userPositions` 是 public mapping，Solidity 自动生成 getter 函数
 
 ---
 

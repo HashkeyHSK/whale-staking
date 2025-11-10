@@ -19,7 +19,7 @@
 ### 1.2 技术栈
 
 - **Solidity**: ^0.8.27
-- **代理模式**: UUPS (Universal Upgradeable Proxy Standard)
+- **代理模式**: Transparent Proxy
 - **升级库**: OpenZeppelin Contracts ^5.1.0
 - **开发框架**: Hardhat ^2.22.17
 - **网络**: HashKey Layer2 (Testnet/Mainnet)
@@ -33,7 +33,9 @@ Layer2StakingV2 (主合约)
 ├── ReentrancyGuardUpgradeable (重入保护)
 ├── PausableUpgradeable (暂停功能)
 ├── OwnableUpgradeable (所有权管理)
-└── UUPSUpgradeable (可升级代理)
+```
+
+**说明**: 不再使用 UUPS，改为 Transparent Proxy 模式，由 ProxyAdmin 控制升级
 ```
 
 ---
@@ -187,8 +189,9 @@ npx hardhat run scripts/checkStakes.ts --network hashkeyTestnet \
 #### `pendingReward(uint256 positionId) view → uint256`
 查询待提取奖励。
 
-#### `getUserPositions(address user) view → Position[]`
-获取用户的所有质押位置。
+#### 查看用户质押位置
+通过 `userPositions(address user, uint256 index)` 查看单个位置。
+- **说明**: `userPositions` 是 public mapping，需要遍历索引获取所有位置。
 
 ### 4.2 管理员接口
 
@@ -309,9 +312,9 @@ npx hardhat run scripts/checkStakes.ts --network hashkeyTestnet \
 
 ### 7.2 访问控制
 
-- **Owner**: 合约所有者，可以升级合约
-- **Admin**: 管理员，可以修改配置（不能升级合约）
-- 支持两步转移管理员权限（`setPendingAdmin()` → `acceptAdmin()`）
+- **Owner**: 合约所有者，负责所有管理功能（包括升级、参数配置等）
+- 使用 OpenZeppelin 的 OwnableUpgradeable 标准实现
+- 支持所有权转移（`transferOwnership`）和放弃所有权（`renounceOwnership`）
 
 ### 7.3 紧急模式
 
@@ -356,8 +359,8 @@ npx hardhat run scripts/checkStakes.ts --network hashkeyTestnet \
 
 ### 8.4 代理升级
 
-- 使用 UUPS 代理模式
-- 升级需要 Owner 权限
+- 使用 Transparent Proxy 代理模式
+- 升级由 ProxyAdmin 合约控制
 - 升级前需要充分测试
 - 注意存储布局兼容性
 
@@ -420,7 +423,7 @@ npx hardhat run scripts/checkStakes.ts --network hashkeyTestnet \
 5. 监听 `Staked` 事件
 
 #### 提取奖励流程
-1. 查询用户质押位置（`getUserPositions()`）
+1. 查询用户质押位置（`userPositions(user, index)`，需遍历）
 2. 查询待提取奖励（`pendingReward()`）
 3. 调用 `claimReward(positionId)`
 4. 监听 `RewardClaimed` 事件
@@ -429,14 +432,14 @@ npx hardhat run scripts/checkStakes.ts --network hashkeyTestnet \
 1. 检查锁定期是否结束
 2. 查询用户质押位置
 3. 调用 `unstake(positionId)`
-4. 监听 `Unstaked` 事件
+4. 监听 `PositionUnstaked` 事件
 
 ### 10.2 显示数据
 
 - **总质押量**：`totalStaked()`
 - **奖励池余额**：`rewardPoolBalance()`
 - **剩余质押容量**：`maxTotalStake() - totalStaked()`
-- **用户质押位置**：`getUserPositions(user)`
+- **用户质押位置**：`userPositions(user, index)`（需遍历索引）
 - **待提取奖励**：`pendingReward(positionId)`
 
 ### 10.3 错误处理
@@ -497,7 +500,7 @@ npx hardhat run scripts/checkStakes.ts --network hashkeyTestnet \
 
 - [ ] 合约地址正确记录
 - [ ] 配置参数验证通过
-- [ ] 权限设置正确（Owner/Admin）
+- [ ] 权限设置正确（Owner）
 - [ ] 奖励池充值成功
 - [ ] 白名单用户添加成功（Premium Staking）
 - [ ] 测试质押/提取流程
