@@ -69,22 +69,20 @@ npx hardhat run scripts/add-rewards.ts --network hashkeyTestnet \
 ### 普通用户质押（普通 Staking）
 
 ```bash
-# 质押 2000 HSK，锁定期 365 天（8% APY）
+# 质押 2000 HSK（锁定期固定365天，8% APY）
 npx hardhat run scripts/stake.ts --network hashkeyTestnet \
   -- --contract $NORMAL_STAKING_ADDRESS \
-  --amount 2000 \
-  --period 365
+  --amount 2000
 ```
 
 ### 大户质押（Premium Staking）
 
 ```bash
-# 质押 600000 HSK，锁定期 365 天（16% APY）
+# 质押 600000 HSK（锁定期固定365天，16% APY）
 # 注意：需要先被添加到白名单
 npx hardhat run scripts/stake.ts --network hashkeyTestnet \
   -- --contract $PREMIUM_STAKING_ADDRESS \
-  --amount 600000 \
-  --period 365
+  --amount 600000
 ```
 
 ## 📊 查询和监控
@@ -121,8 +119,8 @@ npx hardhat run scripts/analyzeAPY.ts --network hashkeyTestnet \
 | 配置项 | 普通 Staking | Premium Staking |
 |--------|-------------|-----------|
 | 最小质押 | 1 HSK | 500,000 HSK |
-| 年化收益 | 8% | 16% |
-| 锁定期选项 | 365天 | 365天 |
+| 年化收益 | 8%（部署时配置） | 16%（部署时配置） |
+| 锁定期 | 365天（固定） | 365天（固定） |
 | 白名单 | 关闭 | 启用 |
 | 最大总质押 | 10,000,000 HSK（池子上限） | 20,000,000 HSK（池子上限） |
 
@@ -184,11 +182,11 @@ npx hardhat run scripts/checkWhitelist.ts --network hashkeyTestnet \
   -- --contract $PREMIUM_STAKING_ADDRESS --user 0xYourUserAddress
 ```
 
-### Q: 如何添加新的锁定期选项？
+### Q: 如何修改锁定期或收益率？
 
-锁定期选项在部署脚本中已配置，如需修改，需要：
-1. 确保新的锁定期未被现有质押使用
-2. 使用 `addLockOption` 函数添加（需要管理员权限）
+Layer2StakingV2 采用固定锁定期（365天）和固定收益率设计，部署后不支持修改。
+
+如需提供不同的锁定期或收益率配置，请部署新的合约实例。
 
 ## 📚 更多文档
 
