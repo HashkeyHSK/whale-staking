@@ -31,6 +31,7 @@ contract Layer2Staking is
     event Received(address indexed sender, uint256 amount);
     event WhitelistStatusChanged(address indexed user, bool status);
     event WhitelistBonusRateUpdated(uint256 oldRate, uint256 newRate);
+    event StakeStartTimeUpdated(uint256 oldStartTime, uint256 newStartTime);
     event StakeEndTimeUpdated(uint256 oldEndTime, uint256 newEndTime);
     event LockOptionUpdated(uint256 indexed index, uint256 newPeriod, uint256 newRate);
     event MinStakeAmountUpdated(uint256 oldAmount, uint256 newAmount);
@@ -132,6 +133,7 @@ contract Layer2Staking is
         whenNotEmergency  // Add emergency mode check
         returns (uint256) 
     {
+        require(block.timestamp >= stakeStartTime, "Staking has not started yet");
         require(block.timestamp < stakeEndTime, "Staking period has ended");
 
         // Add validation for lockPeriod
@@ -579,6 +581,12 @@ contract Layer2Staking is
         }
         
         return (total, current, remaining, progressPercentage);
+    }
+
+    function setStakeStartTime(uint256 newStartTime) external onlyAdmin {
+        uint256 oldStartTime = stakeStartTime;
+        stakeStartTime = newStartTime;
+        emit StakeStartTimeUpdated(oldStartTime, newStartTime);
     }
 
     function setStakeEndTime(uint256 newEndTime) external onlyAdmin {

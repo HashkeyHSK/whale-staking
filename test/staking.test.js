@@ -42,6 +42,10 @@ describe("Layer2Staking", function () {
     const lockPeriod = 30 * 24 * 60 * 60; // 30 days in seconds
     await stakingContract.addLockOption(lockPeriod, 1000);
     
+    // 设置质押开始时间为当前时间（立即开始）
+    const startTime = Math.floor(Date.now() / 1000);
+    await stakingContract.setStakeStartTime(startTime);
+    
     // 设置质押截止时间为未来的某个时间
     const futureTime = Math.floor(Date.now() / 1000) + (365 * 24 * 60 * 60); // 1年后
     await stakingContract.setStakeEndTime(futureTime);

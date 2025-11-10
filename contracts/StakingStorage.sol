@@ -45,6 +45,7 @@ abstract contract StakingStorage is Initializable {
     
     // Staking limits and timing
     uint256 public maxTotalStake;     // Maximum total stake allowed
+    uint256 public stakeStartTime;    // Start time for new stakes
     uint256 public stakeEndTime;      // Deadline for new stakes
     bool public onlyWhitelistCanStake;    // Whitelist-only mode flag
 
@@ -84,6 +85,7 @@ abstract contract StakingStorage is Initializable {
         maxTotalStake = 10_000 * 10**HSK_DECIMALS;
 
         // Initialize timing and access controls
+        stakeStartTime = 0;                  // Initial value 0, needs admin to set
         stakeEndTime = type(uint256).max;    // No initial end time
         onlyWhitelistCanStake = true;        // Start in whitelist-only mode
     }

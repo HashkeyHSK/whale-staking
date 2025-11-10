@@ -48,6 +48,8 @@ Layer2StakingV2 (主合约)
 | `lockPeriod` | 365 天 (31,536,000 秒) | `addLockOption(31536000, 800)` |
 | `rewardRate` | 8% (800 basis points) | `addLockOption(31536000, 800)` |
 | `maxTotalStake` | 10,000,000 HSK (1e25) | `setMaxTotalStake(10000000e18)` |
+| `stakeStartTime` | 部署后7天 | `setStakeStartTime(timestamp)` |
+| `stakeEndTime` | `type(uint256).max` | `setStakeEndTime(timestamp)` |
 | `onlyWhitelistCanStake` | `false` | `setWhitelistOnlyMode(false)` |
 
 ### 2.2 Premium Staking 配置
@@ -58,6 +60,8 @@ Layer2StakingV2 (主合约)
 | `lockPeriod` | 365 天 (31,536,000 秒) | `addLockOption(31536000, 1600)` |
 | `rewardRate` | 16% (1600 basis points) | `addLockOption(31536000, 1600)` |
 | `maxTotalStake` | 20,000,000 HSK (2e25) | `setMaxTotalStake(20000000e18)` |
+| `stakeStartTime` | 部署后7天 | `setStakeStartTime(timestamp)` |
+| `stakeEndTime` | `type(uint256).max` | `setStakeEndTime(timestamp)` |
 | `onlyWhitelistCanStake` | `true` | `setWhitelistOnlyMode(true)` |
 
 ### 2.3 关键数据结构

@@ -50,6 +50,14 @@ async function main() {
   // 配置普通 Staking 产品参数
   console.log("\n配置普通 Staking 产品参数...");
 
+  // 0. 设置质押开始时间
+  const stakingStartTime = Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60); // 7天后开始
+  console.log("\n设置质押开始时间...");
+  console.log(`开始时间: ${new Date(stakingStartTime * 1000).toISOString()}`);
+  const setStartTimeTx = await staking.setStakeStartTime(stakingStartTime);
+  await setStartTimeTx.wait();
+  console.log("✅ 质押开始时间设置完成");
+
   // 1. 配置锁定期选项（8% APY）
   // 注意：最新版本仅保留 365 天锁定期，以下步骤确保链上存在该配置
   console.log("\n配置锁定期选项（年化 8%）...");
@@ -89,11 +97,13 @@ async function main() {
   console.log("==========================================");
   const minStake = await staking.minStakeAmount();
   const maxStake = await staking.maxTotalStake();
+  const startTime = await staking.stakeStartTime();
   const whitelistMode = await staking.onlyWhitelistCanStake();
   const lockOptions = await staking.getLockOptions();
 
   console.log("最小质押金额:", ethers.formatEther(minStake), "HSK");
   console.log("最大总质押量:", ethers.formatEther(maxStake), "HSK");
+  console.log("质押开始时间:", new Date(Number(startTime) * 1000).toISOString());
   console.log("白名单模式:", whitelistMode ? "启用" : "关闭");
   console.log("\n锁定期选项:");
   for (let i = 0; i < lockOptions.length; i++) {

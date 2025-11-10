@@ -22,6 +22,7 @@
 - **多锁定期选项**：支持多个锁定期配置，每个锁定期对应不同的年化收益率
 - **可升级代理**：采用 UUPS (Universal Upgradeable Proxy Standard) 代理模式，支持合约升级
 - **白名单机制**：支持白名单模式，可限制只有白名单用户才能质押
+- **质押时间控制**：支持设置质押开始时间和结束时间，灵活控制质押时间窗口
 - **奖励池管理**：独立的奖励池系统，确保奖励分配的安全性
 - **历史记录**：保存历史锁定期配置，已存在的质押位置不受更新影响
 
@@ -106,6 +107,7 @@ npx hardhat test
 - **参数**: `lockPeriod` - 锁定期（秒）
 - **返回**: `positionId` - 质押位置 ID
 - **要求**: 
+  - 当前时间必须在质押时间窗口内（`stakeStartTime <= now < stakeEndTime`）
   - 如果启用白名单模式，必须是白名单用户
   - 不能是黑名单用户
   - 质押金额 >= 最小质押金额
@@ -161,8 +163,16 @@ npx hardhat test
 #### `setMaxTotalStake(uint256 newLimit)`
 设置最大总质押量
 
+#### `setStakeStartTime(uint256 newStartTime)`
+设置质押开始时间
+- **参数**: `newStartTime` - 质押开始时间戳（秒）
+- **说明**: 用户只能在 `stakeStartTime` 之后开始质押
+
 #### `setStakeEndTime(uint256 newEndTime)`
 设置质押截止时间
+- **参数**: `newEndTime` - 质押结束时间戳（秒）
+- **要求**: 必须是未来的时间
+- **说明**: 用户只能在 `stakeEndTime` 之前质押
 
 #### `updateRewardPool()`
 向奖励池充值
@@ -348,6 +358,16 @@ npx hardhat run scripts/deployDualTier.ts --network <network>
 
 #### 部署后配置
 
+**注意**：部署脚本会自动设置质押开始时间为部署后7天。如需调整，可以使用以下脚本：
+
+```bash
+# 设置质押开始时间
+npx hardhat run scripts/setStakeStartTime.ts --network <network> \
+  -- --contract <CONTRACT_ADDRESS> --timestamp <START_TIMESTAMP>
+```
+
+其他配置：
+
 1. **为 Premium Staking 添加白名单用户**（Premium Staking 启用了白名单模式）
    ```bash
    npx hardhat run scripts/addToWhitelist.ts --network <network> \
@@ -400,6 +420,7 @@ npx hardhat run scripts/upgrade.ts --network hashkeyTestnet
 | `checkStakes.ts` | 查询用户质押情况 |
 | `checkWhitelist.ts` | 检查白名单状态 |
 | `setMaxStake.ts` | 设置最大质押量 |
+| `setStakeStartTime.ts` | 设置质押开始时间 |
 | `setStakeEndTime.ts` | 设置质押截止时间 |
 | `add-rewards.ts` | 向奖励池充值 |
 
@@ -461,11 +482,12 @@ npx hardhat coverage
 
 ## ⚠️ 重要提醒
 
-1. **奖励计算限制**：奖励只计算到锁定期结束，多质押的时间不会增加奖励
-2. **白名单模式**：合约支持白名单模式，可在部署时配置。双层产品方案中，普通 Staking 关闭白名单（开放），Premium Staking 启用白名单（需审核）
-3. **最小质押金额**：合约默认最小质押金额为 100 HSK，但产品部署时可配置（普通 Staking 产品配置为 1 HSK）
-4. **最大质押量**：合约默认最大总质押量为 10,000 HSK，但产品部署时可配置（普通 Staking 产品配置为 10,000,000 HSK）
-5. **奖励池**：确保奖励池有足够资金，否则新质押可能失败
+1. **质押时间窗口**：合约支持设置质押开始时间和结束时间。部署脚本默认设置开始时间为部署后7天，结束时间无限制。管理员可以通过 `setStakeStartTime` 和 `setStakeEndTime` 函数调整
+2. **奖励计算限制**：奖励只计算到锁定期结束，多质押的时间不会增加奖励
+3. **白名单模式**：合约支持白名单模式，可在部署时配置。双层产品方案中，普通 Staking 关闭白名单（开放），Premium Staking 启用白名单（需审核）
+4. **最小质押金额**：合约默认最小质押金额为 100 HSK，但产品部署时可配置（普通 Staking 产品配置为 1 HSK）
+5. **最大质押量**：合约默认最大总质押量为 10,000 HSK，但产品部署时可配置（普通 Staking 产品配置为 10,000,000 HSK）
+6. **奖励池**：确保奖励池有足够资金，否则新质押可能失败
 
 ### 双层产品方案配置
 
