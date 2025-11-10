@@ -2,6 +2,7 @@
 pragma solidity ^0.8.27;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "./interfaces/IStake.sol";
 
 /**
@@ -10,7 +11,7 @@ import "./interfaces/IStake.sol";
  * This contract contains all state variables used in the staking system
  * and handles their initialization
  */
-abstract contract StakingStorage is Initializable {
+abstract contract StakingStorage is Initializable, OwnableUpgradeable {
     // Constants for calculations and configurations
     uint256 internal constant HSK_DECIMALS = 18;    // Decimal places for HSK token
     uint256 public constant LOCK_PERIOD = 365 days; // Fixed lock period
@@ -27,8 +28,6 @@ abstract contract StakingStorage is Initializable {
     // Emergency and admin controls
     bool public emergencyMode;    // Emergency stop mechanism
     mapping(uint256 => address) public positionOwner;    // Maps position IDs to owners
-    address public admin;         // Admin address
-    address public pendingAdmin;  // Pending admin for two-step transfer
     
     // Reward and stake tracking
     mapping(address => uint256) public userTotalStaked;    // Total staked per user
@@ -50,27 +49,25 @@ abstract contract StakingStorage is Initializable {
     // Gap for future storage variables (reserves 50 slots for upgrades)
     uint256[50] private __gap;
 
-    // Add event for admin changes
-    event AdminTransferInitiated(address indexed currentAdmin, address indexed pendingAdmin);
-    event AdminTransferCompleted(address indexed oldAdmin, address indexed newAdmin);
-
     // Add event for reward pool updates
     event RewardPoolUpdated(uint256 newBalance);
 
     /**
      * @dev Initializes the storage contract with basic settings
-     * @param _admin Address of the contract administrator
+     * @param _owner Address of the contract owner
      * @param _rewardRate Annual reward rate in basis points (800 for 8%, 1600 for 16%)
      */
     function __StakingStorage_init(
-        address _admin,
+        address _owner,
         uint256 _rewardRate
     ) internal onlyInitializing {
-        require(_admin != address(0), "StakingStorage: zero admin");
+        require(_owner != address(0), "StakingStorage: zero owner");
         require(_rewardRate > 0 && _rewardRate <= 10000, "Invalid reward rate");
         
+        // Initialize Ownable
+        __Ownable_init(_owner);
+        
         // Initialize basic parameters
-        admin = _admin;
         rewardRate = _rewardRate;           // Set fixed reward rate
         minStakeAmount = 100 * 10**HSK_DECIMALS;
         nextPositionId = 1;

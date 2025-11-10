@@ -33,11 +33,10 @@ contract Layer2StakingV2 is
     event StakeStartTimeUpdated(uint256 oldStartTime, uint256 newStartTime);
     event StakeEndTimeUpdated(uint256 oldEndTime, uint256 newEndTime);
     event MinStakeAmountUpdated(uint256 oldAmount, uint256 newAmount);
-    event EmergencyModeEnabled(address indexed admin, uint256 timestamp);
+    event EmergencyModeEnabled(address indexed operator, uint256 timestamp);
     event WhitelistModeChanged(bool oldMode, bool newMode);
 
     // Custom errors for better gas efficiency and clearer error messages
-    error OnlyAdmin();
     error InvalidAmount();
     error AlreadyUnstaked();
     error StillLocked();
@@ -45,12 +44,6 @@ contract Layer2StakingV2 is
     error PositionNotFound();
     error NotWhitelisted();
     error MaxTotalStakeExceeded();
-
-    // Access control modifiers
-    modifier onlyAdmin() {
-        if (msg.sender != admin) revert OnlyAdmin();
-        _;
-    }
 
     modifier validPosition(uint256 positionId) {
         if (positionOwner[positionId] != msg.sender) revert PositionNotFound();
@@ -70,11 +63,6 @@ contract Layer2StakingV2 is
         require(!emergencyMode, "Contract is in emergency mode");
         _;
     }
-
-    // Constants
-    uint256 private constant UPGRADE_COOLDOWN = 1 days; // Cooldown period between upgrades
-    uint256 public lastUpgradeTime;
-    string public constant VERSION = "2.0.0";
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -281,31 +269,27 @@ contract Layer2StakingV2 is
         return userPositions[user];
     }
 
-    function version() public pure override returns (string memory) {
-        return VERSION;
-    }
-
     // ========== ADMIN FUNCTIONS ==========
 
 
-    function setMinStakeAmount(uint256 newAmount) external onlyAdmin whenNotEmergency {
+    function setMinStakeAmount(uint256 newAmount) external onlyOwner whenNotEmergency {
         uint256 oldAmount = minStakeAmount;
         minStakeAmount = newAmount;
         emit MinStakeAmountUpdated(oldAmount, newAmount);
     }
 
-    function enableEmergencyMode() external onlyAdmin {
+    function enableEmergencyMode() external onlyOwner {
         emergencyMode = true;
         emit EmergencyModeEnabled(msg.sender, block.timestamp);
     }
 
-    function pause() external onlyAdmin {
+    function pause() external onlyOwner {
         _pause();
         emit StakingPaused(msg.sender, block.timestamp);
     }
 
 
-    function unpause() external onlyAdmin {
+    function unpause() external onlyOwner {
         _unpause();
         emit StakingUnpaused(msg.sender, block.timestamp);
     }
@@ -378,7 +362,7 @@ contract Layer2StakingV2 is
     }
 
 
-    function setMaxTotalStake(uint256 newLimit) external onlyAdmin {
+    function setMaxTotalStake(uint256 newLimit) external onlyOwner {
         require(newLimit > 0, "Limit must be positive");
         require(newLimit >= totalStaked, "New limit below current stake");
         require(newLimit <= type(uint128).max, "Limit too large");
@@ -388,7 +372,7 @@ contract Layer2StakingV2 is
         emit MaxTotalStakeUpdated(oldLimit, newLimit);
     }
 
-    function setStakeStartTime(uint256 newStartTime) external onlyAdmin {
+    function setStakeStartTime(uint256 newStartTime) external onlyOwner {
         require(newStartTime > 0, "Invalid start time");
         require(newStartTime < stakeEndTime, "Start time must be before end time");
         
@@ -397,7 +381,7 @@ contract Layer2StakingV2 is
         emit StakeStartTimeUpdated(oldStartTime, newStartTime);
     }
 
-    function setStakeEndTime(uint256 newEndTime) external onlyAdmin {
+    function setStakeEndTime(uint256 newEndTime) external onlyOwner {
         require(newEndTime > block.timestamp, "End time must be in future");
         require(newEndTime > stakeStartTime, "End time must be after start time");
         
@@ -406,43 +390,7 @@ contract Layer2StakingV2 is
         emit StakeEndTimeUpdated(oldEndTime, newEndTime);
     }
 
-    /**
-     * @dev Initiates the transfer of admin role to a new address
-     * @param newAdmin Address of the new admin
-     */
-    function transferAdmin(address newAdmin) external onlyAdmin {
-        require(newAdmin != address(0), "Invalid address");
-        require(newAdmin != admin, "Same as current admin");
-        pendingAdmin = newAdmin;
-        emit AdminTransferInitiated(admin, newAdmin);
-    }
-
-    /**
-     * @dev Completes the admin transfer process
-     * Only callable by the pending admin
-     */
-    function acceptAdmin() external {
-        require(msg.sender == pendingAdmin, "Caller is not pending admin");
-        address oldAdmin = admin;
-        admin = pendingAdmin;
-        pendingAdmin = address(0);
-        emit AdminTransferCompleted(oldAdmin, admin);
-    }
-
-    
     // ========== WHITELIST FUNCTIONS ==========
-
-    /**
-     * @dev Sets whitelist status for a single user
-     * @param user User address
-     * @param status True to add to whitelist, false to remove
-     */
-    function setWhitelist(address user, bool status) external onlyAdmin {
-        if (whitelisted[user] != status) {
-            whitelisted[user] = status;
-            emit WhitelistStatusChanged(user, status);
-        }
-    }
 
     /**
      * @dev Updates whitelist status for multiple users
@@ -451,7 +399,7 @@ contract Layer2StakingV2 is
      */
     function updateWhitelistBatch(address[] calldata users, bool status) 
         external 
-        onlyAdmin 
+        onlyOwner 
     {
         uint256 length = users.length;
         require(length <= 100, "Batch too large");
@@ -469,7 +417,7 @@ contract Layer2StakingV2 is
      * @dev Toggles whitelist-only mode
      * @param enabled True to enable whitelist-only mode, false to disable
      */
-    function setWhitelistOnlyMode(bool enabled) external onlyAdmin {
+    function setWhitelistOnlyMode(bool enabled) external onlyOwner {
         bool oldMode = onlyWhitelistCanStake;
         onlyWhitelistCanStake = enabled;
         emit WhitelistModeChanged(oldMode, enabled);
@@ -478,7 +426,7 @@ contract Layer2StakingV2 is
     // ========== REWARD POOL FUNCTIONS ==========
 
     // Add function to update reward pool balance
-    function updateRewardPool() external payable onlyAdmin {
+    function updateRewardPool() external payable onlyOwner {
         rewardPoolBalance += msg.value;
         emit RewardPoolUpdated(rewardPoolBalance);
     }
@@ -504,7 +452,7 @@ contract Layer2StakingV2 is
      * @dev Withdraws excess reward pool balance that is not reserved for pending rewards
      * @param amount Amount to withdraw
      */
-    function withdrawExcessRewardPool(uint256 amount) external onlyAdmin {
+    function withdrawExcessRewardPool(uint256 amount) external onlyOwner {
         require(rewardPoolBalance >= totalPendingRewards, "Insufficient reward pool");
         uint256 excess = rewardPoolBalance - totalPendingRewards;
         require(amount <= excess, "Cannot withdraw required rewards");
@@ -516,25 +464,6 @@ contract Layer2StakingV2 is
     }
 
     // ========== INTERNAL FUNCTIONS ==========
-
-    function _authorizeUpgrade(address newImplementation) internal override onlyAdmin {
-        require(
-            block.timestamp >= lastUpgradeTime + UPGRADE_COOLDOWN,
-            "Upgrade cooldown not expired"
-        );
-
-        require(newImplementation != address(0), "Invalid implementation");
-        
-        string memory newVersion = IStaking(newImplementation).version();
-        require(
-            keccak256(abi.encodePacked(newVersion)) != 
-            keccak256(abi.encodePacked(VERSION)),
-            "Same version"
-        );
-
-        lastUpgradeTime = block.timestamp;
-        emit ContractUpgraded(newVersion, newImplementation, block.timestamp);
-    }
 
     /**
      * @dev Receives ETH and automatically adds it to the reward pool

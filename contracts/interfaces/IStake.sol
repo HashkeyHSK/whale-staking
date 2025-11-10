@@ -57,8 +57,6 @@ interface IStaking {
      */
     function getUserPositions(address user) external view returns (Position[] memory);
 
-    function version() external pure returns (string memory);
-
     event PositionCreated(
         address indexed user,
         uint256 indexed positionId,
