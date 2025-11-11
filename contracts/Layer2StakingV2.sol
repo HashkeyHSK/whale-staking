@@ -284,7 +284,6 @@ contract Layer2StakingV2 is
     function setMaxTotalStake(uint256 newLimit) external onlyOwner {
         require(newLimit > 0, "Limit must be positive");
         require(newLimit >= totalStaked, "New limit below current stake");
-        require(newLimit <= type(uint128).max, "Limit too large");
         
         uint256 oldLimit = maxTotalStake;
         maxTotalStake = newLimit;

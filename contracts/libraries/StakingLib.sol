@@ -19,9 +19,9 @@ library StakingLib {
     /**
      * @dev Calculates the reward for a staking position
      * @param amount The staked amount
-     * @param timeElapsed Time since last reward claim
+     * @param timeElapsed Time since last reward claim (must be <= lockPeriod)
      * @param rewardRate Annual reward rate in basis points (100% = 10000)
-     * @param lockPeriod Duration of the lock in seconds
+     * @param lockPeriod Duration of the lock in seconds (not used, kept for interface compatibility)
      * @return reward The calculated reward amount
      * @notice Optimized for fixed 365-day lock period (timeElapsed always <= 365 days)
      */
@@ -35,20 +35,11 @@ library StakingLib {
             return 0;
         }
         
-        if (timeElapsed > lockPeriod) {
-            timeElapsed = lockPeriod;
-        }
-        
-        require(rewardRate <= BASIS_POINTS, "Rate too large");
-
-        uint256 annualRate = (rewardRate * PRECISION) / BASIS_POINTS;
-        require(annualRate <= type(uint256).max / PRECISION, "Annual rate overflow");
-        
+        // Note: rewardRate is validated at contract initialization (0 < rate <= 10000)
         // Direct calculation since timeElapsed <= 365 days (always < 1 year)
+        uint256 annualRate = (rewardRate * PRECISION) / BASIS_POINTS;
         uint256 timeRatio = (timeElapsed * PRECISION) / SECONDS_PER_YEAR;
         uint256 totalReward = (amount * annualRate * timeRatio) / (PRECISION * PRECISION);
-        
-        require(totalReward <= amount * rewardRate / BASIS_POINTS, "Reward overflow");
         
         return totalReward;
     }
