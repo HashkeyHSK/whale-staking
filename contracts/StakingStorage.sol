@@ -42,19 +42,22 @@ abstract contract StakingStorage is Initializable, OwnableUpgradeable {
     /**
      * @dev Initializes the storage contract with basic settings
      * @param _owner Address of the contract owner
+     * @param _minStakeAmount Minimum stake amount (in wei)
      * @param _rewardRate Annual reward rate in basis points (800 for 8%, 1600 for 16%)
      */
     function __StakingStorage_init(
         address _owner,
+        uint256 _minStakeAmount,
         uint256 _rewardRate
     ) internal onlyInitializing {
         require(_owner != address(0), "StakingStorage: zero owner");
+        require(_minStakeAmount > 0, "Invalid min stake amount");
         require(_rewardRate > 0 && _rewardRate <= 10000, "Invalid reward rate");
         
         __Ownable_init(_owner);
         
+        minStakeAmount = _minStakeAmount;
         rewardRate = _rewardRate;
-        minStakeAmount = 100 * 10**HSK_DECIMALS;
         nextPositionId = 1;
 
         stakeStartTime = type(uint256).max;

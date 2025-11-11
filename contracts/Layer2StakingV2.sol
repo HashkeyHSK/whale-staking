@@ -27,9 +27,7 @@ contract Layer2StakingV2 is
 {
     event Received(address indexed sender, uint256 amount);
     event WhitelistStatusChanged(address indexed user, bool status);
-    event StakeStartTimeUpdated(uint256 oldStartTime, uint256 newStartTime);
     event StakeEndTimeUpdated(uint256 oldEndTime, uint256 newEndTime);
-    event MinStakeAmountUpdated(uint256 oldAmount, uint256 newAmount);
     event EmergencyModeEnabled(address indexed operator, uint256 timestamp);
     event WhitelistModeChanged(bool oldMode, bool newMode);
 
@@ -66,15 +64,24 @@ contract Layer2StakingV2 is
      * Sets up initial staking parameters and enables whitelist-only mode
      * @param _minStakeAmount Minimum stake amount (in wei)
      * @param _rewardRate Annual reward rate in basis points (800 for 8%, 1600 for 16%)
+     * @param _stakeStartTime Timestamp when staking begins
+     * @param _stakeEndTime Timestamp when staking ends
      */
-    function initialize(uint256 _minStakeAmount, uint256 _rewardRate) external initializer {
+    function initialize(
+        uint256 _minStakeAmount,
+        uint256 _rewardRate,
+        uint256 _stakeStartTime,
+        uint256 _stakeEndTime
+    ) external initializer {
+        require(_stakeStartTime > 0, "Invalid start time");
+        require(_stakeEndTime > _stakeStartTime, "End time must be after start time");
+        
         __ReentrancyGuard_init();
         __Pausable_init();
-        __StakingStorage_init(msg.sender, _rewardRate);
+        __StakingStorage_init(msg.sender, _minStakeAmount, _rewardRate);
         
-        if (_minStakeAmount > 0) {
-            minStakeAmount = _minStakeAmount;
-        }
+        stakeStartTime = _stakeStartTime;
+        stakeEndTime = _stakeEndTime;
     }
 
     /**
@@ -195,24 +202,18 @@ contract Layer2StakingV2 is
         return _calculatePendingReward(position);
     }
 
-    function setMinStakeAmount(uint256 newAmount) external onlyOwner whenNotEmergency {
-        uint256 oldAmount = minStakeAmount;
-        minStakeAmount = newAmount;
-        emit MinStakeAmountUpdated(oldAmount, newAmount);
-    }
-
     function enableEmergencyMode() external onlyOwner {
         emergencyMode = true;
         emit EmergencyModeEnabled(msg.sender, block.timestamp);
     }
 
-    function pause() external onlyOwner {
+    function pause() external override onlyOwner {
         _pause();
         emit StakingPaused(msg.sender, block.timestamp);
     }
 
 
-    function unpause() external onlyOwner {
+    function unpause() external override onlyOwner {
         _unpause();
         emit StakingUnpaused(msg.sender, block.timestamp);
     }
@@ -273,15 +274,6 @@ contract Layer2StakingV2 is
         position.lastRewardAt = currentTime > lockEndTime ? lockEndTime : currentTime;
     }
 
-
-    function setStakeStartTime(uint256 newStartTime) external onlyOwner {
-        require(newStartTime > 0, "Invalid start time");
-        require(newStartTime < stakeEndTime, "Start time must be before end time");
-        
-        uint256 oldStartTime = stakeStartTime;
-        stakeStartTime = newStartTime;
-        emit StakeStartTimeUpdated(oldStartTime, newStartTime);
-    }
 
     function setStakeEndTime(uint256 newEndTime) external onlyOwner {
         require(newEndTime > block.timestamp, "End time must be in future");
