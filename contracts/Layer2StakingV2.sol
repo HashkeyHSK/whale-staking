@@ -134,7 +134,6 @@ contract Layer2StakingV2 is
             amount: amount,
             stakedAt: block.timestamp,
             lastRewardAt: block.timestamp,
-            rewardRate: rewardRate,
             isUnstaked: false
         });
         
@@ -234,7 +233,7 @@ contract Layer2StakingV2 is
         uint256 reservedReward = StakingLib.calculateReward(
             position.amount,
             LOCK_PERIOD,
-            position.rewardRate
+            rewardRate
         );
         require(totalPendingRewards >= reservedReward, "Pending rewards accounting error");
         totalPendingRewards -= reservedReward;
@@ -262,7 +261,7 @@ contract Layer2StakingV2 is
         reward = StakingLib.calculateReward(
             position.amount, 
             timeElapsed, 
-            position.rewardRate
+            rewardRate
         );
         
         if (reward > 0) {
@@ -353,7 +352,7 @@ contract Layer2StakingV2 is
         return StakingLib.calculateReward(
             position.amount,
             timeElapsed,
-            position.rewardRate
+            rewardRate
         );
     }
 

@@ -12,17 +12,7 @@ interface IStaking {
         uint256 amount;          // Staked amount
         uint256 stakedAt;        // Timestamp when staked
         uint256 lastRewardAt;    // Last reward claim timestamp
-        uint256 rewardRate;      // Reward rate in basis points
         bool isUnstaked;         // Whether position is unstaked
-    }
-
-    /**
-     * @dev Lock option structure (deprecated - kept for backward compatibility)
-     * @notice This structure is no longer used in V2 (fixed 365-day period)
-     */
-    struct LockOption {
-        uint256 period;          // Lock period
-        uint256 rewardRate;      // Annual reward rate in basis points
     }
 
     /**
