@@ -23,11 +23,13 @@ Error: Insufficient stake amount
 **示例**：
 ```typescript
 // ❌ 错误：质押金额不足
-await staking.stake(365 * 24 * 60 * 60, { value: ethers.parseEther("0.5") });
+await staking.stake({ value: ethers.parseEther("0.5") });
 
 // ✅ 正确：满足最小质押金额
-await staking.stake(365 * 24 * 60 * 60, { value: ethers.parseEther("1") });
+await staking.stake({ value: ethers.parseEther("1") });
 ```
+
+**说明**: V2版本使用固定365天锁定期，stake() 函数无需传入 lockPeriod 参数。
 
 ---
 
@@ -87,25 +89,29 @@ Error: Still locked
 
 **原因**：
 - 尝试在锁定期结束前解除质押
-- 当前时间 < 解锁时间 - 15分钟
+- 当前时间 < 解锁时间（质押时间 + 365天）
 
 **解决方法**：
 - 查询质押位置信息，确认解锁时间
-- 等待锁定期结束（或提前15分钟）
+- 等待锁定期结束（365天）
 - 锁定期内只能提取奖励，不能解除质押
 
 **示例**：
 ```typescript
 // 注意: userPositions 是 mapping，需要遍历索引
-const position = await staking.userPositions(userAddress, 0);
-const unlockTime = position.stakedAt.add(await staking.LOCK_PERIOD());
+const position = await staking.positions(positionId);
+const LOCK_PERIOD = 365 * 24 * 60 * 60; // 365天
+const unlockTime = position.stakedAt + LOCK_PERIOD;
 const currentTime = Math.floor(Date.now() / 1000);
 const timeRemaining = unlockTime - currentTime;
 
-if (timeRemaining > 900) { // 15分钟 = 900秒
+if (timeRemaining > 0) {
   console.log(`还需等待 ${timeRemaining} 秒才能解除质押`);
+  console.log(`预计解锁时间: ${new Date(unlockTime * 1000).toLocaleString()}`);
 }
 ```
+
+**说明**: V2版本严格执行365天锁定期，无提前解锁机制。
 
 ---
 
@@ -179,49 +185,7 @@ Error: Blacklisted
 
 ## 管理员操作错误
 
-### 9. "Invalid period" - 无效的锁定期
-
-**错误信息**：
-```
-Error: Invalid period
-```
-
-**原因**：
-- 锁定期不在允许范围内（1天 - 730天）
-- 锁定期格式错误
-
-**解决方法**：
-- 确保锁定期在 86400 秒（1天）到 63072000 秒（730天）之间
-- 使用正确的秒数格式
-
-**示例**：
-```typescript
-// ❌ 错误：锁定期太短
-await staking.addLockOption(3600, 800); // 1小时，无效
-
-// ✅ 正确：锁定期在有效范围内
-await staking.addLockOption(365 * 24 * 60 * 60, 800); // 365天
-```
-
----
-
-### 10. "Lock option already exists" - 锁定期选项已存在
-
-**错误信息**：
-```
-Error: Lock option already exists
-```
-
-**原因**：
-- 尝试添加已存在的锁定期选项
-
-**解决方法**：
-- 查询现有锁定期选项：`await staking.getLockOptions()`
-- 使用不同的锁定期，或使用 `updateLockOption()` 更新现有选项
-
----
-
-### 11. "Only owner" - 仅所有者可操作
+### 9. "Only owner" - 仅所有者可操作
 
 **错误信息**：
 ```
@@ -238,7 +202,7 @@ Error: Only owner
 
 ---
 
-### 12. "OwnableUnauthorizedAccount" - 仅所有者可操作
+### 10. "OwnableUnauthorizedAccount" - 仅所有者可操作
 
 **错误信息**：
 ```
@@ -257,7 +221,7 @@ Error: OwnableUnauthorizedAccount
 
 ## 紧急模式相关
 
-### 13. "Emergency mode not enabled" - 紧急模式未启用
+### 11. "Emergency mode not enabled" - 紧急模式未启用
 
 **错误信息**：
 ```
@@ -275,7 +239,7 @@ Error: Emergency mode not enabled
 
 ## 通用错误处理
 
-### 14. "Transfer failed" - 转账失败
+### 12. "Transfer failed" - 转账失败
 
 **错误信息**：
 ```
@@ -293,7 +257,7 @@ Error: Transfer failed
 
 ---
 
-### 15. "Contract paused" - 合约已暂停
+### 13. "Contract paused" - 合约已暂停
 
 **错误信息**：
 ```
@@ -355,11 +319,9 @@ npx hardhat run scripts/checkStakes.ts --network <network> \
 # 检查白名单状态
 npx hardhat run scripts/checkWhitelist.ts --network <network> \
   -- --contract <CONTRACT_ADDRESS> --user <USER_ADDRESS>
-
-# 检查锁定期选项
-npx hardhat run scripts/checkLockPeriods.ts --network <network> \
-  -- --contract <CONTRACT_ADDRESS>
 ```
+
+**说明**: V2版本使用固定365天锁定期，无需检查锁定期选项。
 
 ---
 

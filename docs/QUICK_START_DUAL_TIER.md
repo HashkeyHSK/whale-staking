@@ -25,7 +25,7 @@ npx hardhat run scripts/deployDualTier.ts --network hashkeyTestnet
 npx hardhat run scripts/deployNormalStaking.ts --network hashkeyTestnet
 
 # 部署 Premium Staking
-npx hardhat run scripts/deployReStaking.ts --network hashkeyTestnet
+npx hardhat run scripts/deployPremiumStaking.ts --network hashkeyTestnet
 ```
 
 部署后会输出两个合约地址，请保存：
@@ -87,18 +87,6 @@ npx hardhat run scripts/stake.ts --network hashkeyTestnet \
 
 ## 📊 查询和监控
 
-### 查看锁定期选项
-
-```bash
-# 普通 Staking
-npx hardhat run scripts/checkLockPeriods.ts --network hashkeyTestnet \
-  -- --contract $NORMAL_STAKING_ADDRESS
-
-# Premium Staking
-npx hardhat run scripts/checkLockPeriods.ts --network hashkeyTestnet \
-  -- --contract $PREMIUM_STAKING_ADDRESS
-```
-
 ### 查询用户质押情况
 
 ```bash
@@ -107,12 +95,15 @@ npx hardhat run scripts/checkStakes.ts --network hashkeyTestnet \
   --user 0xYourUserAddress
 ```
 
-### 分析 APY
+### 查询合约配置
 
 ```bash
-npx hardhat run scripts/analyzeAPY.ts --network hashkeyTestnet \
+# 查看合约状态和配置
+npx hardhat run scripts/checkStakes.ts --network hashkeyTestnet \
   -- --contract $NORMAL_STAKING_ADDRESS
 ```
+
+**说明**: V2版本使用固定365天锁定期，无需查询锁定期选项。
 
 ## ⚙️ 产品配置对比
 
@@ -172,8 +163,10 @@ A: 修改脚本中的合约地址，或使用命令行参数传入：
 
 ```bash
 npx hardhat run scripts/stake.ts --network hashkeyTestnet \
-  -- --contract <NEW_CONTRACT_ADDRESS> --amount 1000 --period 180
+  -- --contract <NEW_CONTRACT_ADDRESS> --amount 1000
 ```
+
+**说明**: V2版本使用固定365天锁定期，无需指定 period 参数。
 
 ### Q: 如何检查白名单状态？
 

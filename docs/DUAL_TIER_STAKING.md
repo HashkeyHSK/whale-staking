@@ -29,7 +29,7 @@ npx hardhat run scripts/deployNormalStaking.ts --network <network>
 
 #### 部署 Premium Staking
 ```bash
-npx hardhat run scripts/deployReStaking.ts --network <network>
+npx hardhat run scripts/deployPremiumStaking.ts --network <network>
 ```
 
 ### 方式二：一次性部署两个产品
@@ -72,12 +72,12 @@ npx hardhat run scripts/add-rewards.ts --network <network> \
 部署完成后，可以验证两个产品的配置：
 
 ```bash
-# 检查普通 Staking 的锁定期选项
-npx hardhat run scripts/checkLockPeriods.ts --network <network> \
+# 检查普通 Staking 的配置参数
+npx hardhat run scripts/checkStakes.ts --network <network> \
   -- --contract <NORMAL_STAKING_ADDRESS>
 
-# 检查 Premium Staking 的锁定期选项
-npx hardhat run scripts/checkLockPeriods.ts --network <network> \
+# 检查 Premium Staking 的配置参数
+npx hardhat run scripts/checkStakes.ts --network <network> \
   -- --contract <PREMIUM_STAKING_ADDRESS>
 ```
 
@@ -86,20 +86,24 @@ npx hardhat run scripts/checkLockPeriods.ts --network <network> \
 ### 普通用户质押（普通 Staking）
 
 ```bash
-# 使用 stake.ts 脚本（锁定期固定365天，无需指定）
+# 使用 stake.ts 脚本（锁定期固定365天）
 npx hardhat run scripts/stake.ts --network <network> \
   -- --contract <NORMAL_STAKING_ADDRESS> \
   --amount 2000
 ```
 
+**说明**: V2版本使用固定365天锁定期，无需指定锁定期参数。
+
 ### 大户质押（Premium Staking）
 
 ```bash
-# 使用 stake.ts 脚本（锁定期固定365天，无需指定）
+# 使用 stake.ts 脚本（锁定期固定365天）
 npx hardhat run scripts/stake.ts --network <network> \
   -- --contract <PREMIUM_STAKING_ADDRESS> \
   --amount 600000
 ```
+
+**说明**: V2版本使用固定365天锁定期，无需指定锁定期参数。需要先被添加到白名单才能质押。
 
 ## 🔧 管理员操作
 
@@ -170,18 +174,12 @@ npx hardhat run scripts/checkStakes.ts --network <network> \
   -- --contract <CONTRACT_ADDRESS> --user <USER_ADDRESS>
 ```
 
-### 分析 APY
+### 查询合约状态
 
 ```bash
-npx hardhat run scripts/analyzeAPY.ts --network <network> \
-  -- --contract <CONTRACT_ADDRESS>
-```
-
-### 分析质押情况
-
-```bash
-npx hardhat run scripts/analyzeStaking.ts --network <network> \
-  -- --contract <CONTRACT_ADDRESS>
+# 查询用户质押信息和合约状态
+npx hardhat run scripts/checkStakes.ts --network <network> \
+  -- --contract <CONTRACT_ADDRESS> --user <USER_ADDRESS>
 ```
 
 ## 📚 相关文档

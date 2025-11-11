@@ -156,9 +156,10 @@
 
 **A:** Layer2StakingV2 采用固定365天锁定期。
 
-- 普通 Staking：365 天（固定）
-- Premium Staking：365 天（固定）
+- 普通 Staking：365 天（固定，约 31,536,000 秒）
+- Premium Staking：365 天（固定，约 31,536,000 秒）
 - V2 版本简化了锁定期选择，所有质押统一为365天
+- 锁定期是合约中的常量 `LOCK_PERIOD`，部署后不可修改
 
 ---
 
@@ -268,10 +269,11 @@
 
 **A:** 通过合约函数查询。
 
-- 使用 `userPositions(address, uint256)` 查询单个质押位置（需要遍历索引）
+- 使用 `userPositions(address, uint256)` 查询用户的第N个质押位置ID（需要遍历索引）
+- 使用 `positions(positionId)` 查询指定位置的详细信息
 - 使用 `pendingReward(positionId)` 查询待提取奖励
 - 可以通过前端界面或调用合约函数查询
-- **注意**: `userPositions` 是 public mapping，Solidity 自动生成 getter 函数
+- **注意**: `userPositions` 是 public mapping，返回 positionId，需要再通过 `positions` 查询详情
 
 ---
 

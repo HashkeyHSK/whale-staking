@@ -103,15 +103,16 @@ npx hardhat test
 
 ### 用户功能
 
-#### `stake()`
+#### `stake() payable`
 创建新的质押位置（固定365天锁定期）
-- **参数**: 无需参数，锁定期固定为365天
+- **参数**: 无参数，通过 `msg.value` 发送质押金额，锁定期固定为365天
 - **返回**: `positionId` - 质押位置 ID
 - **要求**: 
   - 当前时间必须在质押时间窗口内（`stakeStartTime <= now < stakeEndTime`）
   - 如果启用白名单模式，必须是白名单用户
   - 质押金额 >= 最小质押金额
   - 总质押量不能超过最大限制
+  - 奖励池余额充足
 
 #### `unstake(uint256 positionId)`
 解除质押并提取本金和奖励
@@ -334,7 +335,7 @@ npx hardhat run scripts/deploy.ts --network hashkeyMainnet
 npx hardhat run scripts/deployNormalStaking.ts --network <network>
 
 # 部署 Premium Staking
-npx hardhat run scripts/deployReStaking.ts --network <network>
+npx hardhat run scripts/deployPremiumStaking.ts --network <network>
 ```
 
 **方式二：一次性部署两个产品**
@@ -398,7 +399,7 @@ npx hardhat run scripts/upgrade.ts --network hashkeyTestnet
 |------|------|
 | `deploy.ts` | 部署合约（标准部署） |
 | `deployNormalStaking.ts` | 部署普通 Staking 产品 |
-| `deployReStaking.ts` | 部署 Premium Staking 产品 |
+| `deployPremiumStaking.ts` | 部署 Premium Staking 产品 |
 | `deployDualTier.ts` | 一次性部署双层产品方案 |
 | `stake.ts` | 执行质押 |
 | `upgrade.ts` | 升级合约 |
