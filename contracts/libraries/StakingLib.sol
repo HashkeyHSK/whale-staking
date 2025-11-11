@@ -14,11 +14,11 @@ library StakingLib {
 
     uint256 private constant SECONDS_PER_YEAR = 365 days;
     uint256 private constant BASIS_POINTS = 10000; // 100% = 10000
+    uint256 private constant PRECISION = 1e18;
     
     function calculateYearlyReward(
         uint256 amount,
-        uint256 annualRate,
-        uint256 PRECISION
+        uint256 annualRate
     ) private pure returns (uint256) {
         return (amount * annualRate) / PRECISION;
     }
@@ -26,8 +26,7 @@ library StakingLib {
     function calculateRemainingTimeReward(
         uint256 amount,
         uint256 annualRate,
-        uint256 remainingTime,
-        uint256 PRECISION
+        uint256 remainingTime
     ) private pure returns (uint256) {
         uint256 timeRatio = (remainingTime * PRECISION) / SECONDS_PER_YEAR;
         return (amount * annualRate * timeRatio) / (PRECISION * PRECISION);
@@ -55,9 +54,6 @@ library StakingLib {
             timeElapsed = lockPeriod;
         }
         
-        uint256 PRECISION = 1e18;
-        
-        require(amount <= type(uint256).max / PRECISION, "Amount too large");
         require(rewardRate <= BASIS_POINTS, "Rate too large");
 
         uint256 annualRate = (rewardRate * PRECISION) / BASIS_POINTS;
@@ -66,14 +62,13 @@ library StakingLib {
         uint256 completeYears = timeElapsed / SECONDS_PER_YEAR;
         uint256 remainingTime = timeElapsed % SECONDS_PER_YEAR;
         
-        uint256 totalReward = calculateYearlyReward(amount, annualRate, PRECISION) * completeYears;
+        uint256 totalReward = calculateYearlyReward(amount, annualRate) * completeYears;
         
         if (remainingTime > 0) {
             totalReward += calculateRemainingTimeReward(
                 amount,
                 annualRate,
-                remainingTime,
-                PRECISION
+                remainingTime
             );
         }
         

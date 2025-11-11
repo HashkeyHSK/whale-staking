@@ -20,12 +20,11 @@ abstract contract StakingStorage is Initializable, OwnableUpgradeable {
     uint256 public nextPositionId;
     uint256 public rewardRate;
     
-    mapping(address => IStaking.Position[]) public userPositions;
+    mapping(uint256 => IStaking.Position) public positions;
+    mapping(address => uint256[]) public userPositions;
     
     bool public emergencyMode;
-    mapping(uint256 => address) public positionOwner;
     
-    mapping(address => uint256) public userTotalStaked;
     uint256 public totalPendingRewards;
     uint256 public rewardPoolBalance;
     
@@ -35,8 +34,6 @@ abstract contract StakingStorage is Initializable, OwnableUpgradeable {
     uint256 public stakeStartTime;
     uint256 public stakeEndTime;
     bool public onlyWhitelistCanStake;
-    
-    mapping(uint256 => uint256) internal positionIndexMap;
     
     // Gap for future storage variables (reserves 50 slots for upgrades)
     uint256[50] private __gap;

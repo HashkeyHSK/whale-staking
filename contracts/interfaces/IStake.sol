@@ -8,6 +8,7 @@ interface IStaking {
      */
     struct Position {
         uint256 positionId;      // Position ID
+        address owner;           // Position owner
         uint256 amount;          // Staked amount
         uint256 stakedAt;        // Timestamp when staked
         uint256 lastRewardAt;    // Last reward claim timestamp

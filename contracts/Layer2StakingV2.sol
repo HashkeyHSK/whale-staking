@@ -41,7 +41,7 @@ contract Layer2StakingV2 is
     error MaxTotalStakeExceeded();
 
     modifier validPosition(uint256 positionId) {
-        if (positionOwner[positionId] != msg.sender) revert PositionNotFound();
+        if (positions[positionId].owner != msg.sender) revert PositionNotFound();
         _;
     }
 
@@ -76,28 +76,6 @@ contract Layer2StakingV2 is
         if (_minStakeAmount > 0) {
             minStakeAmount = _minStakeAmount;
         }
-    }
-
-    /**
-     * @dev Finds the position index for a given position ID
-     * Uses positionIndexMap for O(1) lookup efficiency
-     * @param user User address
-     * @param positionId Position ID to find
-     * @return posIndex Index of the position in the user's positions array
-     */
-    function _findPosition(address user, uint256 positionId) 
-        internal 
-        view 
-        returns (uint256 posIndex) 
-    {
-        posIndex = positionIndexMap[positionId];
-        
-        Position[] storage positions = userPositions[user];
-        if (posIndex >= positions.length || positions[posIndex].positionId != positionId) {
-        revert PositionNotFound();
-        }
-        
-        return posIndex;
     }
 
     /**
@@ -150,21 +128,18 @@ contract Layer2StakingV2 is
         totalPendingRewards += potentialReward;
 
         uint256 positionId = nextPositionId++;
-        Position memory newPosition = Position({
+        
+        positions[positionId] = Position({
             positionId: positionId,
+            owner: msg.sender,
             amount: amount,
             stakedAt: block.timestamp,
             lastRewardAt: block.timestamp,
             rewardRate: rewardRate,
             isUnstaked: false
         });
-
-        uint256 positionIndex = userPositions[msg.sender].length;
-        userPositions[msg.sender].push(newPosition);
         
-        positionIndexMap[positionId] = positionIndex;
-        positionOwner[positionId] = msg.sender;
-        userTotalStaked[msg.sender] += amount;
+        userPositions[msg.sender].push(positionId);
         totalStaked += amount;
 
         emit PositionCreated(
@@ -181,18 +156,16 @@ contract Layer2StakingV2 is
     function unstake(
         uint256 positionId
     ) external override nonReentrant validPosition(positionId) {
-        uint256 posIndex = _findPosition(msg.sender, positionId);
-        Position storage position = userPositions[msg.sender][posIndex];
+        Position storage position = positions[positionId];
         
         if (position.isUnstaked) revert AlreadyUnstaked();
         if (block.timestamp < position.stakedAt + LOCK_PERIOD) revert StillLocked();
 
-        uint256 reward = _updateReward(msg.sender, posIndex);
+        uint256 reward = _updateReward(positionId);
         uint256 amount = position.amount;
         uint256 totalPayout = amount + reward;
 
         position.isUnstaked = true;
-        userTotalStaked[msg.sender] -= amount;
         totalStaked -= amount;
 
         emit RewardClaimed(msg.sender, positionId, reward, block.timestamp);
@@ -205,8 +178,7 @@ contract Layer2StakingV2 is
     function claimReward(
         uint256 positionId
     ) external override nonReentrant whenNotPaused whenNotEmergency validPosition(positionId) returns (uint256) {
-        uint256 posIndex = _findPosition(msg.sender, positionId);
-        uint256 reward = _updateReward(msg.sender, posIndex);
+        uint256 reward = _updateReward(positionId);
         
         if (reward == 0) revert NoReward();
 
@@ -222,16 +194,10 @@ contract Layer2StakingV2 is
     ) external view override returns (uint256) {
         if (emergencyMode) return 0;
         
-        if (positionOwner[positionId] != msg.sender) return 0;
+        Position memory position = positions[positionId];
+        if (position.owner != msg.sender) return 0;
         
-        uint256 posIndex = positionIndexMap[positionId];
-        Position[] memory positions = userPositions[msg.sender];
-        
-        if (posIndex >= positions.length || positions[posIndex].positionId != positionId) {
-            return 0;
-        }
-        
-        return _calculatePendingReward(positions[posIndex]);
+        return _calculatePendingReward(position);
     }
 
     function setMinStakeAmount(uint256 newAmount) external onlyOwner whenNotEmergency {
@@ -259,11 +225,9 @@ contract Layer2StakingV2 is
 
     function emergencyWithdraw(uint256 positionId) external nonReentrant {
         require(emergencyMode, "Not in emergency mode");
-        require(positionOwner[positionId] == msg.sender, "Not position owner");
-
-        uint256 posIndex = _findPosition(msg.sender, positionId);
-        Position storage position = userPositions[msg.sender][posIndex];
         
+        Position storage position = positions[positionId];
+        require(position.owner == msg.sender, "Not position owner");
         require(!position.isUnstaked, "Position already unstaked");
 
         uint256 amount = position.amount;
@@ -274,12 +238,10 @@ contract Layer2StakingV2 is
             position.rewardRate,
             LOCK_PERIOD
         );
-        if (totalPendingRewards >= reservedReward) {
-            totalPendingRewards -= reservedReward;
-        }
+        require(totalPendingRewards >= reservedReward, "Pending rewards accounting error");
+        totalPendingRewards -= reservedReward;
         
         position.isUnstaked = true;
-        userTotalStaked[msg.sender] -= amount;
         totalStaked -= amount;
 
         (bool success, ) = msg.sender.call{value: amount}("");
@@ -289,12 +251,11 @@ contract Layer2StakingV2 is
     }
 
     function _updateReward(
-        address _staker,
-        uint256 _positionIndex
+        uint256 positionId
     ) internal returns (uint256 reward) {
         if (emergencyMode) return 0;
 
-        Position storage position = userPositions[_staker][_positionIndex];
+        Position storage position = positions[positionId];
         if (position.isUnstaked) return 0;
 
         uint256 timeElapsed = _calculateTimeElapsed(position);
