@@ -12,44 +12,35 @@ import "./interfaces/IStake.sol";
  * and handles their initialization
  */
 abstract contract StakingStorage is Initializable, OwnableUpgradeable {
-    // Constants for calculations and configurations
-    uint256 internal constant HSK_DECIMALS = 18;    // Decimal places for HSK token
-    uint256 public constant LOCK_PERIOD = 365 days; // Fixed lock period
+    uint256 internal constant HSK_DECIMALS = 18;
+    uint256 public constant LOCK_PERIOD = 365 days;
     
-    // Staking parameters
-    uint256 public minStakeAmount;    // Minimum amount that can be staked
-    uint256 public totalStaked;       // Total amount currently staked
-    uint256 public nextPositionId;    // Counter for generating unique position IDs
-    uint256 public rewardRate;        // Fixed reward rate (800 for 8%, 1600 for 16%)
+    uint256 public minStakeAmount;
+    uint256 public totalStaked;
+    uint256 public nextPositionId;
+    uint256 public rewardRate;
     
-    // User positions
-    mapping(address => IStaking.Position[]) public userPositions;    // User's staking positions
+    mapping(address => IStaking.Position[]) public userPositions;
     
-    // Emergency and admin controls
-    bool public emergencyMode;    // Emergency stop mechanism
-    mapping(uint256 => address) public positionOwner;    // Maps position IDs to owners
+    bool public emergencyMode;
+    mapping(uint256 => address) public positionOwner;
     
-    // Reward and stake tracking
-    mapping(address => uint256) public userTotalStaked;    // Total staked per user
-    uint256 public totalPendingRewards;     // Total rewards that need to be paid
-    uint256 public rewardPoolBalance;       // Current balance of reward pool
+    mapping(address => uint256) public userTotalStaked;
+    uint256 public totalPendingRewards;
+    uint256 public rewardPoolBalance;
     
-    // Access control
-    mapping(address => bool) public whitelisted;     // Whitelisted addresses
+    mapping(address => bool) public whitelisted;
     
-    // Staking limits and timing
-    uint256 public maxTotalStake;     // Maximum total stake allowed
-    uint256 public stakeStartTime;    // Start time for new stakes
-    uint256 public stakeEndTime;      // Deadline for new stakes
-    bool public onlyWhitelistCanStake;    // Whitelist-only mode flag
+    uint256 public maxTotalStake;
+    uint256 public stakeStartTime;
+    uint256 public stakeEndTime;
+    bool public onlyWhitelistCanStake;
     
-    // Position index mapping for efficient lookup (positionId => array index)
     mapping(uint256 => uint256) internal positionIndexMap;
     
     // Gap for future storage variables (reserves 50 slots for upgrades)
     uint256[50] private __gap;
 
-    // Add event for reward pool updates
     event RewardPoolUpdated(uint256 newBalance);
 
     /**
@@ -64,20 +55,16 @@ abstract contract StakingStorage is Initializable, OwnableUpgradeable {
         require(_owner != address(0), "StakingStorage: zero owner");
         require(_rewardRate > 0 && _rewardRate <= 10000, "Invalid reward rate");
         
-        // Initialize Ownable
         __Ownable_init(_owner);
         
-        // Initialize basic parameters
-        rewardRate = _rewardRate;           // Set fixed reward rate
+        rewardRate = _rewardRate;
         minStakeAmount = 100 * 10**HSK_DECIMALS;
         nextPositionId = 1;
         
-        // Set maximum total stake limit
         maxTotalStake = 10_000 * 10**HSK_DECIMALS;
 
-        // Initialize timing and access controls
-        stakeStartTime = type(uint256).max;  // Set to max to prevent staking before admin configures
-        stakeEndTime = type(uint256).max;    // No initial end time
-        onlyWhitelistCanStake = true;        // Start in whitelist-only mode
+        stakeStartTime = type(uint256).max;
+        stakeEndTime = type(uint256).max;
+        onlyWhitelistCanStake = true;
     }
 }

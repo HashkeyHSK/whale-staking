@@ -25,7 +25,6 @@ contract Layer2StakingV2 is
     ReentrancyGuardUpgradeable, 
     PausableUpgradeable 
 {
-    // Events for tracking contract state changes
     event Received(address indexed sender, uint256 amount);
     event WhitelistStatusChanged(address indexed user, bool status);
     event StakeStartTimeUpdated(uint256 oldStartTime, uint256 newStartTime);
@@ -34,7 +33,6 @@ contract Layer2StakingV2 is
     event EmergencyModeEnabled(address indexed operator, uint256 timestamp);
     event WhitelistModeChanged(bool oldMode, bool newMode);
 
-    // Custom errors for better gas efficiency and clearer error messages
     error AlreadyUnstaked();
     error StillLocked();
     error NoReward();
@@ -47,7 +45,6 @@ contract Layer2StakingV2 is
         _;
     }
 
-    // Add whitelist validation modifier
     modifier whitelistCheck() {
         if (onlyWhitelistCanStake && !whitelisted[msg.sender]) {
             revert NotWhitelisted();
@@ -55,7 +52,6 @@ contract Layer2StakingV2 is
         _;
     }
 
-    // Add emergency mode check modifier
     modifier whenNotEmergency() {
         require(!emergencyMode, "Contract is in emergency mode");
         _;
@@ -77,14 +73,10 @@ contract Layer2StakingV2 is
         __Pausable_init();
         __StakingStorage_init(msg.sender, _rewardRate);
         
-        // Set custom minimum stake amount if provided, otherwise use default from StakingStorage
         if (_minStakeAmount > 0) {
             minStakeAmount = _minStakeAmount;
         }
-        // Note: stakeEndTime and onlyWhitelistCanStake are already set in __StakingStorage_init
     }
-
-    // ========== INTERNAL HELPER FUNCTIONS ==========
 
     /**
      * @dev Finds the position index for a given position ID
@@ -98,10 +90,8 @@ contract Layer2StakingV2 is
         view 
         returns (uint256 posIndex) 
     {
-        // Use the index map for efficient O(1) lookup
         posIndex = positionIndexMap[positionId];
         
-        // Verify the position belongs to the user and is valid
         Position[] storage positions = userPositions[user];
         if (posIndex >= positions.length || positions[posIndex].positionId != positionId) {
         revert PositionNotFound();
@@ -125,8 +115,6 @@ contract Layer2StakingV2 is
         return endTime - position.lastRewardAt;
     }
 
-    // ========== PUBLIC STAKING FUNCTIONS ==========
-
     /**
      * @dev Creates a new staking position with fixed 365-day lock period
      * @return uint256 ID of the newly created position
@@ -147,7 +135,6 @@ contract Layer2StakingV2 is
         
         if (totalStaked + amount > maxTotalStake) revert MaxTotalStakeExceeded();
 
-        // Calculate potential reward for this new stake using fixed parameters
         uint256 potentialReward = StakingLib.calculateReward(
             amount,
             LOCK_PERIOD,
@@ -155,13 +142,11 @@ contract Layer2StakingV2 is
             LOCK_PERIOD
         );
 
-        // Check if reward pool can cover this new stake
         require(
             rewardPoolBalance >= totalPendingRewards + potentialReward,
             "Insufficient reward pool"
         );
 
-        // Update total pending rewards
         totalPendingRewards += potentialReward;
 
         uint256 positionId = nextPositionId++;
@@ -174,11 +159,9 @@ contract Layer2StakingV2 is
             isUnstaked: false
         });
 
-        // Get the index where this position will be stored
         uint256 positionIndex = userPositions[msg.sender].length;
         userPositions[msg.sender].push(newPosition);
         
-        // Update the position index map for efficient lookup
         positionIndexMap[positionId] = positionIndex;
         positionOwner[positionId] = msg.sender;
         userTotalStaked[msg.sender] += amount;
@@ -234,30 +217,22 @@ contract Layer2StakingV2 is
         return reward;
     }
 
-    // ========== VIEW FUNCTIONS ==========
-
     function pendingReward(
         uint256 positionId
     ) external view override returns (uint256) {
         if (emergencyMode) return 0;
         
-        // Verify position ownership
         if (positionOwner[positionId] != msg.sender) return 0;
         
-        // Use position index map for O(1) lookup
         uint256 posIndex = positionIndexMap[positionId];
         Position[] memory positions = userPositions[msg.sender];
         
-        // Verify the position belongs to the user and is valid
         if (posIndex >= positions.length || positions[posIndex].positionId != positionId) {
             return 0;
         }
         
         return _calculatePendingReward(positions[posIndex]);
     }
-
-    // ========== ADMIN FUNCTIONS ==========
-
 
     function setMinStakeAmount(uint256 newAmount) external onlyOwner whenNotEmergency {
         uint256 oldAmount = minStakeAmount;
@@ -293,7 +268,6 @@ contract Layer2StakingV2 is
 
         uint256 amount = position.amount;
         
-        // Calculate and deduct the reserved pending reward for this position
         uint256 reservedReward = StakingLib.calculateReward(
             position.amount,
             LOCK_PERIOD,
@@ -308,7 +282,6 @@ contract Layer2StakingV2 is
         userTotalStaked[msg.sender] -= amount;
         totalStaked -= amount;
 
-        // Only transfer principal in emergency mode
         (bool success, ) = msg.sender.call{value: amount}("");
         require(success, "Emergency withdraw failed");
         
@@ -319,7 +292,6 @@ contract Layer2StakingV2 is
         address _staker,
         uint256 _positionIndex
     ) internal returns (uint256 reward) {
-        // Return 0 rewards if in emergency mode
         if (emergencyMode) return 0;
 
         Position storage position = userPositions[_staker][_positionIndex];
@@ -335,7 +307,6 @@ contract Layer2StakingV2 is
             LOCK_PERIOD   
         );
         
-        // Update reward pool balance
         if (reward > 0) {
             require(rewardPoolBalance >= reward, "Insufficient reward pool");
             rewardPoolBalance -= reward;
@@ -377,7 +348,6 @@ contract Layer2StakingV2 is
         emit StakeEndTimeUpdated(oldEndTime, newEndTime);
     }
 
-    // ========== WHITELIST FUNCTIONS ==========
 
     /**
      * @dev Updates whitelist status for multiple users
@@ -410,15 +380,11 @@ contract Layer2StakingV2 is
         emit WhitelistModeChanged(oldMode, enabled);
     }
 
-    // ========== REWARD POOL FUNCTIONS ==========
-
-    // Add function to update reward pool balance
     function updateRewardPool() external payable onlyOwner {
         rewardPoolBalance += msg.value;
         emit RewardPoolUpdated(rewardPoolBalance);
     }
 
-    // Internal function to calculate pending reward
     function _calculatePendingReward(
         Position memory position
     ) internal view returns (uint256) {
@@ -449,8 +415,6 @@ contract Layer2StakingV2 is
         require(success, "Withdrawal failed");
         emit RewardPoolUpdated(rewardPoolBalance);
     }
-
-    // ========== INTERNAL FUNCTIONS ==========
 
     /**
      * @dev Receives ETH and automatically adds it to the reward pool

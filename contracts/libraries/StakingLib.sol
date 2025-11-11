@@ -10,11 +10,8 @@ import "../interfaces/IStake.sol";
  * Optimized for fixed 365-day lock period staking system
  */
 library StakingLib {
-    
-    // Custom errors for better gas efficiency and clearer error messages
     error InvalidAmount();
 
-    // Constants used in calculations
     uint256 private constant SECONDS_PER_YEAR = 365 days;
     uint256 private constant BASIS_POINTS = 10000; // 100% = 10000
     
@@ -50,35 +47,27 @@ library StakingLib {
         uint256 rewardRate,
         uint256 lockPeriod
     ) public pure returns (uint256 reward) {
-        // Early return for zero values
         if (amount == 0 || timeElapsed == 0 || rewardRate == 0) {
             return 0;
         }
         
-        // If current time is beyond lock period, only calculate rewards up to lock end
         if (timeElapsed > lockPeriod) {
             timeElapsed = lockPeriod;
         }
         
-        // High precision calculations using 18 decimals
         uint256 PRECISION = 1e18;
         
-        // Input validation to prevent overflow
         require(amount <= type(uint256).max / PRECISION, "Amount too large");
         require(rewardRate <= BASIS_POINTS, "Rate too large");
 
-        // Calculate annual rate with high precision
         uint256 annualRate = (rewardRate * PRECISION) / BASIS_POINTS;
         require(annualRate <= type(uint256).max / PRECISION, "Annual rate overflow");
         
-        // Calculate complete years and remaining time
         uint256 completeYears = timeElapsed / SECONDS_PER_YEAR;
         uint256 remainingTime = timeElapsed % SECONDS_PER_YEAR;
         
-        // Calculate rewards for complete years
         uint256 totalReward = calculateYearlyReward(amount, annualRate, PRECISION) * completeYears;
         
-        // Calculate rewards for remaining time
         if (remainingTime > 0) {
             totalReward += calculateRemainingTimeReward(
                 amount,
@@ -88,7 +77,6 @@ library StakingLib {
             );
         }
         
-        // Validation check
         require(totalReward <= amount * rewardRate * (timeElapsed / SECONDS_PER_YEAR + 1) / BASIS_POINTS, 
             "Reward overflow");
         
