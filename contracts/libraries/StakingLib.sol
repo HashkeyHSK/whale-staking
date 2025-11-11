@@ -16,22 +16,6 @@ library StakingLib {
     uint256 private constant BASIS_POINTS = 10000; // 100% = 10000
     uint256 private constant PRECISION = 1e18;
     
-    function calculateYearlyReward(
-        uint256 amount,
-        uint256 annualRate
-    ) private pure returns (uint256) {
-        return (amount * annualRate) / PRECISION;
-    }
-
-    function calculateRemainingTimeReward(
-        uint256 amount,
-        uint256 annualRate,
-        uint256 remainingTime
-    ) private pure returns (uint256) {
-        uint256 timeRatio = (remainingTime * PRECISION) / SECONDS_PER_YEAR;
-        return (amount * annualRate * timeRatio) / (PRECISION * PRECISION);
-    }
-
     /**
      * @dev Calculates the reward for a staking position
      * @param amount The staked amount
@@ -39,6 +23,7 @@ library StakingLib {
      * @param rewardRate Annual reward rate in basis points (100% = 10000)
      * @param lockPeriod Duration of the lock in seconds
      * @return reward The calculated reward amount
+     * @notice Optimized for fixed 365-day lock period (timeElapsed always <= 365 days)
      */
     function calculateReward(
         uint256 amount,
@@ -59,21 +44,11 @@ library StakingLib {
         uint256 annualRate = (rewardRate * PRECISION) / BASIS_POINTS;
         require(annualRate <= type(uint256).max / PRECISION, "Annual rate overflow");
         
-        uint256 completeYears = timeElapsed / SECONDS_PER_YEAR;
-        uint256 remainingTime = timeElapsed % SECONDS_PER_YEAR;
+        // Direct calculation since timeElapsed <= 365 days (always < 1 year)
+        uint256 timeRatio = (timeElapsed * PRECISION) / SECONDS_PER_YEAR;
+        uint256 totalReward = (amount * annualRate * timeRatio) / (PRECISION * PRECISION);
         
-        uint256 totalReward = calculateYearlyReward(amount, annualRate) * completeYears;
-        
-        if (remainingTime > 0) {
-            totalReward += calculateRemainingTimeReward(
-                amount,
-                annualRate,
-                remainingTime
-            );
-        }
-        
-        require(totalReward <= amount * rewardRate * (timeElapsed / SECONDS_PER_YEAR + 1) / BASIS_POINTS, 
-            "Reward overflow");
+        require(totalReward <= amount * rewardRate / BASIS_POINTS, "Reward overflow");
         
         return totalReward;
     }
