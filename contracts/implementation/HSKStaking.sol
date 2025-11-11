@@ -4,8 +4,8 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
 import "./StakingStorage.sol";
-import "./libraries/StakingConstants.sol";
-import "./interfaces/IStake.sol";
+import "../constants/StakingConstants.sol";
+import "../interfaces/IStake.sol";
 
 /**
  * @title HSKStaking
