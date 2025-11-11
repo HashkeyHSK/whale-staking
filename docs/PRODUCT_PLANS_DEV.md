@@ -49,7 +49,6 @@ Layer2StakingV2 (主合约)
 | `minStakeAmount` | 1 HSK (1e18) | `setMinStakeAmount(1e18)` |
 | `LOCK_PERIOD` | 365 天 (31,536,000 秒) | 固定常量，部署时设置 |
 | `rewardRate` | 8% (800 basis points) | 部署时通过 initialize() 设置 |
-| `maxTotalStake` | 10,000,000 HSK (1e25) | `setMaxTotalStake(10000000e18)` |
 | `stakeStartTime` | 部署后7天 | `setStakeStartTime(timestamp)` |
 | `stakeEndTime` | `type(uint256).max` | `setStakeEndTime(timestamp)` |
 | `onlyWhitelistCanStake` | `false` | `setWhitelistOnlyMode(false)` |
@@ -61,7 +60,6 @@ Layer2StakingV2 (主合约)
 | `minStakeAmount` | 500,000 HSK (5e23) | `setMinStakeAmount(500000e18)` |
 | `LOCK_PERIOD` | 365 天 (31,536,000 秒) | 固定常量，部署时设置 |
 | `rewardRate` | 16% (1600 basis points) | 部署时通过 initialize() 设置 |
-| `maxTotalStake` | 20,000,000 HSK (2e25) | `setMaxTotalStake(20000000e18)` |
 | `stakeStartTime` | 部署后7天 | `setStakeStartTime(timestamp)` |
 | `stakeEndTime` | `type(uint256).max` | `setStakeEndTime(timestamp)` |
 | `onlyWhitelistCanStake` | `true` | `setWhitelistOnlyMode(true)` |
@@ -111,7 +109,6 @@ npx hardhat run scripts/deployDualTier.ts --network hashkeyTestnet
 - [ ] 验证 `minStakeAmount` = 1 HSK
 - [ ] 验证 `rewardRate` = 800 (8% APY)
 - [ ] 验证 `LOCK_PERIOD` = 365 days (固定)
-- [ ] 验证 `maxTotalStake` = 10,000,000 HSK
 - [ ] 验证 `onlyWhitelistCanStake` = false
 - [ ] 向奖励池充值（通过 `updateRewardPool()`）
 
@@ -119,7 +116,6 @@ npx hardhat run scripts/deployDualTier.ts --network hashkeyTestnet
 - [ ] 验证 `minStakeAmount` = 500,000 HSK
 - [ ] 验证 `rewardRate` = 1600 (16% APY)
 - [ ] 验证 `LOCK_PERIOD` = 365 days (固定)
-- [ ] 验证 `maxTotalStake` = 20,000,000 HSK
 - [ ] 验证 `onlyWhitelistCanStake` = true
 - [ ] 添加白名单用户（通过 `updateWhitelistBatch()`）
 - [ ] 向奖励池充值（通过 `updateRewardPool()`）
@@ -152,11 +148,10 @@ npx hardhat run scripts/checkWhitelist.ts --network hashkeyTestnet \
 - `block.timestamp >= stakeStartTime` - 质押时间窗口已开始
 - `block.timestamp < stakeEndTime` - 质押时间窗口未结束
 - `msg.value >= minStakeAmount` - 满足最小质押金额
-- `totalStaked + msg.value <= maxTotalStake` - 不超过最大总质押量
 - 如果启用白名单：`whitelisted[msg.sender] == true` - 在白名单中
 - `!emergencyMode` - 非紧急模式
 - `!paused()` - 合约未暂停
-- `rewardPoolBalance` 充足
+- `rewardPoolBalance >= totalPendingRewards + potentialReward` - 奖励池余额充足
 
 **返回**：新创建的质押位置 ID
 
@@ -221,9 +216,6 @@ userPositions(address user, uint256 index) view → uint256 positionId
 
 #### `setMinStakeAmount(uint256 newAmount)`
 设置最小质押金额。
-
-#### `setMaxTotalStake(uint256 newLimit)`
-设置最大总质押量（池子上限）。
 
 #### `setWhitelistOnlyMode(bool enabled)`
 启用/禁用白名单模式。
@@ -473,7 +465,6 @@ userPositions(address user, uint256 index) view → uint256 positionId
 
 - **总质押量**：`totalStaked()`
 - **奖励池余额**：`rewardPoolBalance()`
-- **剩余质押容量**：`maxTotalStake() - totalStaked()`
 - **锁定期**：`LOCK_PERIOD()` (固定365天)
 - **年化收益率**：`rewardRate()` (部署时设置，例如：800 = 8%)
 - **用户质押位置**：`userPositions(user, index)`（需遍历索引）
@@ -484,7 +475,6 @@ userPositions(address user, uint256 index) view → uint256 positionId
 
 常见错误：
 - `InvalidAmount` - 质押金额不足
-- `MaxTotalStakeExceeded` - 超过最大总质押量
 - `NotWhitelisted` - 未在白名单中
 - `StillLocked` - 锁定期未结束（365天）
 - `"Insufficient reward pool"` - 奖励池余额不足
@@ -504,7 +494,6 @@ userPositions(address user, uint256 index) view → uint256 positionId
 #### 普通 Staking
 - `totalStaked` - 总质押量
 - `rewardPoolBalance` - 奖励池余额
-- `totalStaked / maxTotalStake` - 质押率
 - 用户数量统计（通过事件）
 
 #### Premium Staking
@@ -514,8 +503,7 @@ userPositions(address user, uint256 index) view → uint256 positionId
 
 ### 11.2 告警阈值
 
-- ⚠️ 奖励池余额 < 总质押量 × 年化收益率 × 30天
-- ⚠️ 质押率 > 80%
+- ⚠️ 奖励池余额 < 总待发放奖励（totalPendingRewards）
 - ⚠️ 紧急模式启用
 - ⚠️ 合约暂停
 

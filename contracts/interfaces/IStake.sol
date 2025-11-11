@@ -73,6 +73,4 @@ interface IStaking {
         uint256 amount,
         uint256 timestamp
     );
-
-    event MaxTotalStakeUpdated(uint256 oldLimit, uint256 newLimit);
 }

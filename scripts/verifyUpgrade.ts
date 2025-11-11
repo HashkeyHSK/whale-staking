@@ -19,9 +19,6 @@ async function main() {
   const totalStaked = await staking.totalStaked();
   console.log(`Total staked: ${ethers.formatEther(totalStaked)} ETH`);
   
-  const maxTotalStake = await staking.maxTotalStake();
-  console.log(`Max total stake: ${ethers.formatEther(maxTotalStake)} ETH`);
-  
   const minStakeAmount = await staking.minStakeAmount();
   console.log(`Min stake amount: ${ethers.formatEther(minStakeAmount)} ETH`);
   

@@ -150,9 +150,6 @@ npx hardhat test
 #### `setWhitelistOnlyMode(bool enabled)`
 启用/禁用白名单模式
 
-#### `setMaxTotalStake(uint256 newLimit)`
-设置最大总质押量
-
 #### `setStakeStartTime(uint256 newStartTime)`
 设置质押开始时间
 - **参数**: `newStartTime` - 质押开始时间戳（秒）

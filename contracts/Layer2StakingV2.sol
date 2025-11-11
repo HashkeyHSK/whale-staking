@@ -38,7 +38,6 @@ contract Layer2StakingV2 is
     error NoReward();
     error PositionNotFound();
     error NotWhitelisted();
-    error MaxTotalStakeExceeded();
 
     modifier validPosition(uint256 positionId) {
         if (positions[positionId].owner != msg.sender) revert PositionNotFound();
@@ -110,8 +109,6 @@ contract Layer2StakingV2 is
 
         uint256 amount = msg.value;
         amount = StakingLib.validateAndFormatAmount(amount, minStakeAmount);
-        
-        if (totalStaked + amount > maxTotalStake) revert MaxTotalStakeExceeded();
 
         uint256 potentialReward = StakingLib.calculateReward(
             amount,
@@ -276,15 +273,6 @@ contract Layer2StakingV2 is
         position.lastRewardAt = currentTime > lockEndTime ? lockEndTime : currentTime;
     }
 
-
-    function setMaxTotalStake(uint256 newLimit) external onlyOwner {
-        require(newLimit > 0, "Limit must be positive");
-        require(newLimit >= totalStaked, "New limit below current stake");
-        
-        uint256 oldLimit = maxTotalStake;
-        maxTotalStake = newLimit;
-        emit MaxTotalStakeUpdated(oldLimit, newLimit);
-    }
 
     function setStakeStartTime(uint256 newStartTime) external onlyOwner {
         require(newStartTime > 0, "Invalid start time");

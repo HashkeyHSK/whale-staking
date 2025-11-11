@@ -30,7 +30,6 @@ abstract contract StakingStorage is Initializable, OwnableUpgradeable {
     
     mapping(address => bool) public whitelisted;
     
-    uint256 public maxTotalStake;
     uint256 public stakeStartTime;
     uint256 public stakeEndTime;
     bool public onlyWhitelistCanStake;
@@ -57,8 +56,6 @@ abstract contract StakingStorage is Initializable, OwnableUpgradeable {
         rewardRate = _rewardRate;
         minStakeAmount = 100 * 10**HSK_DECIMALS;
         nextPositionId = 1;
-        
-        maxTotalStake = 10_000 * 10**HSK_DECIMALS;
 
         stakeStartTime = type(uint256).max;
         stakeEndTime = type(uint256).max;

@@ -19,9 +19,7 @@ async function main() {
     const minStakeAmount = await staking.minStakeAmount();
     console.log("Minimum stake amount:", ethers.formatEther(minStakeAmount), "HSK");
 
-    const maxTotalStake = await staking.maxTotalStake();
     const totalStaked = await staking.totalStaked();
-    console.log("Max total stake:", ethers.formatEther(maxTotalStake), "HSK");
     console.log("Current total staked:", ethers.formatEther(totalStaked), "HSK");
 
     // 2. 检查账户状态

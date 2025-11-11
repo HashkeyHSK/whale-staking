@@ -33,32 +33,7 @@ await staking.stake({ value: ethers.parseEther("1") });
 
 ---
 
-### 2. "Exceeds maximum total stake" - 超过最大总质押量
-
-**错误信息**：
-```
-Error: Exceeds maximum total stake
-```
-
-**原因**：
-- 当前总质押量 + 本次质押金额 > 最大总质押量
-
-**解决方法**：
-- 查询当前总质押量：`await staking.totalStaked()`
-- 查询最大总质押量：`await staking.maxTotalStake()`
-- 减少质押金额或等待其他用户解除质押
-
-**示例**：
-```typescript
-const totalStaked = await staking.totalStaked();
-const maxTotalStake = await staking.maxTotalStake();
-const available = maxTotalStake - totalStaked;
-console.log(`可质押额度: ${ethers.formatEther(available)} HSK`);
-```
-
----
-
-### 3. "Not whitelisted" - 未在白名单中
+### 2. "Not whitelisted" - 未在白名单中
 
 **错误信息**：
 ```
@@ -80,7 +55,7 @@ Error: Not whitelisted
 
 ---
 
-### 4. "Still locked" - 锁定期未结束
+### 3. "Still locked" - 锁定期未结束
 
 **错误信息**：
 ```
@@ -115,7 +90,7 @@ if (timeRemaining > 0) {
 
 ---
 
-### 5. "Position not found" - 质押位置不存在
+### 4. "Position not found" - 质押位置不存在
 
 **错误信息**：
 ```
@@ -133,7 +108,7 @@ Error: Position not found
 
 ---
 
-### 6. "Already unstaked" - 已解除质押
+### 5. "Already unstaked" - 已解除质押
 
 **错误信息**：
 ```
@@ -149,7 +124,7 @@ Error: Already unstaked
 
 ---
 
-### 7. "Insufficient reward pool" - 奖励池余额不足
+### 6. "Insufficient reward pool" - 奖励池余额不足
 
 **错误信息**：
 ```
@@ -167,7 +142,7 @@ Error: Insufficient reward pool
 
 ---
 
-### 8. "Blacklisted" - 地址被列入黑名单
+### 7. "Blacklisted" - 地址被列入黑名单
 
 **错误信息**：
 ```
@@ -185,7 +160,7 @@ Error: Blacklisted
 
 ## 管理员操作错误
 
-### 9. "Only owner" - 仅所有者可操作
+### 8. "Only owner" - 仅所有者可操作
 
 **错误信息**：
 ```
@@ -202,7 +177,7 @@ Error: Only owner
 
 ---
 
-### 10. "OwnableUnauthorizedAccount" - 仅所有者可操作
+### 9. "OwnableUnauthorizedAccount" - 仅所有者可操作
 
 **错误信息**：
 ```
@@ -221,7 +196,7 @@ Error: OwnableUnauthorizedAccount
 
 ## 紧急模式相关
 
-### 11. "Emergency mode not enabled" - 紧急模式未启用
+### 10. "Emergency mode not enabled" - 紧急模式未启用
 
 **错误信息**：
 ```
@@ -239,7 +214,7 @@ Error: Emergency mode not enabled
 
 ## 通用错误处理
 
-### 12. "Transfer failed" - 转账失败
+### 11. "Transfer failed" - 转账失败
 
 **错误信息**：
 ```
@@ -257,7 +232,7 @@ Error: Transfer failed
 
 ---
 
-### 13. "Contract paused" - 合约已暂停
+### 12. "Contract paused" - 合约已暂停
 
 **错误信息**：
 ```
