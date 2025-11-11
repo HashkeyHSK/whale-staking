@@ -4,12 +4,12 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
 import "./StakingStorage.sol";
-import "./libraries/StakingLib.sol";
+import "./libraries/StakingConstants.sol";
 import "./interfaces/IStake.sol";
 
 /**
- * @title Layer2StakingV2
- * @dev Main staking contract for Layer2 network - Version 2
+ * @title HSKStaking
+ * @dev Main staking contract for HSK token
  * Implements staking functionality with fixed 365-day lock period
  * Reward rate is configurable at deployment (e.g., 800 for 8% APY, 1600 for 16% APY)
  * Features include:
@@ -19,9 +19,10 @@ import "./interfaces/IStake.sol";
  * - Automatic reward calculation and distribution
  * - Pause functionality
  */
-contract Layer2StakingV2 is 
+contract HSKStaking is 
     IStaking, 
-    StakingStorage, 
+    StakingStorage,
+    StakingConstants,
     ReentrancyGuardUpgradeable, 
     PausableUpgradeable 
 {
@@ -86,21 +87,7 @@ contract Layer2StakingV2 is
         stakeEndTime = _stakeEndTime;
     }
 
-    /**
-     * @dev Calculates time elapsed for reward calculation, capped at lock period
-     * @param position The staking position
-     * @return timeElapsed Time elapsed since last reward, capped at lock end
-     */
-    function _calculateTimeElapsed(Position memory position) 
-        internal 
-        view 
-        returns (uint256) 
-    {
-        uint256 lockEndTime = position.stakedAt + LOCK_PERIOD;
-        uint256 endTime = block.timestamp < lockEndTime ? block.timestamp : lockEndTime;
-        return endTime - position.lastRewardAt;
-    }
-
+    // ==================== EXTERNAL USER FUNCTIONS ====================
     /**
      * @dev Creates a new staking position with fixed 365-day lock period
      * @return uint256 ID of the newly created position
@@ -119,7 +106,7 @@ contract Layer2StakingV2 is
         uint256 amount = msg.value;
         require(amount >= minStakeAmount, "Amount below minimum");
 
-        uint256 potentialReward = StakingLib.calculateReward(
+        uint256 potentialReward = _calculateReward(
             amount,
             LOCK_PERIOD,
             rewardRate
@@ -204,29 +191,6 @@ contract Layer2StakingV2 is
         return _calculatePendingReward(position);
     }
 
-    function setMinStakeAmount(uint256 newAmount) external onlyOwner whenNotEmergency {
-        uint256 oldAmount = minStakeAmount;
-        minStakeAmount = newAmount;
-        emit MinStakeAmountUpdated(oldAmount, newAmount);
-    }
-
-    function enableEmergencyMode() external onlyOwner {
-        emergencyMode = true;
-        emit EmergencyModeEnabled(msg.sender, block.timestamp);
-    }
-
-    function pause() external override onlyOwner {
-        _pause();
-        emit StakingPaused(msg.sender, block.timestamp);
-    }
-
-
-    function unpause() external override onlyOwner {
-        _unpause();
-        emit StakingUnpaused(msg.sender, block.timestamp);
-    }
-
-
     function emergencyWithdraw(uint256 positionId) external nonReentrant {
         require(emergencyMode, "Not in emergency mode");
         
@@ -236,7 +200,7 @@ contract Layer2StakingV2 is
 
         uint256 amount = position.amount;
         
-        uint256 reservedReward = StakingLib.calculateReward(
+        uint256 reservedReward = _calculateReward(
             position.amount,
             LOCK_PERIOD,
             rewardRate
@@ -253,32 +217,12 @@ contract Layer2StakingV2 is
         emit EmergencyWithdrawn(msg.sender, positionId, amount, block.timestamp);
     }
 
-    function _updateReward(
-        uint256 positionId
-    ) internal returns (uint256 reward) {
-        if (emergencyMode) return 0;
+    // ==================== EXTERNAL SETTER FUNCTIONS ====================
 
-        Position storage position = positions[positionId];
-        if (position.isUnstaked) return 0;
-
-        uint256 timeElapsed = _calculateTimeElapsed(position);
-
-        reward = StakingLib.calculateReward(
-            position.amount, 
-            timeElapsed, 
-            rewardRate
-        );
-        
-        if (reward > 0) {
-            require(rewardPoolBalance >= reward, "Insufficient reward pool");
-            rewardPoolBalance -= reward;
-            totalPendingRewards -= reward;
-            emit RewardPoolUpdated(rewardPoolBalance);
-        }
-
-        uint256 currentTime = block.timestamp;
-        uint256 lockEndTime = position.stakedAt + LOCK_PERIOD;
-        position.lastRewardAt = currentTime > lockEndTime ? lockEndTime : currentTime;
+    function setMinStakeAmount(uint256 newAmount) external onlyOwner whenNotEmergency {
+        uint256 oldAmount = minStakeAmount;
+        minStakeAmount = newAmount;
+        emit MinStakeAmountUpdated(oldAmount, newAmount);
     }
 
     function setStakeStartTime(uint256 newStartTime) external onlyOwner {
@@ -299,6 +243,32 @@ contract Layer2StakingV2 is
         emit StakeEndTimeUpdated(oldEndTime, newEndTime);
     }
 
+    /**
+     * @dev Toggles whitelist-only mode
+     * @param enabled True to enable whitelist-only mode, false to disable
+     */
+    function setWhitelistOnlyMode(bool enabled) external onlyOwner {
+        bool oldMode = onlyWhitelistCanStake;
+        onlyWhitelistCanStake = enabled;
+        emit WhitelistModeChanged(oldMode, enabled);
+    }
+
+    // ==================== EXTERNAL ADMIN FUNCTIONS ====================
+
+    function pause() external override onlyOwner {
+        _pause();
+        emit StakingPaused(msg.sender, block.timestamp);
+    }
+
+    function unpause() external override onlyOwner {
+        _unpause();
+        emit StakingUnpaused(msg.sender, block.timestamp);
+    }
+
+    function enableEmergencyMode() external onlyOwner {
+        emergencyMode = true;
+        emit EmergencyModeEnabled(msg.sender, block.timestamp);
+    }
 
     /**
      * @dev Updates whitelist status for multiple users
@@ -321,33 +291,9 @@ contract Layer2StakingV2 is
         }
     }
 
-    /**
-     * @dev Toggles whitelist-only mode
-     * @param enabled True to enable whitelist-only mode, false to disable
-     */
-    function setWhitelistOnlyMode(bool enabled) external onlyOwner {
-        bool oldMode = onlyWhitelistCanStake;
-        onlyWhitelistCanStake = enabled;
-        emit WhitelistModeChanged(oldMode, enabled);
-    }
-
     function updateRewardPool() external payable onlyOwner {
         rewardPoolBalance += msg.value;
         emit RewardPoolUpdated(rewardPoolBalance);
-    }
-
-    function _calculatePendingReward(
-        Position memory position
-    ) internal view returns (uint256) {
-        if (position.isUnstaked) return 0;
-        
-        uint256 timeElapsed = _calculateTimeElapsed(position);
-
-        return StakingLib.calculateReward(
-            position.amount,
-            timeElapsed,
-            rewardRate
-        );
     }
 
     /**
@@ -365,6 +311,92 @@ contract Layer2StakingV2 is
         emit RewardPoolUpdated(rewardPoolBalance);
     }
 
+    // ==================== INTERNAL FUNCTIONS ====================
+
+    /**
+     * @dev Calculates time elapsed for reward calculation, capped at lock period
+     * @param position The staking position
+     * @return timeElapsed Time elapsed since last reward, capped at lock end
+     */
+    function _calculateTimeElapsed(Position memory position) 
+        internal 
+        view 
+        returns (uint256) 
+    {
+        uint256 lockEndTime = position.stakedAt + LOCK_PERIOD;
+        uint256 endTime = block.timestamp < lockEndTime ? block.timestamp : lockEndTime;
+        return endTime - position.lastRewardAt;
+    }
+
+    /**
+     * @dev Calculates the reward for a staking position
+     * @param amount The staked amount
+     * @param timeElapsed Time since last reward claim (must be <= 365 days)
+     * @param _rewardRate Annual reward rate in basis points (100% = 10000)
+     * @return reward The calculated reward amount
+     * @notice Optimized for fixed 365-day lock period (timeElapsed always <= 365 days)
+     */
+    function _calculateReward(
+        uint256 amount,
+        uint256 timeElapsed,
+        uint256 _rewardRate
+    ) internal pure returns (uint256 reward) {
+        if (amount == 0 || timeElapsed == 0 || _rewardRate == 0) {
+            return 0;
+        }
+        
+        // Direct calculation since timeElapsed <= 365 days (always < 1 year)
+        uint256 annualRate = (_rewardRate * PRECISION) / BASIS_POINTS;
+        uint256 timeRatio = (timeElapsed * PRECISION) / SECONDS_PER_YEAR;
+        uint256 totalReward = (amount * annualRate * timeRatio) / (PRECISION * PRECISION);
+        
+        return totalReward;
+    }
+
+    function _updateReward(
+        uint256 positionId
+    ) internal returns (uint256 reward) {
+        if (emergencyMode) return 0;
+
+        Position storage position = positions[positionId];
+        if (position.isUnstaked) return 0;
+
+        uint256 timeElapsed = _calculateTimeElapsed(position);
+
+        reward = _calculateReward(
+            position.amount, 
+            timeElapsed, 
+            rewardRate
+        );
+        
+        if (reward > 0) {
+            require(rewardPoolBalance >= reward, "Insufficient reward pool");
+            rewardPoolBalance -= reward;
+            totalPendingRewards -= reward;
+            emit RewardPoolUpdated(rewardPoolBalance);
+        }
+
+        uint256 currentTime = block.timestamp;
+        uint256 lockEndTime = position.stakedAt + LOCK_PERIOD;
+        position.lastRewardAt = currentTime > lockEndTime ? lockEndTime : currentTime;
+    }
+
+    function _calculatePendingReward(
+        Position memory position
+    ) internal view returns (uint256) {
+        if (position.isUnstaked) return 0;
+        
+        uint256 timeElapsed = _calculateTimeElapsed(position);
+
+        return _calculateReward(
+            position.amount,
+            timeElapsed,
+            rewardRate
+        );
+    }
+
+    // ==================== RECEIVE FUNCTION ====================
+
     /**
      * @dev Receives ETH and automatically adds it to the reward pool
      * This allows anyone to contribute to the reward pool
@@ -374,4 +406,4 @@ contract Layer2StakingV2 is
         emit Received(msg.sender, msg.value);
         emit RewardPoolUpdated(rewardPoolBalance);
     }
-} 
+}
