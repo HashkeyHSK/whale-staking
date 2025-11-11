@@ -41,23 +41,4 @@ library StakingLib {
         
         return totalReward;
     }
-
-
-    /**
-     * @dev Validates and formats the staking amount
-     * @param amount Amount to be staked
-     * @param minAmount Minimum allowed staking amount
-     * @return The validated amount
-     * @custom:throws InvalidAmount if amount is less than minimum
-     */
-    function validateAndFormatAmount(
-        uint256 amount,
-        uint256 minAmount
-    ) public pure returns (uint256) {
-        if (amount < minAmount) {
-            revert InvalidAmount();
-        }
-        return amount;
-    }
-
 }

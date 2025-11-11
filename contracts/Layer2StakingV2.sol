@@ -27,7 +27,9 @@ contract Layer2StakingV2 is
 {
     event Received(address indexed sender, uint256 amount);
     event WhitelistStatusChanged(address indexed user, bool status);
+    event StakeStartTimeUpdated(uint256 oldStartTime, uint256 newStartTime);
     event StakeEndTimeUpdated(uint256 oldEndTime, uint256 newEndTime);
+    event MinStakeAmountUpdated(uint256 oldAmount, uint256 newAmount);
     event EmergencyModeEnabled(address indexed operator, uint256 timestamp);
     event WhitelistModeChanged(bool oldMode, bool newMode);
 
@@ -115,7 +117,7 @@ contract Layer2StakingV2 is
         require(block.timestamp < stakeEndTime, "Staking period has ended");
 
         uint256 amount = msg.value;
-        amount = StakingLib.validateAndFormatAmount(amount, minStakeAmount);
+        require(amount >= minStakeAmount, "Amount below minimum");
 
         uint256 potentialReward = StakingLib.calculateReward(
             amount,
@@ -125,7 +127,7 @@ contract Layer2StakingV2 is
 
         require(
             rewardPoolBalance >= totalPendingRewards + potentialReward,
-            "Insufficient reward pool"
+            "Stake amount exceed"
         );
 
         totalPendingRewards += potentialReward;
@@ -202,6 +204,12 @@ contract Layer2StakingV2 is
         return _calculatePendingReward(position);
     }
 
+    function setMinStakeAmount(uint256 newAmount) external onlyOwner whenNotEmergency {
+        uint256 oldAmount = minStakeAmount;
+        minStakeAmount = newAmount;
+        emit MinStakeAmountUpdated(oldAmount, newAmount);
+    }
+
     function enableEmergencyMode() external onlyOwner {
         emergencyMode = true;
         emit EmergencyModeEnabled(msg.sender, block.timestamp);
@@ -254,7 +262,6 @@ contract Layer2StakingV2 is
         if (position.isUnstaked) return 0;
 
         uint256 timeElapsed = _calculateTimeElapsed(position);
-        if (timeElapsed == 0) return 0;
 
         reward = StakingLib.calculateReward(
             position.amount, 
@@ -274,6 +281,14 @@ contract Layer2StakingV2 is
         position.lastRewardAt = currentTime > lockEndTime ? lockEndTime : currentTime;
     }
 
+    function setStakeStartTime(uint256 newStartTime) external onlyOwner {
+        require(newStartTime > 0, "Invalid start time");
+        require(newStartTime < stakeEndTime, "Start time must be before end time");
+        
+        uint256 oldStartTime = stakeStartTime;
+        stakeStartTime = newStartTime;
+        emit StakeStartTimeUpdated(oldStartTime, newStartTime);
+    }
 
     function setStakeEndTime(uint256 newEndTime) external onlyOwner {
         require(newEndTime > block.timestamp, "End time must be in future");
@@ -327,7 +342,6 @@ contract Layer2StakingV2 is
         if (position.isUnstaked) return 0;
         
         uint256 timeElapsed = _calculateTimeElapsed(position);
-        if (timeElapsed == 0) return 0;
 
         return StakingLib.calculateReward(
             position.amount,
