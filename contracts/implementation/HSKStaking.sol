@@ -88,10 +88,7 @@ contract HSKStaking is
     }
 
     // ==================== EXTERNAL USER FUNCTIONS ====================
-    /**
-     * @dev Creates a new staking position with fixed 365-day lock period
-     * @return uint256 ID of the newly created position
-     */
+
     function stake() external 
         payable 
         nonReentrant 
@@ -243,10 +240,6 @@ contract HSKStaking is
         emit StakeEndTimeUpdated(oldEndTime, newEndTime);
     }
 
-    /**
-     * @dev Toggles whitelist-only mode
-     * @param enabled True to enable whitelist-only mode, false to disable
-     */
     function setWhitelistOnlyMode(bool enabled) external onlyOwner {
         bool oldMode = onlyWhitelistCanStake;
         onlyWhitelistCanStake = enabled;
@@ -270,11 +263,6 @@ contract HSKStaking is
         emit EmergencyModeEnabled(msg.sender, block.timestamp);
     }
 
-    /**
-     * @dev Updates whitelist status for multiple users
-     * @param users Array of user addresses
-     * @param status True to add to whitelist, false to remove
-     */
     function updateWhitelistBatch(address[] calldata users, bool status) 
         external 
         onlyOwner 
@@ -296,10 +284,6 @@ contract HSKStaking is
         emit RewardPoolUpdated(rewardPoolBalance);
     }
 
-    /**
-     * @dev Withdraws excess reward pool balance that is not reserved for pending rewards
-     * @param amount Amount to withdraw
-     */
     function withdrawExcessRewardPool(uint256 amount) external onlyOwner {
         require(rewardPoolBalance >= totalPendingRewards, "Insufficient reward pool");
         uint256 excess = rewardPoolBalance - totalPendingRewards;
@@ -313,11 +297,6 @@ contract HSKStaking is
 
     // ==================== INTERNAL FUNCTIONS ====================
 
-    /**
-     * @dev Calculates time elapsed for reward calculation, capped at lock period
-     * @param position The staking position
-     * @return timeElapsed Time elapsed since last reward, capped at lock end
-     */
     function _calculateTimeElapsed(Position memory position) 
         internal 
         view 
@@ -328,14 +307,6 @@ contract HSKStaking is
         return endTime - position.lastRewardAt;
     }
 
-    /**
-     * @dev Calculates the reward for a staking position
-     * @param amount The staked amount
-     * @param timeElapsed Time since last reward claim (must be <= 365 days)
-     * @param _rewardRate Annual reward rate in basis points (100% = 10000)
-     * @return reward The calculated reward amount
-     * @notice Optimized for fixed 365-day lock period (timeElapsed always <= 365 days)
-     */
     function _calculateReward(
         uint256 amount,
         uint256 timeElapsed,
@@ -395,12 +366,6 @@ contract HSKStaking is
         );
     }
 
-    // ==================== RECEIVE FUNCTION ====================
-
-    /**
-     * @dev Receives ETH and automatically adds it to the reward pool
-     * This allows anyone to contribute to the reward pool
-     */
     receive() external payable {
         rewardPoolBalance += msg.value;
         emit Received(msg.sender, msg.value);

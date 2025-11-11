@@ -9,12 +9,6 @@ import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.so
  * This proxy contract can be upgraded independently from the Premium pool
  */
 contract NormalStakingProxy is TransparentUpgradeableProxy {
-    /**
-     * @dev Initializes the proxy with the implementation contract, admin, and initialization data
-     * @param _logic Address of the HSKStaking implementation contract
-     * @param admin_ Address of the proxy admin (can upgrade the proxy)
-     * @param _data Initialization data to be passed to the implementation contract's initialize function
-     */
     constructor(
         address _logic,
         address admin_,
