@@ -19,17 +19,15 @@ library StakingLib {
     /**
      * @dev Calculates the reward for a staking position
      * @param amount The staked amount
-     * @param timeElapsed Time since last reward claim (must be <= lockPeriod)
+     * @param timeElapsed Time since last reward claim (must be <= 365 days)
      * @param rewardRate Annual reward rate in basis points (100% = 10000)
-     * @param lockPeriod Duration of the lock in seconds (not used, kept for interface compatibility)
      * @return reward The calculated reward amount
      * @notice Optimized for fixed 365-day lock period (timeElapsed always <= 365 days)
      */
     function calculateReward(
         uint256 amount,
         uint256 timeElapsed,
-        uint256 rewardRate,
-        uint256 lockPeriod
+        uint256 rewardRate
     ) public pure returns (uint256 reward) {
         if (amount == 0 || timeElapsed == 0 || rewardRate == 0) {
             return 0;
