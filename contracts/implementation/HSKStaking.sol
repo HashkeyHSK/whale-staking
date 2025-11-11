@@ -248,12 +248,12 @@ contract HSKStaking is
 
     // ==================== EXTERNAL ADMIN FUNCTIONS ====================
 
-    function pause() external override onlyOwner {
+    function pause() external onlyOwner {
         _pause();
         emit StakingPaused(msg.sender, block.timestamp);
     }
 
-    function unpause() external override onlyOwner {
+    function unpause() external onlyOwner {
         _unpause();
         emit StakingUnpaused(msg.sender, block.timestamp);
     }
