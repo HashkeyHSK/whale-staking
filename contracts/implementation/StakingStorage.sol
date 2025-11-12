@@ -44,11 +44,13 @@ abstract contract StakingStorage is Initializable, OwnableUpgradeable {
      * @param _owner Address of the contract owner
      * @param _minStakeAmount Minimum stake amount (in wei)
      * @param _rewardRate Annual reward rate in basis points (800 for 8%, 1600 for 16%)
+     * @param _whitelistMode Enable whitelist mode (true for Premium, false for Normal)
      */
     function __StakingStorage_init(
         address _owner,
         uint256 _minStakeAmount,
-        uint256 _rewardRate
+        uint256 _rewardRate,
+        bool _whitelistMode
     ) internal onlyInitializing {
         require(_owner != address(0), "StakingStorage: zero owner");
         require(_minStakeAmount > 0, "Invalid min stake amount");
@@ -62,6 +64,6 @@ abstract contract StakingStorage is Initializable, OwnableUpgradeable {
 
         stakeStartTime = type(uint256).max;
         stakeEndTime = type(uint256).max;
-        onlyWhitelistCanStake = true;
+        onlyWhitelistCanStake = _whitelistMode;
     }
 }

@@ -63,24 +63,26 @@ contract HSKStaking is
 
     /**
      * @dev Initializes the contract with custom settings
-     * Sets up initial staking parameters and enables whitelist-only mode
+     * Sets up initial staking parameters with configurable whitelist mode
      * @param _minStakeAmount Minimum stake amount (in wei)
      * @param _rewardRate Annual reward rate in basis points (800 for 8%, 1600 for 16%)
      * @param _stakeStartTime Timestamp when staking begins
      * @param _stakeEndTime Timestamp when staking ends
+     * @param _whitelistMode Enable whitelist mode (false for Normal Staking, true for Premium Staking)
      */
     function initialize(
         uint256 _minStakeAmount,
         uint256 _rewardRate,
         uint256 _stakeStartTime,
-        uint256 _stakeEndTime
+        uint256 _stakeEndTime,
+        bool _whitelistMode
     ) external initializer {
         require(_stakeStartTime > 0, "Invalid start time");
         require(_stakeEndTime > _stakeStartTime, "End time must be after start time");
         
         __ReentrancyGuard_init();
         __Pausable_init();
-        __StakingStorage_init(msg.sender, _minStakeAmount, _rewardRate);
+        __StakingStorage_init(msg.sender, _minStakeAmount, _rewardRate, _whitelistMode);
         
         stakeStartTime = _stakeStartTime;
         stakeEndTime = _stakeEndTime;
