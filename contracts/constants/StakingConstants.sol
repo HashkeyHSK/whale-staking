@@ -11,5 +11,6 @@ contract StakingConstants {
     uint256 public constant BASIS_POINTS = 10000; // 100% = 10000
     uint256 public constant PRECISION = 1e18;
     uint256 public constant LOCK_PERIOD = 365 days;
+    uint256 public constant HSK_DECIMALS = 18; // HSK token decimals
 }
 

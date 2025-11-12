@@ -3,7 +3,7 @@ pragma solidity ^0.8.27;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "./interfaces/IStake.sol";
+import "../interfaces/IStake.sol";
 
 /**
  * @title StakingStorage
@@ -12,9 +12,6 @@ import "./interfaces/IStake.sol";
  * and handles their initialization
  */
 abstract contract StakingStorage is Initializable, OwnableUpgradeable {
-    uint256 internal constant HSK_DECIMALS = 18;
-    uint256 public constant LOCK_PERIOD = 365 days;
-    
     uint256 public minStakeAmount;
     uint256 public totalStaked;
     uint256 public nextPositionId;
