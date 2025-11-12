@@ -134,7 +134,7 @@ npx hardhat run scripts/setStakeEndTime.ts --network <network> \
 
 ### 注意事项
 
-**重要**：Layer2StakingV2 采用固定锁定期设计（365天），不支持修改锁定期。
+**重要**：HSKStaking 采用固定锁定期设计（365天），不支持修改锁定期。
 
 如需提供不同的锁定期或收益率配置，请部署新的合约实例。
 
@@ -185,6 +185,7 @@ npx hardhat run scripts/checkStakes.ts --network <network> \
 ## 📚 相关文档
 
 - [主 README](../README.md)
+- [合约架构说明](./CONTRACT_ARCHITECTURE.md) - **合约架构详解（开发必读）**
 - [产品方案详细文档](./PRODUCT_PLANS.md) - **运营文档（推荐）**
 - [产品方案执行摘要](./PRODUCT_SUMMARY.md) - 快速了解
 - [产品开发文档](./PRODUCT_PLANS_DEV.md) - 开发团队文档

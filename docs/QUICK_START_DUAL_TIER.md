@@ -177,13 +177,14 @@ npx hardhat run scripts/checkWhitelist.ts --network hashkeyTestnet \
 
 ### Q: 如何修改锁定期或收益率？
 
-Layer2StakingV2 采用固定锁定期（365天）和固定收益率设计，部署后不支持修改。
+HSKStaking 采用固定锁定期（365天）和固定收益率设计，部署后不支持修改。
 
 如需提供不同的锁定期或收益率配置，请部署新的合约实例。
 
 ## 📚 更多文档
 
 - [主 README](../README.md)
+- [合约架构说明](./CONTRACT_ARCHITECTURE.md) - **合约架构详解（开发必读）**
 - [完整部署文档](./DUAL_TIER_STAKING.md) - 技术部署文档
 - [产品方案详细文档](./PRODUCT_PLANS.md) - **运营文档（推荐）**
 - [产品方案执行摘要](./PRODUCT_SUMMARY.md) - 快速了解

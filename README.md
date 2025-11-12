@@ -38,29 +38,45 @@
 
 ```
 contracts/
-├── staking.sol              # Layer2Staking V1.0.0 主合约
-├── Layer2StakingV2.sol      # Layer2Staking V1.0.1 升级版本
-├── StakingStorage.sol       # 存储层合约（定义所有状态变量）
-├── interfaces/
-│   ├── IStake.sol          # 主要接口定义
-│   └── IStaking.sol        # 质押接口
-└── libraries/
-    └── StakingLib.sol      # 奖励计算和验证库
+├── implementation/          # 实现合约目录
+│   ├── HSKStaking.sol      # 主实现合约（核心质押逻辑）
+│   └── StakingStorage.sol  # 存储层合约（定义所有状态变量）
+├── constants/               # 常量定义目录
+│   └── StakingConstants.sol # 质押常量（锁定期、精度等）
+├── interfaces/              # 接口定义目录
+│   └── IStake.sol          # 质押接口定义
+├── NormalStakingProxy.sol   # 普通质押代理合约（1 HSK, 8% APY）
+└── PremiumStakingProxy.sol  # 高级质押代理合约（500K HSK, 16% APY）
 ```
 
 ### 合约继承关系
 
 ```
-Layer2StakingV2
-├── IStaking (接口)
-├── StakingStorage (存储层，继承 OwnableUpgradeable)
+HSKStaking (主实现合约)
+├── IStaking (接口定义)
+├── StakingStorage (存储层)
+│   ├── Initializable (初始化控制)
+│   └── OwnableUpgradeable (所有权管理)
+├── StakingConstants (常量定义)
 ├── ReentrancyGuardUpgradeable (重入保护)
 └── PausableUpgradeable (暂停功能)
 
-StakingStorage
-├── Initializable (初始化控制)
-└── OwnableUpgradeable (所有权管理)
+代理合约架构
+├── NormalStakingProxy (TransparentUpgradeableProxy)
+│   ├── 指向 HSKStaking 实现
+│   ├── 最小质押：1 HSK
+│   └── 年化收益：8% (800 basis points)
+└── PremiumStakingProxy (TransparentUpgradeableProxy)
+    ├── 指向 HSKStaking 实现
+    ├── 最小质押：500,000 HSK
+    └── 年化收益：16% (1600 basis points)
 ```
+
+**架构说明**：
+- 两个代理合约共享同一个 HSKStaking 实现合约
+- 通过 `initialize()` 函数的不同参数配置不同的产品特性
+- 固定锁定期 365 天由 `StakingConstants.LOCK_PERIOD` 定义
+- 年化收益率在部署时通过 `rewardRate` 参数设置（basis points: 100% = 10000）
 
 ## 🚀 快速开始
 
@@ -103,36 +119,48 @@ npx hardhat test
 
 ### 用户功能
 
-#### `stake() payable`
+#### `stake() payable → uint256 positionId`
 创建新的质押位置（固定365天锁定期）
 - **参数**: 无参数，通过 `msg.value` 发送质押金额，锁定期固定为365天
 - **返回**: `positionId` - 质押位置 ID
 - **要求**: 
   - 当前时间必须在质押时间窗口内（`stakeStartTime <= now < stakeEndTime`）
-  - 如果启用白名单模式，必须是白名单用户
-  - 质押金额 >= 最小质押金额
-  - 总质押量不能超过最大限制
-  - 奖励池余额充足
+  - 如果启用白名单模式，必须是白名单用户（通过 `whitelistCheck` 修饰符检查）
+  - 质押金额 >= 最小质押金额（`minStakeAmount`）
+  - 奖励池余额充足（`rewardPoolBalance >= totalPendingRewards + potentialReward`）
+  - 合约未暂停（`whenNotPaused`）
+  - 非紧急模式（`whenNotEmergency`）
 
 #### `unstake(uint256 positionId)`
 解除质押并提取本金和奖励
 - **参数**: `positionId` - 质押位置 ID
 - **返回**: 自动转账本金和奖励到调用者地址
 - **要求**: 
-  - 必须是位置所有者
-  - 锁定期已结束（365天）
+  - 必须是位置所有者（通过 `validPosition` 修饰符检查）
+  - 锁定期已结束（`block.timestamp >= position.stakedAt + LOCK_PERIOD`，即365天）
+  - 位置未解除质押（`!position.isUnstaked`）
 - **提取金额**: 本金 + 全部累积奖励
+- **重入保护**: 使用 `nonReentrant` 修饰符防止重入攻击
 
-#### `claimReward(uint256 positionId)`
+#### `claimReward(uint256 positionId) → uint256 reward`
 提取奖励（不解除质押）
 - **参数**: `positionId` - 质押位置 ID
 - **返回**: `reward` - 提取的奖励金额
-- **要求**: 必须有未提取的奖励
+- **要求**: 
+  - 必须是位置所有者（通过 `validPosition` 修饰符检查）
+  - 必须有未提取的奖励（`reward > 0`）
+  - 合约未暂停（`whenNotPaused`）
+  - 非紧急模式（`whenNotEmergency`）
+- **重入保护**: 使用 `nonReentrant` 修饰符防止重入攻击
 
-#### `pendingReward(uint256 positionId)`
+#### `pendingReward(uint256 positionId) view → uint256 reward`
 查询待提取奖励
 - **参数**: `positionId` - 质押位置 ID
 - **返回**: `reward` - 待提取奖励金额
+- **说明**: 
+  - 紧急模式下返回 0
+  - 只能查询自己的质押位置
+  - 奖励按秒连续累积，精确到秒
 
 #### 查看用户质押位置
 通过 `userPositions(address user, uint256 index)` 查看
@@ -146,6 +174,8 @@ npx hardhat test
 - **参数**: 
   - `users` - 用户地址数组（最多100个）
   - `status` - true 添加到白名单，false 从白名单移除
+- **要求**: 仅管理员可调用（`onlyOwner`）
+- **事件**: 为每个状态变更的用户触发 `WhitelistStatusChanged` 事件
 
 #### `setWhitelistOnlyMode(bool enabled)`
 启用/禁用白名单模式
@@ -153,34 +183,58 @@ npx hardhat test
 #### `setStakeStartTime(uint256 newStartTime)`
 设置质押开始时间
 - **参数**: `newStartTime` - 质押开始时间戳（秒）
+- **要求**: 
+  - 仅管理员可调用（`onlyOwner`）
+  - `newStartTime > 0` - 必须是有效时间
+  - `newStartTime < stakeEndTime` - 必须早于结束时间
 - **说明**: 用户只能在 `stakeStartTime` 之后开始质押
+- **事件**: 触发 `StakeStartTimeUpdated` 事件
 
 #### `setStakeEndTime(uint256 newEndTime)`
 设置质押截止时间
 - **参数**: `newEndTime` - 质押结束时间戳（秒）
-- **要求**: 必须是未来的时间
+- **要求**: 
+  - 仅管理员可调用（`onlyOwner`）
+  - `newEndTime > block.timestamp` - 必须是未来的时间
+  - `newEndTime > stakeStartTime` - 必须晚于开始时间
 - **说明**: 用户只能在 `stakeEndTime` 之前质押
+- **事件**: 触发 `StakeEndTimeUpdated` 事件
 
-#### `updateRewardPool()`
+#### `updateRewardPool() payable`
 向奖励池充值
+- **参数**: 通过 `msg.value` 发送充值金额
+- **要求**: 仅管理员可调用（`onlyOwner`）
+- **效果**: 增加 `rewardPoolBalance`
+- **事件**: 触发 `RewardPoolUpdated` 事件
 
 #### `enableEmergencyMode()`
 启用紧急模式（暂停奖励分配）
+- **要求**: 仅管理员可调用（`onlyOwner`）
+- **效果**: 
+  - 设置 `emergencyMode = true`
+  - 暂停奖励分配（所有奖励相关函数返回0）
+  - 阻止新质押
+  - 允许紧急提取（仅本金）
+- **事件**: 触发 `EmergencyModeEnabled` 事件
+- **注意**: 当前版本紧急模式一旦启用无法通过函数关闭，可能需要合约升级
 
 #### `emergencyWithdraw(uint256 positionId)`
 紧急提取（仅提取本金，不包含奖励）
 - **参数**: `positionId` - 质押位置 ID
 - **要求**: 
-  - 必须在紧急模式下（管理员启用）
-  - 必须是位置所有者
+  - 必须在紧急模式下（`emergencyMode == true`）
+  - 必须是位置所有者（`position.owner == msg.sender`）
+  - 位置未解除质押（`!position.isUnstaked`）
   - **不受锁定期限制**（可以随时提取）
 - **提取金额**: 仅本金，**不包含奖励**
+- **重入保护**: 使用 `nonReentrant` 修饰符防止重入攻击
+- **事件**: 触发 `EmergencyWithdrawn` 事件
 
 ## 🔒 锁定期和收益率
 
 ### 固定锁定期
 
-Layer2StakingV2 采用固定锁定期设计：
+HSKStaking 采用固定锁定期设计：
 
 | 参数 | 配置 | 说明 |
 |------|------|------|
@@ -257,19 +311,30 @@ V2 版本简化了锁定期选择：
 
 ## 💰 奖励计算
 
-奖励计算公式（`StakingLib.calculateReward`）：
+奖励计算公式（`HSKStaking._calculateReward`）：
 
 ```solidity
 // 年化率 = rewardRate (basis points) / 10000
-// 完整年份奖励 = 本金 × 年化率 × 完整年份数
-// 剩余时间奖励 = 本金 × 年化率 × (剩余秒数 / 365天的秒数)
-// 总奖励 = 完整年份奖励 + 剩余时间奖励
+// 时间比率 = timeElapsed / 365 days
+// 奖励 = 本金 × (年化率 / 10000) × (timeElapsed / 365 days)
+//
+// 简化公式：
+// reward = (amount × rewardRate × timeElapsed) / (10000 × 365 days)
+```
+
+**实现细节**：
+```solidity
+uint256 annualRate = (rewardRate × PRECISION) / BASIS_POINTS;
+uint256 timeRatio = (timeElapsed × PRECISION) / SECONDS_PER_YEAR;
+uint256 totalReward = (amount × annualRate × timeRatio) / (PRECISION × PRECISION);
 ```
 
 **计算特点**：
 - 奖励按秒连续累积，精确到秒
-- 如果 `timeElapsed > lockPeriod`，奖励只计算到 `lockPeriod` 结束
-- 使用 18 位小数精度进行高精度计算
+- 如果 `timeElapsed > LOCK_PERIOD`，奖励只计算到 `LOCK_PERIOD` 结束
+- 使用 18 位小数精度（`PRECISION = 1e18`）进行高精度计算
+- BASIS_POINTS = 10000（100% = 10000 basis points）
+- SECONDS_PER_YEAR = 365 days = 31,536,000 秒
 
 ## 🛡️ 安全特性
 
@@ -462,20 +527,25 @@ npx hardhat coverage
 
 ## 🔍 合约版本
 
-- **Layer2Staking V1.0.0** (`staking.sol`) - 初始版本
-  - 支持多个锁定期选项
-  - 支持 `updateLockOption` 修改锁定期
-  - 升级冷却期：7天
-  
-- **Layer2StakingV2 V2.0.0** (`Layer2StakingV2.sol`) - 当前版本
-  - **固定365天锁定期**，简化用户操作
-  - **移除多锁定期选项**，通过不同产品（普通/Premium）提供不同收益率
-  - **移除 TIME_TOLERANCE**，严格执行锁定期
-  - **优化的 stake() 接口**：无需传入 lockPeriod 参数
-  - **使用 Transparent Proxy**：替代 UUPS，升级由 ProxyAdmin 控制
-  - **简化访问控制**：使用 OpenZeppelin Ownable，移除自定义 admin 机制
-  - **优化接口**：移除冗余方法（getUserPositions、setWhitelist 等）
-  - **奖励池检查逻辑优化**
+### 当前版本: HSKStaking V2.0.0
+
+**核心特性**：
+- **固定365天锁定期**：简化用户操作，无需选择锁定期
+- **双代理架构**：通过 `NormalStakingProxy` 和 `PremiumStakingProxy` 支持两套产品方案
+- **Transparent Proxy 模式**：升级由 ProxyAdmin 控制，安全可靠
+- **统一实现合约**：`HSKStaking.sol` 作为通用实现，通过初始化参数配置不同产品
+- **简化的 stake() 接口**：无需传入 lockPeriod 参数
+- **常量分离**：将常量定义独立到 `StakingConstants.sol`
+
+**架构优势**：
+- **模块化设计**：实现、存储、常量、接口分离，清晰易维护
+- **可复用性**：同一实现合约支持多个产品实例
+- **独立升级**：两个代理合约可独立升级
+- **灵活配置**：通过初始化参数配置不同的产品特性
+
+**版本历史**：
+- V1.0.0 (`staking.sol`): 初始版本，支持多锁定期选项
+- V2.0.0 (`HSKStaking.sol`): 当前版本，固定锁定期 + 双代理架构
 
 ## ⚠️ 重要提醒
 
@@ -523,16 +593,25 @@ MIT License
 
 ## 📚 相关文档
 
+### 核心文档
+- [合约架构说明](./docs/CONTRACT_ARCHITECTURE.md) - **合约架构详解（开发必读）**
 - [产品方案详细文档](./docs/PRODUCT_PLANS.md) - **运营文档（推荐）**
 - [产品方案执行摘要](./docs/PRODUCT_SUMMARY.md) - 快速了解产品方案
+
+### 部署和开发
 - [双层产品方案文档](./docs/DUAL_TIER_STAKING.md) - 技术部署文档
 - [产品开发文档](./docs/PRODUCT_PLANS_DEV.md) - 开发团队文档
 - [快速开始指南](./docs/QUICK_START_DUAL_TIER.md) - 快速部署指南
+
+### 参考文档
 - [技术常见问题](./docs/TECHNICAL_FAQ.md) - 技术机制说明
+- [错误处理指南](./docs/ERROR_HANDLING.md) - 常见错误处理
 - [术语表](./docs/GLOSSARY.md) - 术语定义
 
 ---
 
-**文档版本**: 1.1.0  
+**文档版本**: 2.0.0  
 **最后更新**: 2026-11  
 **维护者**: Whale Staking Team
+
+**版本说明**: V2.0.0 - 更新合约架构说明，反映 HSKStaking + 双代理架构

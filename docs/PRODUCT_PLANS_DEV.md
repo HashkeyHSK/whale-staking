@@ -9,7 +9,7 @@
 
 ### 1.1 产品方案
 
-本方案基于 `Layer2StakingV2` 合约，通过部署两个独立的合约实例实现两套产品：
+本方案基于 `HSKStaking` 合约，通过部署两个独立的代理合约（`NormalStakingProxy` 和 `PremiumStakingProxy`）实现两套产品：
 
 | 产品 | 合约实例 | 目标用户 | 最小质押 | 年化收益 | 白名单 |
 |------|---------|---------|---------|---------|--------|
@@ -26,17 +26,32 @@
 
 ### 1.3 合约架构
 
+#### 实现合约层
 ```
-Layer2StakingV2 (主合约)
+HSKStaking (主实现合约)
+├── IStaking (接口定义)
 ├── StakingStorage (存储层)
-├── StakingLib (计算库)
+│   ├── Initializable (初始化控制)
+│   └── OwnableUpgradeable (所有权管理)
+├── StakingConstants (常量定义)
 ├── ReentrancyGuardUpgradeable (重入保护)
-├── PausableUpgradeable (暂停功能)
-├── OwnableUpgradeable (所有权管理)
+└── PausableUpgradeable (暂停功能)
 ```
 
-**说明**: 不再使用 UUPS，改为 Transparent Proxy 模式，由 ProxyAdmin 控制升级
+#### 代理合约层
 ```
+代理合约架构
+├── NormalStakingProxy (TransparentUpgradeableProxy)
+│   └── 指向 HSKStaking 实现
+└── PremiumStakingProxy (TransparentUpgradeableProxy)
+    └── 指向 HSKStaking 实现
+```
+
+**架构说明**：
+- 使用 Transparent Proxy 模式，由 ProxyAdmin 控制升级
+- 两个代理合约共享同一个 `HSKStaking` 实现
+- 通过初始化参数配置不同的产品特性
+- 两个代理合约可独立升级
 
 ---
 
@@ -67,18 +82,36 @@ Layer2StakingV2 (主合约)
 ### 2.3 关键数据结构
 
 ```solidity
-// Position 结构
+// Position 结构（定义在 IStaking 接口中）
 struct Position {
     uint256 positionId;      // 质押位置 ID
     address owner;           // 质押位置所有者
     uint256 amount;          // 质押金额
     uint256 stakedAt;        // 质押时间戳
     uint256 lastRewardAt;    // 上次奖励提取时间戳
-    uint256 rewardRate;      // 年化收益率（basis points）
     bool isUnstaked;         // 是否已解除质押
 }
 
 // 注意: V2版本使用固定的 LOCK_PERIOD 常量（365天），不再使用 LockOption 结构
+// 注意: Position 结构中不包含 rewardRate 字段，rewardRate 是合约级别的状态变量
+```
+
+**存储变量（定义在 StakingStorage 中）**：
+```solidity
+uint256 public minStakeAmount;        // 最小质押金额
+uint256 public totalStaked;           // 总质押量
+uint256 public nextPositionId;        // 下一个位置ID
+uint256 public rewardRate;            // 年化收益率（basis points）
+uint256 public totalPendingRewards;   // 总待发放奖励
+uint256 public rewardPoolBalance;     // 奖励池余额
+uint256 public stakeStartTime;        // 质押开始时间
+uint256 public stakeEndTime;          // 质押结束时间
+bool public onlyWhitelistCanStake;    // 是否只允许白名单质押
+bool public emergencyMode;            // 紧急模式
+
+mapping(uint256 => Position) public positions;       // 位置ID => 位置信息
+mapping(address => uint256[]) public userPositions;  // 用户地址 => 位置ID数组
+mapping(address => bool) public whitelisted;         // 白名单mapping
 ```
 
 ---
@@ -216,9 +249,13 @@ userPositions(address user, uint256 index) view → uint256 positionId
 
 #### `setMinStakeAmount(uint256 newAmount)`
 设置最小质押金额。
+- **要求**: 仅管理员可调用（`onlyOwner`）
+- **要求**: 非紧急模式（`whenNotEmergency`）
 
 #### `setWhitelistOnlyMode(bool enabled)`
 启用/禁用白名单模式。
+- **要求**: 仅管理员可调用（`onlyOwner`）
+- **事件**: 触发 `WhitelistModeChanged` 事件
 
 #### `updateWhitelistBatch(address[] calldata users, bool status)`
 批量管理白名单用户。
@@ -227,14 +264,40 @@ userPositions(address user, uint256 index) view → uint256 positionId
 - `users`: 用户地址数组（最多100个）
 - `status`: true 添加到白名单，false 从白名单移除
 
+**要求**: 仅管理员可调用（`onlyOwner`）
+**事件**: 为每个状态变更的用户触发 `WhitelistStatusChanged` 事件
+
 #### `updateRewardPool() payable`
 向奖励池充值。
+
+**参数**: 通过 `msg.value` 发送充值金额
+**要求**: 仅管理员可调用（`onlyOwner`）
+**效果**: 增加 `rewardPoolBalance`
+**事件**: 触发 `RewardPoolUpdated` 事件
 
 **重要**：
 - 奖励池需要独立管理（普通 Staking 和 Premium Staking 分别管理）
 
+#### `withdrawExcessRewardPool(uint256 amount)`
+提取奖励池多余资金。
+
+**参数**: `amount` - 提取金额
+**要求**: 
+- 仅管理员可调用（`onlyOwner`）
+- `rewardPoolBalance >= totalPendingRewards` - 奖励池余额充足
+- `amount <= excess` - 不能提取已分配的奖励
+
 #### `enableEmergencyMode()`
 启用紧急模式。
+
+**要求**: 仅管理员可调用（`onlyOwner`）
+**效果**: 
+- 设置 `emergencyMode = true`
+- 暂停奖励分配（所有奖励相关函数返回0）
+- 阻止新质押
+- 允许紧急提取（仅本金）
+**事件**: 触发 `EmergencyModeEnabled` 事件
+**注意**: 当前版本紧急模式一旦启用无法通过函数关闭，可能需要合约升级
 
 **紧急模式下的限制**：
 - 暂停奖励分配（所有奖励相关函数返回0）
@@ -245,9 +308,15 @@ userPositions(address user, uint256 index) view → uint256 positionId
 #### `emergencyWithdraw(uint256 positionId)`
 紧急提取（仅本金，放弃奖励）。
 
+**参数**: `positionId` - 质押位置 ID
 **要求**：
-- 必须在紧急模式下
-- 位置所有者
+- 必须在紧急模式下（`emergencyMode == true`）
+- 位置所有者（`position.owner == msg.sender`）
+- 位置未解除质押（`!position.isUnstaked`）
+- 不受锁定期限制
+
+**重入保护**: 使用 `nonReentrant` 修饰符
+**事件**: 触发 `EmergencyWithdrawn` 事件
 
 ### 4.3 查询接口
 
@@ -289,17 +358,31 @@ userPositions(address user, uint256 index) view → uint256 positionId
 
 ### 5.1 计算公式
 
-奖励计算由 `StakingLib.calculateReward()` 实现：
+奖励计算由 `HSKStaking._calculateReward()` 实现：
 
 ```solidity
-// 年化率 = rewardRate / 10000
-// 完整年份数 = timeElapsed / 365 days
-// 剩余天数 = (timeElapsed % 365 days)
-// 
-// 奖励 = 本金 × 年化率 × (完整年份数 + 剩余天数/365)
+// 年化率 = rewardRate (basis points) / 10000
+// 时间比率 = timeElapsed / 365 days
+// 奖励 = 本金 × (年化率 / 10000) × (timeElapsed / 365 days)
 //
-// 限制：如果 timeElapsed > lockPeriod，则 timeElapsed = lockPeriod
+// 简化公式：
+// reward = (amount × rewardRate × timeElapsed) / (10000 × 365 days)
+//
+// 限制：如果 timeElapsed > LOCK_PERIOD，则 timeElapsed = LOCK_PERIOD
 ```
+
+**实现细节**：
+```solidity
+uint256 annualRate = (rewardRate × PRECISION) / BASIS_POINTS;
+uint256 timeRatio = (timeElapsed × PRECISION) / SECONDS_PER_YEAR;
+uint256 totalReward = (amount × annualRate × timeRatio) / (PRECISION × PRECISION);
+```
+
+**常量定义**：
+- `PRECISION = 1e18` - 18位小数精度
+- `BASIS_POINTS = 10000` - 100% = 10000 basis points
+- `SECONDS_PER_YEAR = 365 days` - 31,536,000 秒
+- `LOCK_PERIOD = 365 days` - 固定锁定期
 
 ### 5.2 计算示例
 
@@ -324,7 +407,20 @@ userPositions(address user, uint256 index) view → uint256 positionId
 - 实际质押了 400 天才提取
 - 奖励仍按 365 天计算，超期的 35 天不产生奖励
 
-**实现位置**：`StakingLib.calculateReward()` 中的限制逻辑
+**实现位置**：`HSKStaking._calculateReward()` 和 `_calculateTimeElapsed()` 中的限制逻辑
+
+**实现代码**：
+```solidity
+function _calculateTimeElapsed(Position memory position) 
+    internal 
+    view 
+    returns (uint256) 
+{
+    uint256 lockEndTime = position.stakedAt + LOCK_PERIOD;
+    uint256 endTime = block.timestamp < lockEndTime ? block.timestamp : lockEndTime;
+    return endTime - position.lastRewardAt;
+}
+```
 
 ---
 
@@ -572,6 +668,7 @@ A: 使用 `enableEmergencyMode()` 启用。注意：当前合约版本中，紧�
 ## 十四. 相关资源
 
 - [主 README](../README.md)
+- [合约架构说明](./CONTRACT_ARCHITECTURE.md) - **合约架构详解（开发必读）**
 - [产品方案详细文档](./PRODUCT_PLANS.md) - **运营文档（推荐）**
 - [产品方案执行摘要](./PRODUCT_SUMMARY.md) - 快速了解
 - [双层产品方案文档](./DUAL_TIER_STAKING.md) - 技术部署文档
