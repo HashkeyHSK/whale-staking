@@ -75,26 +75,75 @@ scripts/
 │   ├── helpers.ts            # 辅助函数
 │   └── utils.ts              # 工具函数
 │
-└── normal/                    # 普通质押
-    ├── deploy.ts             # 部署合约
-    ├── stake.ts              # 质押操作
-    ├── unstake.ts            # 解除质押
-    ├── claim-rewards.ts      # 领取奖励
-    ├── add-rewards.ts        # 添加奖励池
-    ├── emergency-withdraw.ts # 紧急提取本金
-    ├── withdraw-excess.ts    # 提取多余奖励
-    ├── verify-forge.ts       # 验证合约（使用 Foundry）
-    ├── config/               # 配置管理
-    │   ├── pause.ts          # 暂停合约
-    │   ├── unpause.ts        # 恢复合约
-    │   ├── set-start-time.ts # 设置开始时间
-    │   ├── set-end-time.ts   # 设置结束时间
-    │   ├── set-min-stake.ts  # 设置最小质押金额
-    │   └── enable-emergency.ts # 启用紧急模式
-    └── query/                # 状态查询
-        ├── check-status.ts   # 查询合约状态
-        ├── check-stakes.ts   # 查询质押信息
-        └── pending-reward.ts # 查询待领取奖励
+├── normal/                    # 普通质押
+│   ├── deploy.ts             # 部署合约
+│   ├── upgrade.ts            # 升级合约
+│   ├── stake.ts              # 质押操作
+│   ├── unstake.ts            # 解除质押
+│   ├── claim-rewards.ts      # 领取奖励
+│   ├── add-rewards.ts        # 添加奖励池
+│   ├── emergency-withdraw.ts # 紧急提取本金
+│   ├── withdraw-excess.ts    # 提取多余奖励
+│   ├── verify-forge.ts       # 验证合约（使用 Foundry）
+│   ├── config/               # 配置管理
+│   │   ├── pause.ts          # 暂停合约
+│   │   ├── unpause.ts        # 恢复合约
+│   │   ├── set-start-time.ts # 设置开始时间
+│   │   ├── set-end-time.ts   # 设置结束时间
+│   │   ├── set-min-stake.ts  # 设置最小质押金额
+│   │   └── enable-emergency.ts # 启用紧急模式
+│   └── query/                # 状态查询
+│       ├── check-status.ts   # 查询合约状态
+│       ├── check-stakes.ts   # 查询质押信息
+│       └── pending-reward.ts # 查询待领取奖励
+│
+├── premium/                   # 高级质押（功能同 normal，包含白名单管理）
+│   ├── deploy.ts             # 部署合约
+│   ├── upgrade.ts            # 升级合约
+│   ├── stake.ts              # 质押操作
+│   ├── unstake.ts            # 解除质押
+│   ├── claim-rewards.ts      # 领取奖励
+│   ├── add-rewards.ts        # 添加奖励池
+│   ├── emergency-withdraw.ts # 紧急提取本金
+│   ├── withdraw-excess.ts    # 提取多余奖励
+│   ├── verify-forge.ts       # 验证合约
+│   ├── whitelist/            # 白名单管理
+│   │   ├── add-batch.ts      # 批量添加白名单
+│   │   ├── remove-batch.ts   # 批量移除白名单
+│   │   ├── check-user.ts     # 查询用户白名单状态
+│   │   └── toggle-mode.ts   # 切换白名单模式
+│   ├── config/               # 配置管理
+│   │   ├── pause.ts
+│   │   ├── unpause.ts
+│   │   ├── set-start-time.ts
+│   │   ├── set-end-time.ts
+│   │   ├── set-min-stake.ts
+│   │   └── enable-emergency.ts
+│   └── query/                # 状态查询
+│       ├── check-status.ts
+│       ├── check-stakes.ts
+│       ├── pending-reward.ts
+│       └── check-whitelist.ts
+│
+├── dev/                       # 开发脚本
+│   ├── compile.ts            # 编译合约
+│   ├── clean.ts              # 清理编译产物
+│   ├── test-all.ts           # 运行所有测试
+│   └── coverage.ts           # 生成测试覆盖率报告
+│
+├── test/                      # 测试脚本
+│   ├── helpers/              # 测试辅助函数
+│   │   ├── fixtures.ts       # 测试夹具
+│   │   └── test-utils.ts     # 测试工具函数
+│   └── integration/          # 集成测试
+│       ├── deploy-test.ts    # 部署测试
+│       ├── stake-test.ts     # 质押操作测试
+│       └── whitelist-test.ts # 白名单功能测试
+│
+└── tools/                     # 工具脚本
+    ├── extract-abi.ts        # 提取 ABI
+    ├── generate-types.ts     # 生成 TypeScript 类型
+    └── compare-contracts.ts  # 对比合约差异
 ```
 
 ## 🔧 配置
@@ -128,6 +177,10 @@ export NEW_MIN_STAKE="1"            # 新的最小质押金额
 # 高级操作
 export WITHDRAW_AMOUNT="100"       # 提取金额
 export CONFIRM_EMERGENCY="YES_I_UNDERSTAND"  # 确认启用紧急模式
+
+# 升级相关
+export PROXY_ADMIN_ADDRESS="0x..."  # ProxyAdmin 地址（升级时必需，通常是部署者地址）
+export NEW_IMPLEMENTATION_ADDRESS="0x..."  # 新实现合约地址（可选，不提供则自动部署）
 ```
 
 ### 合约地址配置
@@ -151,6 +204,26 @@ export const TESTNET_ADDRESSES: ContractAddresses = {
 ### 合约验证
 - `npm run verify:forge` - 验证实现合约（主网，使用 Foundry）
 - `npm run verify:forge:testnet` - 验证实现合约（测试网，使用 Foundry）
+
+### 合约升级
+- `npm run upgrade:normal:testnet` - 升级普通质押合约（测试网）
+- `npm run upgrade:premium:testnet` - 升级高级质押合约（测试网）
+
+### 开发工具
+- `npm run dev:compile` - 编译合约（通过脚本）
+- `npm run dev:clean` - 清理编译产物（通过脚本）
+- `npm run dev:test` - 运行所有测试（通过脚本）
+- `npm run dev:coverage` - 生成测试覆盖率报告（通过脚本）
+
+### 集成测试
+- `npm run test:integration:deploy` - 运行部署集成测试
+- `npm run test:integration:stake` - 运行质押操作集成测试
+- `npm run test:integration:whitelist` - 运行白名单功能集成测试
+
+### 工具脚本
+- `npm run tools:extract-abi` - 提取合约 ABI
+- `npm run tools:generate-types` - 生成 TypeScript 类型
+- `npm run tools:compare-contracts` - 对比合约差异
 
 ### 质押操作
 - `npm run stake:testnet` - 质押
@@ -236,6 +309,64 @@ WITHDRAW_AMOUNT="1000" npm run withdraw-excess:testnet
 
 # 提取所有可用余额（不指定金额）
 npm run withdraw-excess:testnet
+```
+
+**Q: 如何升级合约？**
+升级需要 ProxyAdmin 权限（通常是部署者地址）：
+```bash
+# 升级普通质押合约（自动部署新实现）
+PROXY_ADMIN_ADDRESS="0x..." npm run upgrade:normal:testnet
+
+# 使用已部署的实现合约升级
+PROXY_ADMIN_ADDRESS="0x..." NEW_IMPLEMENTATION_ADDRESS="0x..." npm run upgrade:normal:testnet
+
+# 升级高级质押合约
+PROXY_ADMIN_ADDRESS="0x..." npm run upgrade:premium:testnet
+```
+
+⚠️ **升级注意事项**：
+- 确保新实现合约与现有存储布局兼容
+- 升级后所有状态数据会保留
+- 升级前建议先在测试网验证
+- 升级后需要验证新实现合约
+
+**Q: 如何使用开发脚本？**
+```bash
+# 编译合约
+npm run dev:compile
+
+# 清理编译产物
+npm run dev:clean
+
+# 运行所有测试
+npm run dev:test
+
+# 生成覆盖率报告（需要安装 solidity-coverage）
+npm run dev:coverage
+```
+
+**Q: 如何运行集成测试？**
+```bash
+# 运行部署测试
+npm run test:integration:deploy
+
+# 运行质押操作测试
+npm run test:integration:stake
+
+# 运行白名单功能测试
+npm run test:integration:whitelist
+```
+
+**Q: 如何使用工具脚本？**
+```bash
+# 提取 ABI（需要先编译合约）
+npm run tools:extract-abi
+
+# 生成 TypeScript 类型（编译时自动生成）
+npm run tools:generate-types
+
+# 对比合约实现
+npm run tools:compare-contracts HSKStaking
 ```
 
 ## 🎯 合约配置
