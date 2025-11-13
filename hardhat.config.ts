@@ -1,12 +1,9 @@
-import { HardhatUserConfig } from "hardhat/config";
-import "@nomicfoundation/hardhat-toolbox";
+import { HardhatUserConfig } from "hardhat/config.js";
 import "@nomicfoundation/hardhat-verify";
-import "@openzeppelin/hardhat-upgrades";
-import "@nomicfoundation/hardhat-network-helpers";
-import "@openzeppelin/hardhat-upgrades";
-import * as dotenv from "dotenv";
+import "@nomicfoundation/hardhat-ignition";
+import { config as dotenvConfig } from "dotenv";
 
-dotenv.config();
+dotenvConfig();
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -21,19 +18,20 @@ const config: HardhatUserConfig = {
   },
   networks: {
     hashkeyTestnet: {
+      type: "http" as const,
       url: "https://testnet.hsk.xyz",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       chainId: 133,
-      gasPrice: 20000000000,
       timeout: 1000000,
     },
     hashkeyMainnet: {
+      type: "http" as const,
       url: "https://mainnet.hsk.xyz",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       chainId: 177,
-      gasPrice: "auto",
     },
     hardhat: {
+      type: "edr-simulated" as const,
       chainId: 31337,
       allowUnlimitedContractSize: true,
     },
