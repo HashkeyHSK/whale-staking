@@ -10,32 +10,153 @@
 
 ### 合约架构特性
 
-1. **合约名称**: `HSKStaking` (实现合约)
-2. **代理模式**: Transparent Proxy（使用 `NormalStakingProxy` 和 `PremiumStakingProxy`）
+1. **合约结构**: 
+   - `HSKStaking.sol` - 主实现合约（继承 StakingStorage、StakingConstants、ReentrancyGuardUpgradeable、PausableUpgradeable）
+   - `StakingStorage.sol` - 存储层（继承 Initializable、OwnableUpgradeable）
+   - `StakingConstants.sol` - 常量定义合约
+   - `IStake.sol` - 接口定义
+   - `NormalStakingProxy.sol` / `PremiumStakingProxy.sol` - 代理合约
+
+2. **代理模式**: Transparent Proxy（使用 OpenZeppelin 的 `TransparentUpgradeableProxy`）
+   - 可独立升级 Normal 和 Premium 质押池
+   - ProxyAdmin 用于管理代理合约升级
+
 3. **原生代币**: HSK 是链的原生代币（native token），类似于 ETH，不是 ERC20 代币
-4. **锁定期**: 固定 365 天，在合约常量 `LOCK_PERIOD` 中定义，不能动态修改
-5. **奖励率**: 在合约级别配置（`rewardRate`），所有 position 共享同一个奖励率
+   - 使用 `msg.value` 接收质押
+   - 使用 `call{value: amount}("")` 发送代币
+
+4. **锁定期**: 固定 365 天（`LOCK_PERIOD = 365 days`），在合约常量中定义，不可动态修改
+
+5. **奖励率**: 在合约级别配置（`rewardRate` 状态变量），所有 position 共享同一个奖励率
+   - 使用 basis points 表示（800 = 8%，1600 = 16%）
+   - `BASIS_POINTS = 10000` (100% = 10000)
+
 6. **Position 结构**: 
    ```solidity
    struct Position {
-       uint256 positionId;
-       address owner;
-       uint256 amount;
-       uint256 stakedAt;
-       uint256 lastRewardAt;  // 上次领取奖励时间
-       bool isUnstaked;
+       uint256 positionId;      // Position ID
+       address owner;           // Position owner
+       uint256 amount;          // Staked amount
+       uint256 stakedAt;        // Timestamp when staked
+       uint256 lastRewardAt;    // Last reward claim timestamp
+       bool isUnstaked;         // Whether position is unstaked
    }
    ```
-   注意：Position 中不包含 `lockPeriod` 和 `rewardRate`，这些是合约级别的配置。
+   ⚠️ **注意**: Position 中不包含 `lockPeriod` 和 `rewardRate`，这些是合约级别的配置。
+
+7. **合约常量** (StakingConstants.sol):
+   ```solidity
+   uint256 public constant SECONDS_PER_YEAR = 365 days;
+   uint256 public constant BASIS_POINTS = 10000;     // 100% = 10000
+   uint256 public constant PRECISION = 1e18;
+   uint256 public constant LOCK_PERIOD = 365 days;   // 固定锁定期
+   uint256 public constant HSK_DECIMALS = 18;
+   ```
 
 ### 关键合约函数
 
-- `stake()`: 质押 HSK，不需要传递 lockPeriod 参数，使用 `msg.value` 发送 HSK
-- `unstake(uint256 positionId)`: 解除质押
-- `claimReward(uint256 positionId)`: 领取奖励
-- `updateRewardPool()`: 向奖励池添加资金，使用 `msg.value` 发送 HSK
-- `updateWhitelistBatch(address[] users, bool status)`: 批量更新白名单
-- `setWhitelistOnlyMode(bool enabled)`: 启用/禁用白名单模式
+**质押操作**
+- `stake() external payable returns (uint256)`: 
+  - 质押 HSK，使用 `msg.value` 发送原生代币
+  - 不需要传递 lockPeriod 参数（固定 365 天）
+  - 返回 positionId
+  - 需要满足：未暂停、在质押时间范围内、满足白名单要求（如启用）、非紧急模式
+- `unstake(uint256 positionId) external`: 
+  - 解除质押，自动领取所有累积奖励并返还本金
+  - 需要锁定期满（365 天）且 position 未被 unstake
+- `claimReward(uint256 positionId) external returns (uint256)`: 
+  - 领取指定位置的奖励，不解除质押
+  - 需要：未暂停、非紧急模式
+  - 返回领取的奖励金额
+- `pendingReward(uint256 positionId) external view returns (uint256)`: 
+  - 查询指定位置的待领取奖励（只读函数）
+  - 紧急模式下返回 0
+- `emergencyWithdraw(uint256 positionId) external`: 
+  - 紧急提取本金（仅在紧急模式下可用）
+  - 不含奖励，只返还本金
+  - 更新 totalPendingRewards 和 cachedAccruedRewards
+
+**奖励池管理**
+- `updateRewardPool() external payable`: 
+  - 向奖励池添加资金，使用 `msg.value` 发送 HSK
+  - 仅限 owner 调用
+  - 触发 `RewardPoolUpdated` 事件
+- `withdrawExcessRewardPool(uint256 amount) external`: 
+  - 提取多余的奖励池资金（超过 totalPendingRewards 的部分）
+  - 仅限 owner 调用
+  - 不能提取已预留的奖励
+
+**白名单管理**
+- `updateWhitelistBatch(address[] calldata users, bool status) external`: 
+  - 批量更新白名单（最多 100 个地址）
+  - 仅限 owner 调用
+  - `status = true` 添加，`status = false` 移除
+  - 触发 `WhitelistStatusChanged` 事件
+- `setWhitelistOnlyMode(bool enabled) external`: 
+  - 启用/禁用白名单模式
+  - 仅限 owner 调用
+  - 触发 `WhitelistModeChanged` 事件
+
+**合约配置**
+- `setMinStakeAmount(uint256 newAmount) external`: 
+  - 设置最小质押金额
+  - 仅限 owner，且非紧急模式下可调用
+- `setStakeStartTime(uint256 newStartTime) external`: 
+  - 设置质押开始时间
+  - 需要 > 0 且 < stakeEndTime
+  - 仅限 owner 调用
+- `setStakeEndTime(uint256 newEndTime) external`: 
+  - 设置质押结束时间
+  - 需要 > block.timestamp 且 > stakeStartTime
+  - 仅限 owner 调用
+- `pause() external`: 
+  - 暂停合约（禁止新质押和领取奖励）
+  - 仅限 owner 调用
+- `unpause() external`: 
+  - 恢复合约
+  - 仅限 owner 调用
+- `enableEmergencyMode() external`: 
+  - 启用紧急模式（不可逆）
+  - 启用后用户只能调用 `emergencyWithdraw` 提取本金
+  - 仅限 owner 调用
+
+**状态查询**
+- `positions(uint256 positionId)`: 查询 position 详情
+- `userPositions(address user)`: 查询用户的所有 positionId 数组
+- `whitelisted(address user)`: 查询用户是否在白名单中
+- `minStakeAmount()`: 查询最小质押金额
+- `rewardRate()`: 查询奖励率（basis points）
+- `totalStaked()`: 查询总质押金额
+- `rewardPoolBalance()`: 查询奖励池余额
+- `totalPendingRewards()`: 查询总待领取奖励
+- `stakeStartTime()`: 查询质押开始时间
+- `stakeEndTime()`: 查询质押结束时间
+- `onlyWhitelistCanStake()`: 查询是否启用白名单模式
+- `emergencyMode()`: 查询是否处于紧急模式
+- `paused()`: 查询是否暂停
+
+**合约事件**
+- `PositionCreated(address indexed user, uint256 indexed positionId, uint256 amount, uint256 lockPeriod, uint256 timestamp)`: 质押创建
+- `PositionUnstaked(address indexed user, uint256 indexed positionId, uint256 amount, uint256 timestamp)`: 解除质押
+- `RewardClaimed(address indexed user, uint256 indexed positionId, uint256 amount, uint256 timestamp)`: 奖励领取
+- `StakingPaused(address indexed operator, uint256 timestamp)`: 合约暂停
+- `StakingUnpaused(address indexed operator, uint256 timestamp)`: 合约恢复
+- `EmergencyWithdrawn(address indexed user, uint256 indexed positionId, uint256 amount, uint256 timestamp)`: 紧急提取
+- `WhitelistStatusChanged(address indexed user, bool status)`: 白名单状态变更
+- `WhitelistModeChanged(bool oldMode, bool newMode)`: 白名单模式变更
+- `RewardPoolUpdated(uint256 newBalance)`: 奖励池更新
+- `StakeStartTimeUpdated(uint256 oldStartTime, uint256 newStartTime)`: 开始时间更新
+- `StakeEndTimeUpdated(uint256 oldEndTime, uint256 newEndTime)`: 结束时间更新
+- `MinStakeAmountUpdated(uint256 oldAmount, uint256 newAmount)`: 最小质押金额更新
+- `EmergencyModeEnabled(address indexed operator, uint256 timestamp)`: 紧急模式启用
+- `Received(address indexed sender, uint256 amount)`: 接收原生代币
+
+**自定义错误**
+- `AlreadyUnstaked()`: Position 已经被 unstake
+- `StillLocked()`: 仍在锁定期内
+- `NoReward()`: 没有可领取的奖励
+- `PositionNotFound()`: Position 不存在或不属于调用者
+- `NotWhitelisted()`: 不在白名单中
 
 ### 初始化参数
 
@@ -44,9 +165,51 @@ function initialize(
     uint256 _minStakeAmount,
     uint256 _rewardRate,
     uint256 _stakeStartTime,
-    uint256 _stakeEndTime
-) public initializer
+    uint256 _stakeEndTime,
+    bool _whitelistMode
+) external initializer
 ```
+
+**参数说明**：
+- `_minStakeAmount`: 最小质押金额（wei 单位）
+  - Normal Staking: 1 HSK = `1e18` wei
+  - Premium Staking: 500,000 HSK = `500000e18` wei
+- `_rewardRate`: 年化收益率（basis points）
+  - Normal Staking: 800 (8% APY)
+  - Premium Staking: 1600 (16% APY)
+- `_stakeStartTime`: 质押开始时间（Unix 时间戳）
+- `_stakeEndTime`: 质押结束时间（Unix 时间戳）
+- `_whitelistMode`: 白名单模式
+  - ✅ **Normal Staking**: `false`（所有用户可质押）
+  - ✅ **Premium Staking**: `true`（仅白名单用户可质押）
+
+**白名单模式设计**：
+
+现在可以在初始化时直接指定白名单模式，无需部署后再手动修改：
+
+```typescript
+// Normal Staking 部署示例
+const initData = implementation.interface.encodeFunctionData("initialize", [
+    ethers.parseEther("1"),      // minStakeAmount
+    800,                          // rewardRate (8%)
+    stakeStartTime,
+    stakeEndTime,
+    false                         // whitelistMode: 关闭，所有人可质押
+]);
+
+// Premium Staking 部署示例
+const initData = implementation.interface.encodeFunctionData("initialize", [
+    ethers.parseEther("500000"),  // minStakeAmount
+    1600,                         // rewardRate (16%)
+    stakeStartTime,
+    stakeEndTime,
+    true                          // whitelistMode: 启用，需要白名单
+]);
+```
+
+**后续操作**：
+- **Normal Staking**: 无需额外操作，部署后即可开始质押
+- **Premium Staking**: 使用 `updateWhitelistBatch(addresses, true)` 添加授权用户
 
 ---
 
@@ -191,21 +354,34 @@ scripts/
 - `scripts/premium/unstake.ts` - 高级质押解除质押
 - `scripts/normal/claim-rewards.ts` - 普通质押领取奖励
 - `scripts/premium/claim-rewards.ts` - 高级质押领取奖励
+- `scripts/normal/emergency-withdraw.ts` - 紧急提取本金（仅紧急模式）
+- `scripts/premium/emergency-withdraw.ts` - 紧急提取本金（仅紧急模式）
+
+**奖励池管理**：
+- `scripts/normal/withdraw-excess.ts` - 提取多余奖励池资金
+- `scripts/premium/withdraw-excess.ts` - 提取多余奖励池资金
 
 **配置管理**：
 - `scripts/normal/config/set-start-time.ts` - 设置普通质押开始时间
+- `scripts/normal/config/set-end-time.ts` - 设置普通质押结束时间
+- `scripts/normal/config/set-min-stake.ts` - 设置最小质押金额
 - `scripts/normal/config/pause.ts` - 暂停普通质押合约
 - `scripts/normal/config/unpause.ts` - 恢复普通质押合约
+- `scripts/normal/config/enable-emergency.ts` - 启用紧急模式（不可逆）
 - `scripts/premium/config/set-start-time.ts` - 设置高级质押开始时间
 - `scripts/premium/config/set-end-time.ts` - 设置高级质押结束时间
+- `scripts/premium/config/set-min-stake.ts` - 设置最小质押金额
 - `scripts/premium/config/pause.ts` - 暂停高级质押合约
 - `scripts/premium/config/unpause.ts` - 恢复高级质押合约
+- `scripts/premium/config/enable-emergency.ts` - 启用紧急模式（不可逆）
 
 **状态查询**：
 - `scripts/normal/query/check-status.ts` - 查询普通质押状态
 - `scripts/normal/query/check-rewards.ts` - 查询普通质押奖励
+- `scripts/normal/query/pending-reward.ts` - 查询指定位置的待领取奖励
 - `scripts/premium/query/check-status.ts` - 查询高级质押状态
 - `scripts/premium/query/check-rewards.ts` - 查询高级质押奖励
+- `scripts/premium/query/pending-reward.ts` - 查询指定位置的待领取奖励
 - `scripts/premium/query/check-whitelist.ts` - 查询白名单配置
 
 **共享模块**：
@@ -225,24 +401,25 @@ scripts/
 /**
  * 合约地址配置
  * 根据不同网络环境配置不同的合约地址
+ * 
+ * 注意：HSK 是链的原生代币（native token），类似于 ETH，不需要代币合约地址
  */
 
 export interface ContractAddresses {
   normalStaking: string;
   premiumStaking: string;
-  // 注意：HSK 是链的原生代币（native token），类似于 ETH，不需要代币合约地址
 }
 
 // Mainnet 地址
 export const MAINNET_ADDRESSES: ContractAddresses = {
-  normalStaking: "0x...",  // 待填写
-  premiumStaking: "0x...", // 待填写
+  normalStaking: "0x...",  // 待填写：Normal Staking 代理合约地址
+  premiumStaking: "0x...", // 待填写：Premium Staking 代理合约地址
 };
 
 // Testnet 地址
 export const TESTNET_ADDRESSES: ContractAddresses = {
-  normalStaking: "0x...",  // 待填写
-  premiumStaking: "0x...", // 待填写
+  normalStaking: "0x...",  // 待填写：Normal Staking 代理合约地址
+  premiumStaking: "0x...", // 待填写：Premium Staking 代理合约地址
 };
 
 // 获取当前网络的地址
@@ -252,27 +429,44 @@ export function getAddresses(network: string): ContractAddresses {
       return MAINNET_ADDRESSES;
     case "testnet":
       return TESTNET_ADDRESSES;
+    case "localhost":
+      // 本地测试网络地址可以从环境变量读取
+      return {
+        normalStaking: process.env.NORMAL_STAKING_ADDRESS || "",
+        premiumStaking: process.env.PREMIUM_STAKING_ADDRESS || "",
+      };
     default:
       throw new Error(`Unknown network: ${network}`);
   }
 }
 
+// 合约常量（与 StakingConstants.sol 保持一致）
+export const STAKING_CONSTANTS = {
+  LOCK_PERIOD: 365 * 24 * 60 * 60,      // 365 天（秒）= 365 days
+  BASIS_POINTS: 10000,                   // 100% = 10000
+  PRECISION: BigInt("1000000000000000000"), // 1e18 用于精度计算
+  SECONDS_PER_YEAR: 365 * 24 * 60 * 60, // 365 days
+  HSK_DECIMALS: 18,                      // HSK 原生代币精度
+};
+
 // 质押产品配置
-// 注意：锁定期固定为 365 天，在合约常量中定义
+// 注意：锁定期固定为 365 天，在合约常量 LOCK_PERIOD 中定义
 export const NORMAL_STAKING_CONFIG = {
   minStakeAmount: "1",           // 1 HSK
-  rewardRate: 800,               // 8% APY (basis points)
-  whitelistMode: false,
+  rewardRate: 800,               // 8% APY (basis points: 800/10000 = 0.08 = 8%)
+  whitelistMode: false,          // 关闭白名单模式（部署后需手动关闭）
   productName: "Normal Staking",
   targetUsers: "普通用户",
+  description: "面向普通用户的质押产品，低门槛，稳定收益",
 };
 
 export const PREMIUM_STAKING_CONFIG = {
   minStakeAmount: "500000",      // 500,000 HSK
-  rewardRate: 1600,              // 16% APY (basis points)
-  whitelistMode: true,
+  rewardRate: 1600,              // 16% APY (basis points: 1600/10000 = 0.16 = 16%)
+  whitelistMode: true,           // 启用白名单模式（默认启用）
   productName: "Premium Staking",
   targetUsers: "大户/机构",
+  description: "面向大户和机构的高级质押产品，高门槛，高收益",
 };
 ```
 
@@ -290,8 +484,10 @@ export enum StakingType {
 }
 
 /**
- * 质押位置信息
- * 注意：锁定期固定为365天，奖励率在合约级别配置
+ * 质押位置信息（与合约 Position 结构对应）
+ * 注意：
+ * - 锁定期固定为 365 天（LOCK_PERIOD 常量），不在 Position 中存储
+ * - 奖励率在合约级别配置（rewardRate 状态变量），所有 position 共享
  */
 export interface StakingPosition {
   positionId: bigint;
@@ -308,24 +504,28 @@ export interface StakingPosition {
 export interface ContractStatus {
   isPaused: boolean;
   emergencyMode: boolean;
-  whitelistMode: boolean;
+  onlyWhitelistCanStake: boolean;  // 白名单模式
   totalStaked: bigint;
+  totalPendingRewards: bigint;
   rewardPoolBalance: bigint;
   minStakeAmount: bigint;
-  rewardRate: bigint;
+  rewardRate: bigint;               // basis points (800 = 8%, 1600 = 16%)
   stakeStartTime: bigint;
   stakeEndTime: bigint;
+  nextPositionId: bigint;
+  cachedAccruedRewards: bigint;     // 缓存的已累积奖励
+  lastAccruedUpdateTime: bigint;    // 上次更新时间
 }
 
 /**
  * 部署配置
  */
 export interface DeployConfig {
-  minStakeAmount: string;
-  rewardRate: number;
+  minStakeAmount: string;       // HSK 数量（字符串格式，如 "1" 或 "500000"）
+  rewardRate: number;            // 年化收益率（basis points，如 800 = 8%）
   stakingType: StakingType;
-  whitelistMode: boolean;
-  stakeStartOffset?: number; // 质押开始时间偏移（秒）
+  stakeStartOffset?: number;     // 质押开始时间偏移（秒，默认 7 天）
+  stakeEndOffset?: number;       // 质押结束时间偏移（秒，默认 1 年）
 }
 
 /**
@@ -336,6 +536,29 @@ export interface ScriptResult {
   message: string;
   data?: any;
   error?: Error;
+  txHash?: string;              // 交易哈希
+}
+
+/**
+ * 查询用户质押信息的返回结果
+ */
+export interface UserStakeInfo {
+  userAddress: string;
+  totalPositions: number;
+  activePositions: number;
+  totalStakedAmount: bigint;
+  totalPendingRewards: bigint;
+  positions: StakingPosition[];
+}
+
+/**
+ * 奖励池信息
+ */
+export interface RewardPoolInfo {
+  balance: bigint;
+  totalPendingRewards: bigint;
+  availableRewards: bigint;      // balance - totalPendingRewards
+  utilizationRate: number;       // totalPendingRewards / balance * 100
 }
 ```
 
@@ -377,13 +600,17 @@ export function formatContractStatus(status: any) {
   return {
     isPaused: status.isPaused,
     emergencyMode: status.emergencyMode,
-    whitelistMode: status.whitelistMode,
+    onlyWhitelistCanStake: status.onlyWhitelistCanStake,
     totalStaked: ethers.formatEther(status.totalStaked),
+    totalPendingRewards: ethers.formatEther(status.totalPendingRewards),
     rewardPoolBalance: ethers.formatEther(status.rewardPoolBalance),
     minStakeAmount: ethers.formatEther(status.minStakeAmount),
-    rewardRate: `${Number(status.rewardRate) / 100}%`,
+    rewardRate: `${Number(status.rewardRate) / 100}%`,  // basis points to percentage
     stakeStartTime: new Date(Number(status.stakeStartTime) * 1000).toLocaleString(),
     stakeEndTime: new Date(Number(status.stakeEndTime) * 1000).toLocaleString(),
+    nextPositionId: status.nextPositionId.toString(),
+    cachedAccruedRewards: ethers.formatEther(status.cachedAccruedRewards),
+    lastAccruedUpdateTime: new Date(Number(status.lastAccruedUpdateTime) * 1000).toLocaleString(),
   };
 }
 
@@ -472,6 +699,7 @@ async function main() {
   // 2. 准备初始化参数
   const minStakeAmount = ethers.parseEther(NORMAL_STAKING_CONFIG.minStakeAmount);
   const rewardRate = NORMAL_STAKING_CONFIG.rewardRate;
+  const whitelistMode = NORMAL_STAKING_CONFIG.whitelistMode;  // false for Normal Staking
   const stakeStartTime = Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60); // 7天后
   const stakeEndTime = stakeStartTime + (365 * 24 * 60 * 60); // 1年后
 
@@ -481,6 +709,7 @@ async function main() {
   console.log(`  - 质押开始时间: ${new Date(stakeStartTime * 1000).toISOString()}`);
   console.log(`  - 质押结束时间: ${new Date(stakeEndTime * 1000).toISOString()}`);
   console.log(`  - 锁定期: 365 天（固定）`);
+  console.log(`  - 白名单模式: ${whitelistMode ? "启用" : "关闭"}`);
 
   // 3. 编码初始化数据
   const initData = implementation.interface.encodeFunctionData("initialize", [
@@ -488,6 +717,7 @@ async function main() {
     rewardRate,
     stakeStartTime,
     stakeEndTime,
+    whitelistMode,  // false - 关闭白名单，所有人可质押
   ]);
 
   // 4. 部署 Transparent Proxy 代理合约
@@ -504,17 +734,10 @@ async function main() {
   
   printSuccess(`NormalStakingProxy 代理合约部署成功: ${proxyAddress}`);
 
-  // 5. 通过代理连接到 HSKStaking 合约进行配置
+  // 5. 通过代理连接到 HSKStaking 合约进行验证
   const staking = HSKStaking.attach(proxyAddress);
 
-  // 6. 关闭白名单模式（普通用户可自由质押）
-  console.log("\n关闭白名单模式（允许所有用户质押）...");
-  // 注意：合约初始化时默认启用白名单模式（onlyWhitelistCanStake = true）
-  const setWhitelistTx = await staking.setWhitelistOnlyMode(false);
-  await setWhitelistTx.wait();
-  printSuccess("白名单模式已关闭");
-
-  // 7. 验证配置
+  // 6. 验证配置
   printSeparator("配置验证");
   const minStake = await staking.minStakeAmount();
   const startTime = await staking.stakeStartTime();
@@ -543,6 +766,7 @@ async function main() {
   printWarning("下一步操作:");
   console.log("  1. 使用 scripts/normal/add-rewards.ts 向奖励池充值");
   console.log("  2. 使用 scripts/normal/query/check-status.ts 查询合约状态");
+  console.log("  3. 质押开始时间到达后，用户即可开始质押（无需白名单）");
   
   // 保存部署信息
   console.log("\n请将以下地址保存到 scripts/shared/constants.ts:");
@@ -619,18 +843,30 @@ async function main() {
 
   // 查询质押信息
   console.log("\n查询质押信息...");
-  const positionIds = await staking.userPositions(user.address);
-  console.log("总质押位置数:", positionIds.length);
-
-  if (positionIds.length > 0) {
-    const latestPositionId = positionIds[positionIds.length - 1];
-    const latest = await staking.positions(latestPositionId);
-    console.log("\n最新质押信息:");
-    console.log("  - 位置ID:", latestPositionId.toString());
-    console.log("  - 质押金额:", ethers.formatEther(latest.amount), "HSK");
-    console.log("  - 质押时间:", new Date(Number(latest.stakedAt) * 1000).toLocaleString());
-    console.log("  - 锁定期: 365 天（固定）");
-    console.log("  - 年化收益率:", rewardRate / 100, "%");
+  // 注意：userPositions 是 public mapping，需要多次调用获取数组元素
+  // 或者可以在合约中添加 getUserPositions 辅助函数
+  try {
+    // 获取最新的 positionId（假设从 nextPositionId 推断）
+    const nextId = await staking.nextPositionId();
+    const positionId = nextId - BigInt(1); // 最后创建的 position
+    
+    const position = await staking.positions(positionId);
+    if (position.owner === user.address) {
+      console.log("\n最新质押信息:");
+      console.log("  - 位置ID:", positionId.toString());
+      console.log("  - 质押金额:", ethers.formatEther(position.amount), "HSK");
+      console.log("  - 质押时间:", new Date(Number(position.stakedAt) * 1000).toLocaleString());
+      console.log("  - 上次领取奖励时间:", new Date(Number(position.lastRewardAt) * 1000).toLocaleString());
+      console.log("  - 锁定期: 365 天（固定）");
+      console.log("  - 年化收益率:", Number(rewardRate) / 100, "%");
+      console.log("  - 是否已解除:", position.isUnstaked);
+      
+      // 查询待领取奖励
+      const pending = await staking.pendingReward(positionId);
+      console.log("  - 待领取奖励:", ethers.formatEther(pending), "HSK");
+    }
+  } catch (error) {
+    console.log("查询质押信息失败:", error);
   }
 }
 
@@ -1296,12 +1532,13 @@ export async function deployTestFixture(): Promise<TestFixture> {
   const stakeStartTime = Math.floor(Date.now() / 1000) + 60; // 1分钟后
   const stakeEndTime = stakeStartTime + (365 * 24 * 60 * 60); // 1年后
 
-  // 编码初始化数据
+  // 编码初始化数据（关闭白名单模式）
   const normalInitData = normalImplementation.interface.encodeFunctionData("initialize", [
     minStakeAmount,
     rewardRate,
     stakeStartTime,
     stakeEndTime,
+    false,  // whitelistMode: false - 所有用户可质押
   ]);
 
   // 部署 Normal Staking 代理合约（Transparent Proxy）
@@ -1315,9 +1552,6 @@ export async function deployTestFixture(): Promise<TestFixture> {
 
   const normalStaking = HSKStaking.attach(await normalProxy.getAddress());
 
-  // 关闭 Normal Staking 的白名单模式（允许所有用户质押）
-  await normalStaking.setWhitelistOnlyMode(false);
-
   // 部署 Premium Staking 实现合约
   const premiumImplementation = await HSKStaking.deploy();
   await premiumImplementation.waitForDeployment();
@@ -1325,12 +1559,13 @@ export async function deployTestFixture(): Promise<TestFixture> {
   const premiumMinStakeAmount = ethers.parseEther("500000");
   const premiumRewardRate = 1600; // 16% APY (basis points)
 
-  // 编码初始化数据
+  // 编码初始化数据（启用白名单模式）
   const premiumInitData = premiumImplementation.interface.encodeFunctionData("initialize", [
     premiumMinStakeAmount,
     premiumRewardRate,
     stakeStartTime,
     stakeEndTime,
+    true,  // whitelistMode: true - 仅白名单用户可质押
   ]);
 
   // 部署 Premium Staking 代理合约（Transparent Proxy）
@@ -1343,9 +1578,6 @@ export async function deployTestFixture(): Promise<TestFixture> {
   await premiumProxy.waitForDeployment();
 
   const premiumStaking = HSKStaking.attach(await premiumProxy.getAddress());
-
-  // Premium Staking 保持白名单模式启用（默认就是启用的）
-  // onlyWhitelistCanStake 在初始化时默认为 true
 
   // 向奖励池添加资金（使用原生代币 HSK）
   const rewardAmount = ethers.parseEther("1000000");
@@ -1550,11 +1782,17 @@ describe("质押集成测试", function () {
       await increaseTime(61);
 
       const stakeAmount = parseEther("10");
-      await normalStaking.connect(user1).stake({ value: stakeAmount });
-
-      const positions = await normalStaking.getUserPositions(user1.address);
-      expect(positions.length).to.equal(1);
-      expect(positions[0].amount).to.equal(stakeAmount);
+      const tx = await normalStaking.connect(user1).stake({ value: stakeAmount });
+      const receipt = await tx.wait();
+      
+      // 从事件中获取 positionId 或使用 nextPositionId - 1
+      const nextId = await normalStaking.nextPositionId();
+      const positionId = nextId - BigInt(1);
+      
+      const position = await normalStaking.positions(positionId);
+      expect(position.owner).to.equal(user1.address);
+      expect(position.amount).to.equal(stakeAmount);
+      expect(position.isUnstaked).to.be.false;
 
       printSuccess("Normal Staking 质押成功");
     });
@@ -1584,10 +1822,15 @@ describe("质押集成测试", function () {
       await increaseTime(61);
 
       const stakeAmount = parseEther("600000");
-      await premiumStaking.connect(user1).stake({ value: stakeAmount });
+      const tx = await premiumStaking.connect(user1).stake({ value: stakeAmount });
+      await tx.wait();
 
-      const positionIds = await premiumStaking.userPositions(user1.address);
-      expect(positionIds.length).to.equal(1);
+      const nextId = await premiumStaking.nextPositionId();
+      const positionId = nextId - BigInt(1);
+      const position = await premiumStaking.positions(positionId);
+      
+      expect(position.owner).to.equal(user1.address);
+      expect(position.amount).to.equal(stakeAmount);
 
       printSuccess("Premium Staking 白名单用户质押成功");
     });
@@ -2128,378 +2371,4 @@ main().catch((error) => {
 ```
 
 ---
-
-## 🔄 迁移时间表
-
-| 阶段 | 任务 | 预计时间 | 详细说明 |
-|------|------|---------|---------|
-| 第一阶段 | 创建目录结构和共享模块 | 2 小时 | 创建所有目录，实现 constants、types、helpers、utils |
-| 第二阶段 | 重构普通质押脚本 | 4 小时 | 部署、质押、奖励、升级、查询等脚本 |
-| 第三阶段 | 重构高级质押脚本 | 4 小时 | 包含白名单管理的完整功能 |
-| 第四阶段 | 创建开发和测试脚本 | 4 小时 | compile、clean、test-all、coverage 及测试辅助函数 |
-| 第五阶段 | 实现集成测试 | 3 小时 | 部署、质押、白名单三个测试套件 |
-| 第六阶段 | 迁移工具脚本 | 1 小时 | extract-abi、generate-types、compare-contracts |
-| 第七阶段 | 更新 package.json 和文档 | 2 小时 | 更新所有 npm scripts 和 README 文档 |
-| 第八阶段 | 测试和验证 | 4 小时 | 完整运行验证清单中的所有项目 |
-| 第九阶段 | 清理和优化 | 2 小时 | 清理旧文件，优化代码，最终检查 |
-| **总计** | | **26 小时** | 约 3-4 个工作日 |
-
-### 每日工作计划建议
-
-**第一天（8小时）**
-- 上午：第一阶段 - 创建目录和共享模块（2小时）
-- 上午：第二阶段开始 - 普通质押脚本（2小时）
-- 下午：第二阶段完成（2小时）
-- 下午：第三阶段开始（2小时）
-
-**第二天（8小时）**
-- 上午：第三阶段完成 - 高级质押脚本（2小时）
-- 上午：第四阶段 - 开发和测试脚本（2小时）
-- 下午：第四阶段完成（2小时）
-- 下午：第五阶段 - 集成测试（2小时）
-
-**第三天（8小时）**
-- 上午：第五阶段完成（1小时）
-- 上午：第六阶段 - 工具脚本（1小时）
-- 上午：第七阶段 - 更新文档（2小时）
-- 下午：第八阶段 - 测试验证（4小时）
-
-**第四天（2小时）**
-- 第九阶段 - 清理优化和最终检查（2小时）
-
----
-
-## 🚀 开发工作流程
-
-完成重构后，推荐的开发工作流程如下：
-
-### 日常开发流程
-
-```bash
-# 1. 修改合约代码后，重新编译
-npm run compile
-
-# 2. 运行测试确保没有破坏现有功能
-npm run test
-
-# 3. 如果需要，生成覆盖率报告
-npm run test:coverage
-
-# 4. 部署到测试网进行验证
-npm run deploy:normal:testnet
-npm run deploy:premium:testnet
-
-# 5. 运行集成测试
-npm run test:integration
-
-# 6. 部署到主网（生产环境）
-npm run deploy:normal
-npm run deploy:premium
-```
-
-### 新功能开发流程
-
-```bash
-# 1. 创建功能分支
-git checkout -b feature/new-staking-feature
-
-# 2. 编写合约代码
-# 编辑 contracts/ 目录下的文件
-
-# 3. 编写测试用例
-# 在 scripts/test/unit/ 或 scripts/test/integration/ 创建测试文件
-
-# 4. 编译并运行测试
-npm run build
-npm run test
-
-# 5. 确保测试覆盖率
-npm run test:coverage
-
-# 6. 创建相应的操作脚本
-# 在 scripts/normal/ 或 scripts/premium/ 创建脚本
-
-# 7. 更新 package.json 添加新命令
-
-# 8. 更新文档
-
-# 9. 提交代码
-git add .
-git commit -m "feat: add new staking feature"
-git push origin feature/new-staking-feature
-```
-
-### 问题排查流程
-
-```bash
-# 1. 清理所有编译产物
-npm run clean
-
-# 2. 重新编译
-npm run compile
-
-# 3. 检查合约状态
-npm run query:status:normal
-npm run query:status:premium
-
-# 4. 查看日志和事件
-# 查看交易哈希，使用区块链浏览器
-
-# 5. 运行特定测试
-npm run test -- --grep "specific test name"
-```
-
----
-
-## 📖 最佳实践
-
-### 脚本编写规范
-
-1. **文件命名**
-   - 使用小写字母和连字符：`add-rewards.ts`
-   - 功能明确，一目了然：`check-status.ts`
-
-2. **代码结构**
-   ```typescript
-   // 1. 导入依赖
-   import { ethers } from "hardhat";
-   import { ... } from "../shared/...";
-
-   // 2. 类型定义（如果需要）
-   interface CustomType { ... }
-
-   // 3. 主函数
-   async function main() {
-     // 实现逻辑
-   }
-
-   // 4. 错误处理
-   main().catch((error) => {
-     console.error(error);
-     process.exit(1);
-   });
-   ```
-
-3. **注释说明**
-   - 每个脚本开头添加功能说明
-   - 关键步骤添加注释
-   - 复杂逻辑添加详细说明
-
-4. **错误处理**
-   - 使用 try-catch 捕获异常
-   - 提供清晰的错误信息
-   - 适当的退出码
-
-5. **日志输出**
-   - 使用共享的打印函数（printSuccess、printError 等）
-   - 提供详细的操作步骤日志
-   - 显示重要参数和结果
-
-### 测试编写规范
-
-1. **测试文件命名**
-   - 单元测试：`*.test.ts`
-   - 集成测试：描述性命名，如 `deploy-test.ts`
-
-2. **测试结构**
-   ```typescript
-   describe("功能模块", function () {
-     describe("子功能1", function () {
-       it("应该满足某个条件", async function () {
-         // 准备
-         // 执行
-         // 断言
-       });
-     });
-   });
-   ```
-
-3. **测试覆盖**
-   - 正常流程测试
-   - 边界条件测试
-   - 错误场景测试
-   - 权限检查测试
-
-### 配置管理规范
-
-1. **环境变量**
-   - 敏感信息使用 `.env` 文件
-   - 不同环境使用不同配置
-   - 提供 `.env.example` 模板
-
-2. **合约地址**
-   - 在 `scripts/shared/constants.ts` 集中管理
-   - 区分主网和测试网
-   - 版本化管理
-
-3. **参数配置**
-   - 使用配置对象而非硬编码
-   - 提供合理的默认值
-   - 文档化所有配置项
-
-### 安全最佳实践
-
-1. **权限管理**
-   - 部署和升级脚本需要管理员权限
-   - 查询脚本可以任何人运行
-   - 白名单操作需要严格权限检查
-
-2. **参数验证**
-   - 所有输入参数进行验证
-   - 地址格式检查
-   - 金额范围检查
-
-3. **交易确认**
-   - 重要操作前显示详细信息
-   - 等待交易确认
-   - 验证交易结果
-
-4. **测试网先行**
-   - 所有操作先在测试网验证
-   - 确认无误后再部署到主网
-   - 保留完整的操作日志
-
----
-
-## 📚 参考资料
-
-### 相关文档
-
-- [Hardhat 官方文档](https://hardhat.org/docs)
-- [Ethers.js 文档](https://docs.ethers.org/)
-- [OpenZeppelin Contracts](https://docs.openzeppelin.com/contracts/)
-- [Solidity 文档](https://docs.soliditylang.org/)
-
-### 项目文档
-
-- `docs/PRODUCT_PLANS.md` - 产品规划文档
-- `docs/PRODUCT_PLANS_DEV.md` - 开发规划文档
-- `docs/AUDIT_REPORT.md` - 审计报告
-- `contracts/AUDIT_REPORT.md` - 合约审计报告
-
-### 常见问题
-
-**Q: 如何在本地测试脚本？**
-```bash
-# 启动本地节点
-npx hardhat node
-
-# 在另一个终端运行脚本
-npx hardhat run scripts/xxx.ts --network localhost
-```
-
-**Q: 如何调试脚本？**
-```typescript
-// 使用 console.log
-console.log("变量值:", variable);
-
-// 使用调试器
-// 在 VS Code 中配置 launch.json，使用 F5 调试
-```
-
-**Q: 测试覆盖率报告在哪里？**
-```bash
-# 生成报告后
-open coverage/index.html  # macOS
-start coverage/index.html # Windows
-xdg-open coverage/index.html # Linux
-```
-
-**Q: 如何添加新的 npm 脚本？**
-1. 在 `package.json` 的 `scripts` 部分添加命令
-2. 使用清晰的命名规范：`<分类>:<操作>:<目标>`
-3. 更新本文档的使用示例部分
-
----
-
-## 📝 更新日志
-
-### v2.0.1 - 2024-11-12
-
-**合约架构修正**
-- 🔧 根据实际合约实现更新所有示例代码
-- 📝 澄清 HSK 为原生代币（native token），不是 ERC20
-- 📝 修正 Position 结构定义（移除 lockPeriod 和 rewardRate 字段）
-- 📝 更新锁定期说明：固定 365 天，不可动态修改
-- 📝 更新奖励率说明：在合约级别配置，不在单个 position 中
-- 📝 修正代理模式说明：使用 Transparent Proxy，不是 UUPS
-- 📝 更新所有脚本示例代码以匹配实际合约接口
-- 📝 添加合约架构特性说明章节
-
-**类型定义更新**
-- 🔧 `StakingPosition` 接口：移除 lockPeriod、rewardRate、unstakedAt；添加 lastRewardAt
-- 🔧 `ContractAddresses` 接口：移除 hskToken（HSK 是原生代币）
-- 🔧 `ContractStatus` 接口：添加 rewardRate，移除 version
-- 🔧 `formatStakingPosition` 函数：更新以匹配新的 Position 结构
-- 🔧 `formatContractStatus` 函数：添加 rewardRate 格式化
-
-**脚本示例更新**
-- 🔧 部署脚本：使用 Transparent Proxy，添加锁定期说明
-- 🔧 质押脚本：移除 lockPeriod 参数，使用 userPositions 查询
-- 🔧 查询脚本：添加 rewardRate 查询，移除 version 查询
-- 🔧 测试装置：更新部署流程和白名单配置
-- 🔧 集成测试：使用 updateWhitelistBatch 而不是 addToWhitelist
-
-### v2.0.0 - 2024-11-12
-
-**重大更新**
-- ✨ 完整重构 scripts 目录结构
-- ✨ 按产品类型（Normal/Premium）分离脚本
-- ✨ 新增开发脚本（compile、clean、test-all、coverage）
-- ✨ 新增完整的测试套件（单元测试 + 集成测试）
-- ✨ 新增测试辅助函数（fixtures、test-utils）
-- ✨ 新增共享模块（constants、types、helpers、utils）
-
-**新增脚本**
-- 开发脚本：`scripts/dev/` 目录（4个脚本）
-- 测试脚本：`scripts/test/` 目录（包含单元测试和集成测试）
-- 工具脚本：`scripts/tools/` 目录
-- 白名单管理：`scripts/premium/whitelist/` 目录（4个脚本：批量添加、批量移除、查询、切换模式）
-- 配置管理：`scripts/{normal,premium}/config/` 目录
-- 状态查询：`scripts/{normal,premium}/query/` 目录
-
-**改进**
-- 📝 更新所有文档和注释
-- 🔧 优化 package.json scripts
-- ✅ 新增详细的验证清单
-- 📊 新增迁移时间表和工作计划
-
----
-
-## 🎯 总结
-
-本次重构完成后，`scripts/` 目录将具有以下优势：
-
-1. **清晰的组织结构**
-   - 按产品类型分离（Normal/Premium）
-   - 按功能分类（deploy、stake、config、query 等）
-   - 共享代码模块化
-
-2. **完善的开发工具**
-   - 编译、清理、测试、覆盖率工具齐全
-   - 测试辅助函数完备
-   - 集成测试覆盖主要场景
-
-3. **易于维护和扩展**
-   - 模块化设计，易于添加新功能
-   - 统一的代码规范和错误处理
-   - 详细的文档和注释
-
-4. **提高开发效率**
-   - 命令清晰明确，易于记忆
-   - 自动化测试流程
-   - 完整的工作流程指导
-
-5. **提升代码质量**
-   - 测试覆盖率监控
-   - 统一的代码风格
-   - 完善的错误处理机制
-
-希望这个重构方案能够帮助项目更好地发展！
-
----
-
-**文档维护者**: 开发团队  
-**最后更新**: 2024-11-12  
-**版本**: 2.0.0
 

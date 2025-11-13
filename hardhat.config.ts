@@ -1,11 +1,13 @@
-import { HardhatUserConfig } from "hardhat/config.js";
+import { defineConfig } from "hardhat/config";
+import hardhatEthers from "@nomicfoundation/hardhat-ethers";
+import hardhatIgnition from "@nomicfoundation/hardhat-ignition";
 import "@nomicfoundation/hardhat-verify";
-import "@nomicfoundation/hardhat-ignition";
 import { config as dotenvConfig } from "dotenv";
 
 dotenvConfig();
 
-const config: HardhatUserConfig = {
+export default defineConfig({
+  plugins: [hardhatEthers, hardhatIgnition],
   solidity: {
     version: "0.8.27",
     settings: {
@@ -36,29 +38,39 @@ const config: HardhatUserConfig = {
       allowUnlimitedContractSize: true,
     },
   },
-  etherscan: {
-    apiKey: {
-      hashkeyTestnet: "empty",
-      hashkeyMainnet: 'your API key'
-    },
-    customChains: [
-      {
-        network: "hashkeyMainnet",
-        chainId: 177,
-        urls: {
-          apiURL: "https://explorer.hsk.xyz/api",
-          browserURL: "https://explorer.hsk.xyz"
-        }
-      }
-    ]
-  },
+  // @ts-ignore - mocha config
   mocha: {
     timeout: 100000
   },
   typechain: {
     outDir: 'typechain',
     target: 'ethers-v6'
+  },
+  etherscan: {
+    apiKey: {
+      hashkeyTestnet: "empty",
+      hashkeyMainnet: process.env.HASHKEY_API_KEY || "empty"
+    },
+    customChains: [
+      {
+        network: "hashkeyTestnet",
+        chainId: 133,
+        urls: {
+          apiURL: "https://testnet-explorer.hsk.xyz/api",
+          browserURL: "https://testnet-explorer.hsk.xyz"
+        }
+      },
+      {
+        network: "hashkeyMainnet",
+        chainId: 177,
+        urls: {
+          apiURL: process.env.HASHKEY_MAINNET_API_URL || "https://mainnet.hsk.xyz/api",
+          browserURL: process.env.HASHKEY_MAINNET_BROWSER_URL || "https://mainnet.hsk.xyz"
+        }
+      }
+    ]
+  },
+  sourcify: {
+    enabled: false
   }
-};
-
-export default config;
+});
