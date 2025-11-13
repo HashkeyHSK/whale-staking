@@ -9,7 +9,7 @@
 
 ### 1.1 产品方案
 
-本方案基于 `Layer2StakingV2` 合约，通过部署两个独立的合约实例实现两套产品：
+本方案基于 `HSKStaking` 合约，通过部署两个独立的代理合约（`NormalStakingProxy` 和 `PremiumStakingProxy`）实现两套产品：
 
 | 产品 | 合约实例 | 目标用户 | 最小质押 | 年化收益 | 白名单 |
 |------|---------|---------|---------|---------|--------|
@@ -26,17 +26,32 @@
 
 ### 1.3 合约架构
 
+#### 实现合约层
 ```
-Layer2StakingV2 (主合约)
+HSKStaking (主实现合约)
+├── IStaking (接口定义)
 ├── StakingStorage (存储层)
-├── StakingLib (计算库)
+│   ├── Initializable (初始化控制)
+│   └── OwnableUpgradeable (所有权管理)
+├── StakingConstants (常量定义)
 ├── ReentrancyGuardUpgradeable (重入保护)
-├── PausableUpgradeable (暂停功能)
-├── OwnableUpgradeable (所有权管理)
+└── PausableUpgradeable (暂停功能)
 ```
 
-**说明**: 不再使用 UUPS，改为 Transparent Proxy 模式，由 ProxyAdmin 控制升级
+#### 代理合约层
 ```
+代理合约架构
+├── NormalStakingProxy (TransparentUpgradeableProxy)
+│   └── 指向 HSKStaking 实现
+└── PremiumStakingProxy (TransparentUpgradeableProxy)
+    └── 指向 HSKStaking 实现
+```
+
+**架构说明**：
+- 使用 Transparent Proxy 模式，由 ProxyAdmin 控制升级
+- 两个代理合约共享同一个 `HSKStaking` 实现
+- 通过初始化参数配置不同的产品特性
+- 两个代理合约可独立升级
 
 ---
 
@@ -47,9 +62,8 @@ Layer2StakingV2 (主合约)
 | 参数 | 值 | 合约函数 |
 |------|-----|---------|
 | `minStakeAmount` | 1 HSK (1e18) | `setMinStakeAmount(1e18)` |
-| `lockPeriod` | 365 天 (31,536,000 秒) | `addLockOption(31536000, 800)` |
-| `rewardRate` | 8% (800 basis points) | `addLockOption(31536000, 800)` |
-| `maxTotalStake` | 10,000,000 HSK (1e25) | `setMaxTotalStake(10000000e18)` |
+| `LOCK_PERIOD` | 365 天 (31,536,000 秒) | 固定常量，部署时设置 |
+| `rewardRate` | 8% (800 basis points) | 部署时通过 initialize() 设置 |
 | `stakeStartTime` | 部署后7天 | `setStakeStartTime(timestamp)` |
 | `stakeEndTime` | `type(uint256).max` | `setStakeEndTime(timestamp)` |
 | `onlyWhitelistCanStake` | `false` | `setWhitelistOnlyMode(false)` |
@@ -59,9 +73,8 @@ Layer2StakingV2 (主合约)
 | 参数 | 值 | 合约函数 |
 |------|-----|---------|
 | `minStakeAmount` | 500,000 HSK (5e23) | `setMinStakeAmount(500000e18)` |
-| `lockPeriod` | 365 天 (31,536,000 秒) | `addLockOption(31536000, 1600)` |
-| `rewardRate` | 16% (1600 basis points) | `addLockOption(31536000, 1600)` |
-| `maxTotalStake` | 20,000,000 HSK (2e25) | `setMaxTotalStake(20000000e18)` |
+| `LOCK_PERIOD` | 365 天 (31,536,000 秒) | 固定常量，部署时设置 |
+| `rewardRate` | 16% (1600 basis points) | 部署时通过 initialize() 设置 |
 | `stakeStartTime` | 部署后7天 | `setStakeStartTime(timestamp)` |
 | `stakeEndTime` | `type(uint256).max` | `setStakeEndTime(timestamp)` |
 | `onlyWhitelistCanStake` | `true` | `setWhitelistOnlyMode(true)` |
@@ -69,22 +82,36 @@ Layer2StakingV2 (主合约)
 ### 2.3 关键数据结构
 
 ```solidity
-// Position 结构
+// Position 结构（定义在 IStaking 接口中）
 struct Position {
     uint256 positionId;      // 质押位置 ID
+    address owner;           // 质押位置所有者
     uint256 amount;          // 质押金额
-    uint256 lockPeriod;      // 锁定期（秒）
     uint256 stakedAt;        // 质押时间戳
     uint256 lastRewardAt;    // 上次奖励提取时间戳
-    uint256 rewardRate;      // 年化收益率（basis points）
     bool isUnstaked;         // 是否已解除质押
 }
 
-// LockOption 结构
-struct LockOption {
-    uint256 period;          // 锁定期（秒）
-    uint256 rewardRate;      // 年化收益率（basis points）
-}
+// 注意: V2版本使用固定的 LOCK_PERIOD 常量（365天），不再使用 LockOption 结构
+// 注意: Position 结构中不包含 rewardRate 字段，rewardRate 是合约级别的状态变量
+```
+
+**存储变量（定义在 StakingStorage 中）**：
+```solidity
+uint256 public minStakeAmount;        // 最小质押金额
+uint256 public totalStaked;           // 总质押量
+uint256 public nextPositionId;        // 下一个位置ID
+uint256 public rewardRate;            // 年化收益率（basis points）
+uint256 public totalPendingRewards;   // 总待发放奖励
+uint256 public rewardPoolBalance;     // 奖励池余额
+uint256 public stakeStartTime;        // 质押开始时间
+uint256 public stakeEndTime;          // 质押结束时间
+bool public onlyWhitelistCanStake;    // 是否只允许白名单质押
+bool public emergencyMode;            // 紧急模式
+
+mapping(uint256 => Position) public positions;       // 位置ID => 位置信息
+mapping(address => uint256[]) public userPositions;  // 用户地址 => 位置ID数组
+mapping(address => bool) public whitelisted;         // 白名单mapping
 ```
 
 ---
@@ -113,28 +140,28 @@ npx hardhat run scripts/deployDualTier.ts --network hashkeyTestnet
 
 #### 普通 Staking
 - [ ] 验证 `minStakeAmount` = 1 HSK
-- [ ] 验证锁定期选项：365 天，8% APY
-- [ ] 验证 `maxTotalStake` = 10,000,000 HSK
+- [ ] 验证 `rewardRate` = 800 (8% APY)
+- [ ] 验证 `LOCK_PERIOD` = 365 days (固定)
 - [ ] 验证 `onlyWhitelistCanStake` = false
 - [ ] 向奖励池充值（通过 `updateRewardPool()`）
 
 #### Premium Staking
 - [ ] 验证 `minStakeAmount` = 500,000 HSK
-- [ ] 验证锁定期选项：365 天，16% APY
-- [ ] 验证 `maxTotalStake` = 20,000,000 HSK
+- [ ] 验证 `rewardRate` = 1600 (16% APY)
+- [ ] 验证 `LOCK_PERIOD` = 365 days (固定)
 - [ ] 验证 `onlyWhitelistCanStake` = true
-- [ ] 添加白名单用户（通过 `addToWhitelist()` 或 `addToWhitelistBatch()`）
+- [ ] 添加白名单用户（通过 `updateWhitelistBatch()`）
 - [ ] 向奖励池充值（通过 `updateRewardPool()`）
 
 ### 3.3 部署验证脚本
 
 ```bash
-# 检查锁定期选项
-npx hardhat run scripts/checkLockPeriods.ts --network hashkeyTestnet \
-  -- --contract <CONTRACT_ADDRESS>
-
-# 检查配置参数
+# 检查配置参数和合约状态
 npx hardhat run scripts/checkStakes.ts --network hashkeyTestnet \
+  -- --contract <CONTRACT_ADDRESS> --user <USER_ADDRESS>
+
+# 检查白名单状态（Premium Staking）
+npx hardhat run scripts/checkWhitelist.ts --network hashkeyTestnet \
   -- --contract <CONTRACT_ADDRESS> --user <USER_ADDRESS>
 ```
 
@@ -144,18 +171,20 @@ npx hardhat run scripts/checkStakes.ts --network hashkeyTestnet \
 
 ### 4.1 用户接口
 
-#### `stake(uint256 lockPeriod) payable → uint256 positionId`
-创建新的质押位置。
+#### `stake() payable → uint256 positionId`
+创建新的质押位置（固定365天锁定期）。
 
 **参数**：
-- `lockPeriod`: 锁定期（秒），必须为已配置的锁定期选项
+- 无参数，通过 `msg.value` 发送质押金额
 
 **要求**：
-- `msg.value >= minStakeAmount`
-- `totalStaked + msg.value <= maxTotalStake`
-- 如果启用白名单：`whitelisted[msg.sender] == true`
-- `blacklisted[msg.sender] == false`
-- `rewardPoolBalance` 充足（检查逻辑见合约）
+- `block.timestamp >= stakeStartTime` - 质押时间窗口已开始
+- `block.timestamp < stakeEndTime` - 质押时间窗口未结束
+- `msg.value >= minStakeAmount` - 满足最小质押金额
+- 如果启用白名单：`whitelisted[msg.sender] == true` - 在白名单中
+- `!emergencyMode` - 非紧急模式
+- `!paused()` - 合约未暂停
+- `rewardPoolBalance >= totalPendingRewards + potentialReward` - 奖励池余额充足
 
 **返回**：新创建的质押位置 ID
 
@@ -166,9 +195,9 @@ npx hardhat run scripts/checkStakes.ts --network hashkeyTestnet \
 - `positionId`: 质押位置 ID
 
 **要求**：
-- `msg.sender == positionOwner[positionId]`
-- `block.timestamp >= stakedAt + lockPeriod`
-- 位置未解除质押
+- `msg.sender == position.owner` - 位置所有者
+- `block.timestamp >= position.stakedAt + LOCK_PERIOD` - 锁定期已结束（365天）
+- `!position.isUnstaked` - 位置未解除质押
 
 **效果**：
 - 提取本金 + 全部累积奖励
@@ -183,66 +212,115 @@ npx hardhat run scripts/checkStakes.ts --network hashkeyTestnet \
 **返回**：提取的奖励金额
 
 **要求**：
-- 位置所有者
-- 有未提取的奖励
+- `msg.sender == position.owner` - 位置所有者
+- `reward > 0` - 有未提取的奖励
+- `!emergencyMode` - 非紧急模式
+- `!paused()` - 合约未暂停
 
 #### `pendingReward(uint256 positionId) view → uint256`
 查询待提取奖励。
 
+**参数**：
+- `positionId`: 质押位置 ID
+
+**返回**：待提取的奖励金额
+
+**说明**：紧急模式下返回 0
+
 #### 查看用户质押位置
-通过 `userPositions(address user, uint256 index)` 查看单个位置。
+
+**方法1 - 通过 positions mapping**：
+```solidity
+positions(uint256 positionId) view → Position
+```
+直接查询指定 positionId 的位置信息。
+
+**方法2 - 通过 userPositions mapping**：
+```solidity
+userPositions(address user, uint256 index) view → uint256 positionId
+```
+获取用户的第 index 个质押位置的 ID，然后通过 positions 查询详情。
+
 - **说明**: `userPositions` 是 public mapping，需要遍历索引获取所有位置。
 
 ### 4.2 管理员接口
 
-#### `addLockOption(uint256 period, uint256 rewardRate)`
-添加新的锁定期选项。
-
-**参数**：
-- `period`: 锁定期（秒），范围：1天 - 730天
-- `rewardRate`: 年化收益率（basis points），例如：800 = 8%
+**说明**：V2版本使用固定365天锁定期和固定收益率（部署时设置），不支持动态添加或修改锁定期选项。
 
 #### `setMinStakeAmount(uint256 newAmount)`
 设置最小质押金额。
-
-#### `setMaxTotalStake(uint256 newLimit)`
-设置最大总质押量（池子上限）。
+- **要求**: 仅管理员可调用（`onlyOwner`）
+- **要求**: 非紧急模式（`whenNotEmergency`）
 
 #### `setWhitelistOnlyMode(bool enabled)`
 启用/禁用白名单模式。
+- **要求**: 仅管理员可调用（`onlyOwner`）
+- **事件**: 触发 `WhitelistModeChanged` 事件
 
-#### `addToWhitelist(address user)` / `removeFromWhitelist(address user)`
-管理白名单用户。
+#### `updateWhitelistBatch(address[] calldata users, bool status)`
+批量管理白名单用户。
 
-#### `addToWhitelistBatch(address[] calldata users)`
-批量添加白名单用户（最多100个）。
+**参数**：
+- `users`: 用户地址数组（最多100个）
+- `status`: true 添加到白名单，false 从白名单移除
+
+**要求**: 仅管理员可调用（`onlyOwner`）
+**事件**: 为每个状态变更的用户触发 `WhitelistStatusChanged` 事件
 
 #### `updateRewardPool() payable`
 向奖励池充值。
 
+**参数**: 通过 `msg.value` 发送充值金额
+**要求**: 仅管理员可调用（`onlyOwner`）
+**效果**: 增加 `rewardPoolBalance`
+**事件**: 触发 `RewardPoolUpdated` 事件
+
 **重要**：
 - 奖励池需要独立管理（普通 Staking 和 Premium Staking 分别管理）
+
+#### `withdrawExcessRewardPool(uint256 amount)`
+提取奖励池多余资金。
+
+**参数**: `amount` - 提取金额
+**要求**: 
+- 仅管理员可调用（`onlyOwner`）
+- `rewardPoolBalance >= totalPendingRewards` - 奖励池余额充足
+- `amount <= excess` - 不能提取已分配的奖励
 
 #### `enableEmergencyMode()`
 启用紧急模式。
 
-**紧急模式下的限制**：
-- 暂停奖励分配
+**要求**: 仅管理员可调用（`onlyOwner`）
+**效果**: 
+- 设置 `emergencyMode = true`
+- 暂停奖励分配（所有奖励相关函数返回0）
 - 阻止新质押
-- 暂停正常解除质押
 - 允许紧急提取（仅本金）
+**事件**: 触发 `EmergencyModeEnabled` 事件
+**注意**: 当前版本紧急模式一旦启用无法通过函数关闭，可能需要合约升级
+
+**紧急模式下的限制**：
+- 暂停奖励分配（所有奖励相关函数返回0）
+- 阻止新质押
+- 允许紧急提取（仅本金）
+- 说明：若已满足解锁条件，正常 `unstake` 仍可执行，但奖励为 0；未到期可使用 `emergencyWithdraw`（仅本金）
 
 #### `emergencyWithdraw(uint256 positionId)`
 紧急提取（仅本金，放弃奖励）。
 
+**参数**: `positionId` - 质押位置 ID
 **要求**：
-- 必须在紧急模式下
-- 位置所有者
+- 必须在紧急模式下（`emergencyMode == true`）
+- 位置所有者（`position.owner == msg.sender`）
+- 位置未解除质押（`!position.isUnstaked`）
+- 不受锁定期限制
+
+**重入保护**: 使用 `nonReentrant` 修饰符
+**事件**: 触发 `EmergencyWithdrawn` 事件
 
 ### 4.3 查询接口
 
-#### `getLockOptions() view → LockOption[]`
-获取所有锁定期选项。
+**说明**：V2版本不提供 `getLockOptions()` 函数，因为锁定期固定为365天。
 
 #### `totalStaked() view → uint256`
 获取总质押量。
@@ -256,23 +334,55 @@ npx hardhat run scripts/checkStakes.ts --network hashkeyTestnet \
 #### `emergencyMode() view → bool`
 查询紧急模式状态。
 
+#### `LOCK_PERIOD() view → uint256`
+获取固定锁定期（365 days = 31,536,000秒）。
+
+#### `rewardRate() view → uint256`
+获取年化收益率（basis points，例如：800 = 8%, 1600 = 16%）。
+
+#### `stakeStartTime() view → uint256`
+获取质押开始时间戳。
+
+#### `stakeEndTime() view → uint256`
+获取质押截止时间戳。
+
+#### `positions(uint256 positionId) view → Position`
+获取指定位置的详细信息。
+
+#### `userPositions(address user, uint256 index) view → uint256`
+获取用户的第 index 个质押位置 ID（需要遍历）。
+
 ---
 
 ## 五. 奖励计算机制
 
 ### 5.1 计算公式
 
-奖励计算由 `StakingLib.calculateReward()` 实现：
+奖励计算由 `HSKStaking._calculateReward()` 实现：
 
 ```solidity
-// 年化率 = rewardRate / 10000
-// 完整年份数 = timeElapsed / 365 days
-// 剩余天数 = (timeElapsed % 365 days)
-// 
-// 奖励 = 本金 × 年化率 × (完整年份数 + 剩余天数/365)
+// 年化率 = rewardRate (basis points) / 10000
+// 时间比率 = timeElapsed / 365 days
+// 奖励 = 本金 × (年化率 / 10000) × (timeElapsed / 365 days)
 //
-// 限制：如果 timeElapsed > lockPeriod，则 timeElapsed = lockPeriod
+// 简化公式：
+// reward = (amount × rewardRate × timeElapsed) / (10000 × 365 days)
+//
+// 限制：如果 timeElapsed > LOCK_PERIOD，则 timeElapsed = LOCK_PERIOD
 ```
+
+**实现细节**：
+```solidity
+uint256 annualRate = (rewardRate × PRECISION) / BASIS_POINTS;
+uint256 timeRatio = (timeElapsed × PRECISION) / SECONDS_PER_YEAR;
+uint256 totalReward = (amount × annualRate × timeRatio) / (PRECISION × PRECISION);
+```
+
+**常量定义**：
+- `PRECISION = 1e18` - 18位小数精度
+- `BASIS_POINTS = 10000` - 100% = 10000 basis points
+- `SECONDS_PER_YEAR = 365 days` - 31,536,000 秒
+- `LOCK_PERIOD = 365 days` - 固定锁定期
 
 ### 5.2 计算示例
 
@@ -297,7 +407,20 @@ npx hardhat run scripts/checkStakes.ts --network hashkeyTestnet \
 - 实际质押了 400 天才提取
 - 奖励仍按 365 天计算，超期的 35 天不产生奖励
 
-**实现位置**：`StakingLib.calculateReward()` 中的限制逻辑
+**实现位置**：`HSKStaking._calculateReward()` 和 `_calculateTimeElapsed()` 中的限制逻辑
+
+**实现代码**：
+```solidity
+function _calculateTimeElapsed(Position memory position) 
+    internal 
+    view 
+    returns (uint256) 
+{
+    uint256 lockEndTime = position.stakedAt + LOCK_PERIOD;
+    uint256 endTime = block.timestamp < lockEndTime ? block.timestamp : lockEndTime;
+    return endTime - position.lastRewardAt;
+}
+```
 
 ---
 
@@ -417,10 +540,10 @@ npx hardhat run scripts/checkStakes.ts --network hashkeyTestnet \
 
 #### 质押流程
 1. 检查白名单状态（Premium Staking）
-2. 查询可用锁定期选项
+2. 检查质押时间窗口（`stakeStartTime` 和 `stakeEndTime`）
 3. 检查最大总质押量限制
-4. 调用 `stake(lockPeriod)` 并发送 ETH
-5. 监听 `Staked` 事件
+4. 调用 `stake()` 并发送 ETH（锁定期固定365天）
+5. 监听 `PositionCreated` 事件
 
 #### 提取奖励流程
 1. 查询用户质押位置（`userPositions(user, index)`，需遍历）
@@ -429,27 +552,34 @@ npx hardhat run scripts/checkStakes.ts --network hashkeyTestnet \
 4. 监听 `RewardClaimed` 事件
 
 #### 解除质押流程
-1. 检查锁定期是否结束
-2. 查询用户质押位置
+1. 检查锁定期是否结束（质押时间 + 365天）
+2. 查询用户质押位置（`userPositions` 或 `positions`）
 3. 调用 `unstake(positionId)`
-4. 监听 `PositionUnstaked` 事件
+4. 监听 `PositionUnstaked` 和 `RewardClaimed` 事件
 
 ### 10.2 显示数据
 
 - **总质押量**：`totalStaked()`
 - **奖励池余额**：`rewardPoolBalance()`
-- **剩余质押容量**：`maxTotalStake() - totalStaked()`
+- **锁定期**：`LOCK_PERIOD()` (固定365天)
+- **年化收益率**：`rewardRate()` (部署时设置，例如：800 = 8%)
 - **用户质押位置**：`userPositions(user, index)`（需遍历索引）
+- **位置详情**：`positions(positionId)`
 - **待提取奖励**：`pendingReward(positionId)`
 
 ### 10.3 错误处理
 
 常见错误：
-- `"Insufficient stake amount"` - 质押金额不足
-- `"Exceeds maximum total stake"` - 超过最大总质押量
-- `"Not whitelisted"` - 未在白名单中
-- `"Lock period not ended"` - 锁定期未结束
+- `InvalidAmount` - 质押金额不足
+- `NotWhitelisted` - 未在白名单中
+- `StillLocked` - 锁定期未结束（365天）
 - `"Insufficient reward pool"` - 奖励池余额不足
+- `"Staking has not started yet"` - 质押时间窗口未开始
+- `"Staking period has ended"` - 质押时间窗口已结束
+- `"Contract is in emergency mode"` - 合约处于紧急模式
+- `AlreadyUnstaked` - 位置已解除质押
+- `NoReward` - 没有可提取的奖励
+- `PositionNotFound` - 位置不存在或不属于调用者
 
 ---
 
@@ -460,7 +590,6 @@ npx hardhat run scripts/checkStakes.ts --network hashkeyTestnet \
 #### 普通 Staking
 - `totalStaked` - 总质押量
 - `rewardPoolBalance` - 奖励池余额
-- `totalStaked / maxTotalStake` - 质押率
 - 用户数量统计（通过事件）
 
 #### Premium Staking
@@ -470,8 +599,7 @@ npx hardhat run scripts/checkStakes.ts --network hashkeyTestnet \
 
 ### 11.2 告警阈值
 
-- ⚠️ 奖励池余额 < 总质押量 × 年化收益率 × 30天
-- ⚠️ 质押率 > 80%
+- ⚠️ 奖励池余额 < 总待发放奖励（totalPendingRewards）
 - ⚠️ 紧急模式启用
 - ⚠️ 合约暂停
 
@@ -517,16 +645,9 @@ npx hardhat run scripts/checkStakes.ts --network hashkeyTestnet \
 
 ## 十三. 常见问题
 
-### Q: 如何添加新的锁定期选项？
+### Q: 如何修改锁定期或收益率？
 
-A: 使用 `addLockOption(period, rewardRate)`，但需要注意：
-- 已存在的质押位置不受影响
-- 新选项会添加到 `lockOptions` 数组
-- 旧配置会保存在历史记录中
-
-### Q: 如何更新锁定期选项？
-
-A: 使用 `updateLockOption(index, newPeriod, newRate)`，但只能更新未被使用的选项。
+A: V2版本使用固定锁定期（365天）和固定收益率（部署时设置），不支持动态修改。如需不同配置，请部署新的合约实例。
 
 ### Q: 奖励池余额不足怎么办？
 
@@ -534,7 +655,9 @@ A: 使用 `updateRewardPool()` 充值，确保有足够资金支付奖励。
 
 ### Q: 如何批量添加白名单用户？
 
-A: 使用 `addToWhitelistBatch(address[] calldata users)`，最多100个。
+A: 使用 `updateWhitelistBatch(address[] calldata users, bool status)`，最多100个。
+- `status = true` 添加到白名单
+- `status = false` 从白名单移除
 
 ### Q: 紧急模式如何启用/关闭？
 
@@ -545,6 +668,7 @@ A: 使用 `enableEmergencyMode()` 启用。注意：当前合约版本中，紧�
 ## 十四. 相关资源
 
 - [主 README](../README.md)
+- [合约架构说明](./CONTRACT_ARCHITECTURE.md) - **合约架构详解（开发必读）**
 - [产品方案详细文档](./PRODUCT_PLANS.md) - **运营文档（推荐）**
 - [产品方案执行摘要](./PRODUCT_SUMMARY.md) - 快速了解
 - [双层产品方案文档](./DUAL_TIER_STAKING.md) - 技术部署文档

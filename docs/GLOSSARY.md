@@ -11,13 +11,28 @@
 用户每次质押创建的独立记录，包含质押金额、锁定期、收益率等信息。每个质押位置有唯一的 `positionId`。
 
 ### 锁定期 (Lock Period)
-质押资金被锁定的时间长度，在 Layer2StakingV2 中固定为 365 天。锁定期内不能解除质押，只能提取奖励。
+质押资金被锁定的时间长度，在 HSKStaking 中固定为 365 天。锁定期内不能解除质押，只能提取奖励。
+
+**合约常量**：
+- `LOCK_PERIOD = 365 days` - 定义在 `StakingConstants` 合约中
+- 365 days = 31,536,000 秒
+- V2版本简化设计，所有质押统一使用固定锁定期
 
 ### 年化收益率 (APY - Annual Percentage Yield)
 按年计算的收益率，以 basis points 表示（100% = 10000 basis points）。
 
+**示例**：
+- 8% APY = 800 basis points（普通 Staking）
+- 16% APY = 1600 basis points（Premium Staking）
+
+**合约实现**：年化收益率存储在 `rewardRate` 状态变量中，在部署时通过 `initialize()` 函数设置，部署后不可修改。
+
 ### Basis Points
 利率单位，1 basis point = 0.01%，100 basis points = 1%，10000 basis points = 100%。
+
+**合约常量**：
+- `BASIS_POINTS = 10000` - 定义在 `StakingConstants` 合约中
+- 用于奖励计算公式中的精度控制
 
 ## 产品术语
 
@@ -104,7 +119,7 @@
 用户创建质押位置的时间戳。
 
 ### 解锁时间 (Unlock Time)
-锁定期结束的时间点，计算公式：`解锁时间 = 质押时间 + 365天`。在 Layer2StakingV2 中，必须等待完整的365天后才能解除质押。
+锁定期结束的时间点，计算公式：`解锁时间 = 质押时间 + 365天`。在 HSKStaking 中，必须等待完整的365天后才能解除质押。
 
 ## 合约术语
 

@@ -78,31 +78,22 @@ async function main() {
     }
   }
 
-  // 2. 设置最大总质押量（可根据需要调整）
-  const maxTotalStake = ethers.parseEther("10000000"); // 1000万 HSK
-  console.log(`\n设置最大总质押量: ${ethers.formatEther(maxTotalStake)} HSK`);
-  const setMaxTx = await staking.setMaxTotalStake(maxTotalStake);
-  await setMaxTx.wait();
-  console.log("✅ 最大总质押量设置完成");
-
-  // 3. 关闭白名单模式（普通用户可自由质押）
+  // 2. 关闭白名单模式（普通用户可自由质押）
   console.log("\n关闭白名单模式（允许所有用户质押）...");
   const setWhitelistTx = await staking.setWhitelistOnlyMode(false);
   await setWhitelistTx.wait();
   console.log("✅ 白名单模式已关闭");
 
-  // 4. 验证配置
+  // 3. 验证配置
   console.log("\n==========================================");
   console.log("配置验证");
   console.log("==========================================");
   const minStake = await staking.minStakeAmount();
-  const maxStake = await staking.maxTotalStake();
   const startTime = await staking.stakeStartTime();
   const whitelistMode = await staking.onlyWhitelistCanStake();
   const lockOptions = await staking.getLockOptions();
 
   console.log("最小质押金额:", ethers.formatEther(minStake), "HSK");
-  console.log("最大总质押量:", ethers.formatEther(maxStake), "HSK");
   console.log("质押开始时间:", new Date(Number(startTime) * 1000).toISOString());
   console.log("白名单模式:", whitelistMode ? "启用" : "关闭");
   console.log("\n锁定期选项:");

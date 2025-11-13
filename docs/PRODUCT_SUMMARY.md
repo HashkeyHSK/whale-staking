@@ -261,6 +261,7 @@
 ## 📚 相关文档
 
 - [主 README](../README.md)
+- [合约架构说明](./CONTRACT_ARCHITECTURE.md) - **合约架构详解（开发必读）**
 - [产品方案详细文档](./PRODUCT_PLANS.md) - **运营文档（推荐）**
 - [双层产品方案文档](./DUAL_TIER_STAKING.md) - 技术部署文档
 - [产品开发文档](./PRODUCT_PLANS_DEV.md) - 开发团队文档
