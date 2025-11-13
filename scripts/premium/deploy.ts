@@ -1,25 +1,26 @@
 import hre from "hardhat";
-import { NORMAL_STAKING_CONFIG } from "../shared/constants.js";
+import { PREMIUM_STAKING_CONFIG } from "../shared/constants.js";
 import { printSeparator, printSuccess, printWarning } from "../shared/helpers.js";
 
 /**
- * Deploy Normal Staking product
- * - Min stake: 1 HSK
- * - APY: 8%
- * - For regular users
+ * Deploy Premium Staking product
+ * - Min stake: 500,000 HSK
+ * - APY: 16%
+ * - For whales/institutions
+ * - Whitelist mode enabled
  * 
  * Environment variables:
  * - STAKE_START_TIME: Unix timestamp for stake start time (required, seconds)
  * - STAKE_END_TIME: Unix timestamp for stake end time (required, seconds)
  * 
  * Example:
- * STAKE_START_TIME="1735689600" STAKE_END_TIME="1767225600" npm run deploy:testnet
+ * STAKE_START_TIME="1735689600" STAKE_END_TIME="1767225600" npm run deploy:premium:testnet
  */
 async function main() {
   const { ethers } = await hre.network.connect();
   const [deployer] = await ethers.getSigners();
 
-  printSeparator("Deploy Normal Staking Product");
+  printSeparator("Deploy Premium Staking Product");
   console.log("Deployer address:", deployer.address);
   console.log("Account balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "HSK");
 
@@ -32,9 +33,9 @@ async function main() {
   printSuccess(`HSKStaking implementation deployed: ${implementationAddress}`);
 
   // 2. Prepare initialization parameters
-  const minStakeAmount = ethers.parseEther(NORMAL_STAKING_CONFIG.minStakeAmount);
-  const rewardRate = NORMAL_STAKING_CONFIG.rewardRate;
-  const whitelistMode = NORMAL_STAKING_CONFIG.whitelistMode;  // false for Normal Staking
+  const minStakeAmount = ethers.parseEther(PREMIUM_STAKING_CONFIG.minStakeAmount);
+  const rewardRate = PREMIUM_STAKING_CONFIG.rewardRate;
+  const whitelistMode = PREMIUM_STAKING_CONFIG.whitelistMode;  // true for Premium Staking
   
   // Read Unix timestamps from environment variables
   const stakeStartTimeStr = process.env.STAKE_START_TIME;
@@ -43,7 +44,7 @@ async function main() {
   if (!stakeStartTimeStr) {
     throw new Error(
       "Please provide stake start time (Unix timestamp):\n" +
-      "Method 1: STAKE_START_TIME=\"1735689600\" npm run deploy:testnet\n" +
+      "Method 1: STAKE_START_TIME=\"1735689600\" npm run deploy:premium:testnet\n" +
       "Method 2: Set STAKE_START_TIME=1735689600 in .env file\n\n" +
       "Tip: You can use online tools to convert date to Unix timestamp, e.g.:\n" +
       "  - https://www.epochconverter.com/\n" +
@@ -54,7 +55,7 @@ async function main() {
   if (!stakeEndTimeStr) {
     throw new Error(
       "Please provide stake end time (Unix timestamp):\n" +
-      "Method 1: STAKE_END_TIME=\"1735689600\" npm run deploy:testnet\n" +
+      "Method 1: STAKE_END_TIME=\"1735689600\" npm run deploy:premium:testnet\n" +
       "Method 2: Set STAKE_END_TIME=1735689600 in .env file\n\n" +
       "Tip: You can use online tools to convert date to Unix timestamp, e.g.:\n" +
       "  - https://www.epochconverter.com/\n" +
@@ -91,14 +92,14 @@ async function main() {
     rewardRate,
     stakeStartTime,
     stakeEndTime,
-    whitelistMode,  // false - whitelist disabled, everyone can stake
+    whitelistMode,  // true - whitelist enabled, only whitelisted users can stake
   ]);
 
   // 4. Deploy Transparent Proxy contract
-  console.log("\nDeploying NormalStakingProxy (Transparent Proxy)...");
-  const NormalStakingProxy = await ethers.getContractFactory("NormalStakingProxy");
+  console.log("\nDeploying PremiumStakingProxy (Transparent Proxy)...");
+  const PremiumStakingProxy = await ethers.getContractFactory("PremiumStakingProxy");
   
-  const proxy = await NormalStakingProxy.deploy(
+  const proxy = await PremiumStakingProxy.deploy(
     implementationAddress,  // Implementation contract address
     deployer.address,       // ProxyAdmin address
     initData                // Initialization data
@@ -106,7 +107,7 @@ async function main() {
   await proxy.waitForDeployment();
   const proxyAddress = await proxy.getAddress();
   
-  printSuccess(`NormalStakingProxy deployed: ${proxyAddress}`);
+  printSuccess(`PremiumStakingProxy deployed: ${proxyAddress}`);
 
   // 5. Connect to HSKStaking contract through proxy for verification
   const staking = HSKStaking.attach(proxyAddress);
@@ -128,26 +129,28 @@ async function main() {
   console.log("Stake end time:", new Date(Number(endTime) * 1000).toISOString());
   console.log("Whitelist mode:", whitelistModeCheck ? "Enabled" : "Disabled");
   
-  printSeparator("✅ Normal Staking Product Deployment Complete");
+  printSeparator("✅ Premium Staking Product Deployment Complete");
   console.log("\nProduct configuration:");
-  console.log(`  - Product type: ${NORMAL_STAKING_CONFIG.productName}`);
-  console.log(`  - Target users: ${NORMAL_STAKING_CONFIG.targetUsers}`);
-  console.log(`  - Min stake: ${NORMAL_STAKING_CONFIG.minStakeAmount} HSK`);
-  console.log(`  - APY: ${NORMAL_STAKING_CONFIG.rewardRate / 100}%`);
+  console.log(`  - Product type: ${PREMIUM_STAKING_CONFIG.productName}`);
+  console.log(`  - Target users: ${PREMIUM_STAKING_CONFIG.targetUsers}`);
+  console.log(`  - Min stake: ${PREMIUM_STAKING_CONFIG.minStakeAmount} HSK`);
+  console.log(`  - APY: ${PREMIUM_STAKING_CONFIG.rewardRate / 100}%`);
   console.log(`  - Lock period: 365 days (fixed)`);
-  console.log(`  - Whitelist mode: ${NORMAL_STAKING_CONFIG.whitelistMode ? "Enabled" : "Disabled"}`);
+  console.log(`  - Whitelist mode: ${PREMIUM_STAKING_CONFIG.whitelistMode ? "Enabled" : "Disabled"}`);
 
   printWarning("Next steps:");
-  console.log("  1. Use scripts/normal/add-rewards.ts to fund the reward pool");
-  console.log("  2. Use scripts/normal/query/check-status.ts to check contract status");
-  console.log("  3. Users can start staking after stake start time (no whitelist required)");
+  console.log("  1. Use scripts/premium/whitelist/add-batch.ts to add users to whitelist");
+  console.log("  2. Use scripts/premium/add-rewards.ts to fund the reward pool");
+  console.log("  3. Use scripts/premium/query/check-status.ts to check contract status");
+  console.log("  4. Whitelisted users can start staking after stake start time");
   
   // Save deployment information
   console.log("\nPlease save the following address to scripts/shared/constants.ts:");
-  console.log(`normalStaking: "${proxyAddress}",`);
+  console.log(`premiumStaking: "${proxyAddress}",`);
 }
 
 main().catch((error) => {
   console.error(error);
   process.exit(1);
 });
+

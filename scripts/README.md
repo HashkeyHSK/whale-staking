@@ -5,8 +5,15 @@
 ### 1. 部署合约
 
 ```bash
-npm run deploy:testnet
+# 部署时需要提供开始和结束时间（Unix 时间戳，秒级）
+STAKE_START_TIME="1735689600" STAKE_END_TIME="1767225600" npm run deploy:testnet
 ```
+
+**提示**：
+- `STAKE_START_TIME`: 质押开始时间（Unix 时间戳，秒级）
+- `STAKE_END_TIME`: 质押结束时间（Unix 时间戳，秒级）
+- 可以使用在线工具转换：https://www.epochconverter.com/
+- 或者使用命令：`date +%s` 获取当前时间戳
 
 部署成功后，将代理合约地址保存到 `scripts/shared/constants.ts`。
 
@@ -60,31 +67,83 @@ POSITION_ID="1" npm run unstake:testnet
 
 ```
 scripts/
+├── README.md                 # 使用指南（本文件）
+│
 ├── shared/                    # 共享模块
 │   ├── constants.ts          # 配置和地址
 │   ├── types.ts              # 类型定义
 │   ├── helpers.ts            # 辅助函数
 │   └── utils.ts              # 工具函数
 │
-└── normal/                    # 普通质押
-    ├── deploy.ts             # 部署合约
-    ├── stake.ts              # 质押操作
-    ├── unstake.ts            # 解除质押
-    ├── claim-rewards.ts      # 领取奖励
-    ├── add-rewards.ts        # 添加奖励池
-    ├── emergency-withdraw.ts # 紧急提取本金
-    ├── withdraw-excess.ts    # 提取多余奖励
-    ├── config/               # 配置管理
-    │   ├── pause.ts          # 暂停合约
-    │   ├── unpause.ts        # 恢复合约
-    │   ├── set-start-time.ts # 设置开始时间
-    │   ├── set-end-time.ts   # 设置结束时间
-    │   ├── set-min-stake.ts  # 设置最小质押金额
-    │   └── enable-emergency.ts # 启用紧急模式
-    └── query/                # 状态查询
-        ├── check-status.ts   # 查询合约状态
-        ├── check-stakes.ts   # 查询质押信息
-        └── pending-reward.ts # 查询待领取奖励
+├── normal/                    # 普通质押
+│   ├── deploy.ts             # 部署合约
+│   ├── upgrade.ts            # 升级合约
+│   ├── stake.ts              # 质押操作
+│   ├── unstake.ts            # 解除质押
+│   ├── claim-rewards.ts      # 领取奖励
+│   ├── add-rewards.ts        # 添加奖励池
+│   ├── emergency-withdraw.ts # 紧急提取本金
+│   ├── withdraw-excess.ts    # 提取多余奖励
+│   ├── verify-forge.ts       # 验证合约（使用 Foundry）
+│   ├── config/               # 配置管理
+│   │   ├── pause.ts          # 暂停合约
+│   │   ├── unpause.ts        # 恢复合约
+│   │   ├── set-start-time.ts # 设置开始时间
+│   │   ├── set-end-time.ts   # 设置结束时间
+│   │   ├── set-min-stake.ts  # 设置最小质押金额
+│   │   └── enable-emergency.ts # 启用紧急模式
+│   └── query/                # 状态查询
+│       ├── check-status.ts   # 查询合约状态
+│       ├── check-stakes.ts   # 查询质押信息
+│       └── pending-reward.ts # 查询待领取奖励
+│
+├── premium/                   # 高级质押（✅ 已完成）
+│   ├── deploy.ts             # 部署合约
+│   ├── upgrade.ts            # 升级合约
+│   ├── stake.ts              # 质押操作（需白名单）
+│   ├── unstake.ts            # 解除质押
+│   ├── claim-rewards.ts      # 领取奖励
+│   ├── add-rewards.ts        # 添加奖励池
+│   ├── emergency-withdraw.ts # 紧急提取本金
+│   ├── withdraw-excess.ts    # 提取多余奖励
+│   ├── verify-forge.ts       # 验证合约
+│   ├── whitelist/            # 白名单管理
+│   │   ├── add-batch.ts      # 批量添加白名单
+│   │   ├── remove-batch.ts   # 批量移除白名单
+│   │   ├── check-user.ts     # 查询用户白名单状态
+│   │   └── toggle-mode.ts    # 切换白名单模式
+│   ├── config/               # 配置管理
+│   │   ├── pause.ts
+│   │   ├── unpause.ts
+│   │   ├── set-start-time.ts
+│   │   ├── set-end-time.ts
+│   │   ├── set-min-stake.ts
+│   │   └── enable-emergency.ts
+│   └── query/                # 状态查询
+│       ├── check-status.ts
+│       ├── check-stakes.ts
+│       ├── pending-reward.ts
+│       └── check-whitelist.ts
+│
+├── dev/                       # 开发脚本
+│   ├── compile.ts            # 编译合约
+│   ├── clean.ts              # 清理编译产物
+│   ├── test-all.ts           # 运行所有测试
+│   └── coverage.ts           # 生成测试覆盖率报告
+│
+├── test/                      # 测试脚本
+│   ├── helpers/              # 测试辅助函数
+│   │   ├── fixtures.ts       # 测试夹具
+│   │   └── test-utils.ts     # 测试工具函数
+│   └── integration/          # 集成测试
+│       ├── deploy-test.ts    # 部署测试
+│       ├── stake-test.ts     # 质押操作测试
+│       └── whitelist-test.ts # 白名单功能测试
+│
+└── tools/                     # 工具脚本
+    ├── extract-abi.ts        # 提取 ABI
+    ├── generate-types.ts     # 生成 TypeScript 类型
+    └── compare-contracts.ts  # 对比合约差异
 ```
 
 ## 🔧 配置
@@ -94,6 +153,7 @@ scripts/
 ```bash
 # 合约地址
 export NORMAL_STAKING_ADDRESS="0x..."
+export PREMIUM_STAKING_ADDRESS="0x..."
 
 # 操作相关
 export STAKE_AMOUNT="1"           # 质押金额
@@ -106,14 +166,26 @@ export IMPLEMENTATION_ADDRESS="0x..."  # 实现合约地址（用于验证）
 export RPC_URL="https://testnet.hsk.xyz"  # RPC URL（可选）
 export VERIFIER_URL="https://testnet-explorer.hsk.xyz/api/"  # 验证器 URL（可选）
 
+# 部署相关（必需）
+export STAKE_START_TIME="1735689600"  # 质押开始时间（Unix 时间戳，秒级，部署时必需）
+export STAKE_END_TIME="1767225600"    # 质押结束时间（Unix 时间戳，秒级，部署时必需）
+
 # 配置相关
-export START_TIME="1735689600"      # 开始时间（Unix 时间戳，秒级）
-export END_TIME="1735689600"        # 结束时间（Unix 时间戳，秒级）
+export START_TIME="1735689600"      # 开始时间（Unix 时间戳，秒级，用于修改配置）
+export END_TIME="1735689600"        # 结束时间（Unix 时间戳，秒级，用于修改配置）
 export NEW_MIN_STAKE="1"            # 新的最小质押金额
 
 # 高级操作
 export WITHDRAW_AMOUNT="100"       # 提取金额
 export CONFIRM_EMERGENCY="YES_I_UNDERSTAND"  # 确认启用紧急模式
+
+# 升级相关
+export PROXY_ADMIN_ADDRESS="0x..."  # ProxyAdmin 地址（升级时必需，通常是部署者地址）
+export NEW_IMPLEMENTATION_ADDRESS="0x..."  # 新实现合约地址（可选，不提供则自动部署）
+
+# 白名单相关（Premium Staking）
+export WHITELIST_ADDRESSES="0x123...,0x456..."  # 白名单地址列表（逗号分隔，最多100个）
+export ENABLE="true"  # 启用/禁用白名单模式（"true" 或 "false"）
 ```
 
 ### 合约地址配置
@@ -138,10 +210,41 @@ export const TESTNET_ADDRESSES: ContractAddresses = {
 - `npm run verify:forge` - 验证实现合约（主网，使用 Foundry）
 - `npm run verify:forge:testnet` - 验证实现合约（测试网，使用 Foundry）
 
-### 质押操作
+### 合约升级
+- `npm run upgrade:normal:testnet` - 升级普通质押合约（测试网）
+- `npm run upgrade:premium:testnet` - 升级高级质押合约（测试网）
+
+### 开发工具
+- `npm run dev:compile` - 编译合约（通过脚本）
+- `npm run dev:clean` - 清理编译产物（通过脚本）
+- `npm run dev:test` - 运行所有测试（通过脚本）
+- `npm run dev:coverage` - 生成测试覆盖率报告（通过脚本）
+
+### 集成测试
+- `npm run test:integration:deploy` - 运行部署集成测试
+- `npm run test:integration:stake` - 运行质押操作集成测试
+- `npm run test:integration:whitelist` - 运行白名单功能集成测试
+
+### 工具脚本
+- `npm run tools:extract-abi` - 提取合约 ABI
+- `npm run tools:generate-types` - 生成 TypeScript 类型
+- `npm run tools:compare-contracts` - 对比合约差异
+
+### 质押操作（Normal Staking）
 - `npm run stake:testnet` - 质押
 - `npm run unstake:testnet` - 解除质押
 - `npm run claim:testnet` - 领取奖励
+
+### 质押操作（Premium Staking）
+- `npm run stake:premium:testnet` - 质押（需白名单）
+- `npm run unstake:premium:testnet` - 解除质押
+- `npm run claim:premium:testnet` - 领取奖励
+
+### 白名单管理（Premium Staking）
+- `npm run whitelist:add-batch:premium:testnet` - 批量添加白名单
+- `npm run whitelist:remove-batch:premium:testnet` - 批量移除白名单
+- `npm run whitelist:check-user:premium:testnet` - 查询用户白名单状态
+- `npm run whitelist:toggle-mode:premium:testnet` - 切换白名单模式
 
 ### 奖励管理
 - `npm run rewards:add:testnet` - 添加奖励
@@ -155,10 +258,16 @@ export const TESTNET_ADDRESSES: ContractAddresses = {
 - `npm run config:set-min-stake:testnet` - 设置最小质押金额
 - `npm run config:enable-emergency:testnet` - 启用紧急模式（⚠️ 不可逆）
 
-### 状态查询
+### 状态查询（Normal Staking）
 - `npm run query:status:testnet` - 查询合约状态
 - `npm run query:stakes:testnet` - 查询质押信息
 - `npm run query:pending-reward:testnet` - 查询待领取奖励
+
+### 状态查询（Premium Staking）
+- `npm run query:status:premium:testnet` - 查询合约状态
+- `npm run query:stakes:premium:testnet` - 查询质押信息
+- `npm run query:pending-reward:premium:testnet` - 查询待领取奖励
+- `npm run query:check-whitelist:premium:testnet` - 查询白名单配置
 
 ### 紧急操作
 - `npm run emergency-withdraw:testnet` - 紧急提取本金（仅紧急模式）
@@ -166,10 +275,32 @@ export const TESTNET_ADDRESSES: ContractAddresses = {
 ## ⚠️ 重要提示
 
 1. **锁定期**: 固定 365 天
-2. **奖励率**: 8% APY (800 basis points)
-3. **最小质押**: 1 HSK（可通过 owner 修改）
-4. **白名单**: 关闭（所有用户可质押）
+2. **奖励率**: 
+   - Normal Staking: 8% APY (800 basis points)
+   - Premium Staking: 16% APY (1600 basis points)
+3. **最小质押**: 
+   - Normal Staking: 1 HSK（可通过 owner 修改）
+   - Premium Staking: 500,000 HSK（可通过 owner 修改）
+4. **白名单**: 
+   - Normal Staking: 关闭（所有用户可质押）
+   - Premium Staking: 启用（仅白名单用户可质押）
 5. **测试优先**: 先在测试网验证
+
+## 📊 脚本统计
+
+**当前已实现**: 57 个脚本文件
+- ✅ Normal Staking: 14 个脚本
+- ✅ Premium Staking: 23 个脚本（包含白名单管理）
+- ✅ 开发脚本: 4 个脚本
+- ✅ 测试脚本: 5 个脚本
+- ✅ 工具脚本: 3 个脚本
+- ✅ 共享模块: 4 个文件
+
+**Premium Staking 脚本包含**：
+- 基础操作脚本：9 个（deploy, upgrade, stake, unstake, claim-rewards, add-rewards, emergency-withdraw, withdraw-excess, verify-forge）
+- 白名单管理脚本：4 个（add-batch, remove-batch, check-user, toggle-mode）
+- 配置管理脚本：6 个（pause, unpause, set-start-time, set-end-time, set-min-stake, enable-emergency）
+- 查询脚本：4 个（check-status, check-stakes, pending-reward, check-whitelist）
 
 ## 🐛 常见问题
 
@@ -187,7 +318,14 @@ npm run config:unpause:testnet
 POSITION_ID="1" npm run query:pending-reward:testnet
 ```
 
-**Q: 如何设置开始/结束时间？**
+**Q: 部署时如何设置开始/结束时间？**
+部署时必须提供 Unix 时间戳（秒级）：
+```bash
+# 部署时设置时间（例如：2025-01-01 00:00:00 UTC 开始，2026-01-01 00:00:00 UTC 结束）
+STAKE_START_TIME="1735689600" STAKE_END_TIME="1767225600" npm run deploy:testnet
+```
+
+**Q: 如何修改已部署合约的开始/结束时间？**
 使用 Unix 时间戳（秒级）：
 ```bash
 # 设置开始时间（例如：2025-01-01 00:00:00 UTC）
@@ -215,6 +353,95 @@ WITHDRAW_AMOUNT="1000" npm run withdraw-excess:testnet
 
 # 提取所有可用余额（不指定金额）
 npm run withdraw-excess:testnet
+```
+
+**Q: 如何升级合约？**
+升级需要 ProxyAdmin 权限（通常是部署者地址）：
+```bash
+# 升级普通质押合约（自动部署新实现）
+PROXY_ADMIN_ADDRESS="0x..." npm run upgrade:normal:testnet
+
+# 使用已部署的实现合约升级
+PROXY_ADMIN_ADDRESS="0x..." NEW_IMPLEMENTATION_ADDRESS="0x..." npm run upgrade:normal:testnet
+
+# 升级高级质押合约
+PROXY_ADMIN_ADDRESS="0x..." npm run upgrade:premium:testnet
+```
+
+⚠️ **升级注意事项**：
+- 确保新实现合约与现有存储布局兼容
+- 升级后所有状态数据会保留
+- 升级前建议先在测试网验证
+- 升级后需要验证新实现合约
+
+**Q: 如何使用开发脚本？**
+```bash
+# 编译合约
+npm run dev:compile
+
+# 清理编译产物
+npm run dev:clean
+
+# 运行所有测试
+npm run dev:test
+
+# 生成覆盖率报告（需要安装 solidity-coverage）
+npm run dev:coverage
+```
+
+**Q: 如何运行集成测试？**
+```bash
+# 运行部署测试
+npm run test:integration:deploy
+
+# 运行质押操作测试
+npm run test:integration:stake
+
+# 运行白名单功能测试
+npm run test:integration:whitelist
+```
+
+**Q: 如何使用工具脚本？**
+```bash
+# 提取 ABI（需要先编译合约）
+npm run tools:extract-abi
+
+# 生成 TypeScript 类型（编译时自动生成）
+npm run tools:generate-types
+
+# 对比合约实现
+npm run tools:compare-contracts HSKStaking
+```
+
+**Q: 如何使用 Premium Staking 白名单功能？**
+```bash
+# 添加用户到白名单（批量，最多100个）
+WHITELIST_ADDRESSES="0x123...,0x456..." npm run whitelist:add-batch:premium:testnet
+
+# 从白名单移除用户
+WHITELIST_ADDRESSES="0x123...,0x456..." npm run whitelist:remove-batch:premium:testnet
+
+# 查询用户白名单状态
+USER_ADDRESS="0x123..." npm run whitelist:check-user:premium:testnet
+
+# 切换白名单模式（启用/禁用）
+ENABLE="true" npm run whitelist:toggle-mode:premium:testnet
+
+# 查询白名单配置和用户状态
+USER_ADDRESS="0x123...,0x456..." npm run query:check-whitelist:premium:testnet
+```
+
+**Q: Premium Staking 质押时提示不在白名单中？**
+```bash
+# 1. 检查用户是否在白名单中
+USER_ADDRESS="0x..." npm run whitelist:check-user:premium:testnet
+
+# 2. 如果不在，联系管理员添加到白名单
+# 管理员执行：
+WHITELIST_ADDRESSES="0x..." npm run whitelist:add-batch:premium:testnet
+
+# 3. 确认白名单模式已启用
+npm run query:status:premium:testnet
 ```
 
 ## 🎯 合约配置
@@ -265,5 +492,5 @@ CONFIRM_EMERGENCY=YES_I_UNDERSTAND npm run config:enable-emergency:testnet
 
 ## 📖 完整文档
 
-详细说明请查看: `docs/SCRIPTS_REFACTORING.md`
+详细说明请查看: `docs/SCRIPTS_ARCHITECTURE.md`
 

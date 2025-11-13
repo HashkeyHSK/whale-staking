@@ -6,12 +6,24 @@
   "scripts": {
     "// === Development ===": "",
     "compile": "hardhat compile",
+    "dev:compile": "hardhat run scripts/dev/compile.ts",
     "clean": "hardhat clean",
+    "dev:clean": "hardhat run scripts/dev/clean.ts",
     "build": "npm run clean && npm run compile",
     
     "// === Testing ===": "",
     "test": "hardhat test",
+    "dev:test": "hardhat run scripts/dev/test-all.ts",
     "coverage": "hardhat coverage",
+    "dev:coverage": "hardhat run scripts/dev/coverage.ts",
+    "test:integration:deploy": "hardhat run scripts/test/integration/deploy-test.ts",
+    "test:integration:stake": "hardhat run scripts/test/integration/stake-test.ts",
+    "test:integration:whitelist": "hardhat run scripts/test/integration/whitelist-test.ts",
+    
+    "// === Tools ===": "",
+    "tools:extract-abi": "hardhat run scripts/tools/extract-abi.ts",
+    "tools:generate-types": "hardhat run scripts/tools/generate-types.ts",
+    "tools:compare-contracts": "hardhat run scripts/tools/compare-contracts.ts",
     
     "// === Deployment ===": "",
     "deploy": "hardhat run scripts/normal/deploy.ts --network hashkeyMainnet",
@@ -70,7 +82,11 @@
     "config:set-min-stake": "hardhat run scripts/normal/config/set-min-stake.ts --network hashkeyMainnet",
     "config:set-min-stake:testnet": "hardhat run scripts/normal/config/set-min-stake.ts --network hashkeyTestnet",
     "config:enable-emergency": "hardhat run scripts/normal/config/enable-emergency.ts --network hashkeyMainnet",
-    "config:enable-emergency:testnet": "hardhat run scripts/normal/config/enable-emergency.ts --network hashkeyTestnet"
+    "config:enable-emergency:testnet": "hardhat run scripts/normal/config/enable-emergency.ts --network hashkeyTestnet",
+    
+    "// === Contract Upgrade ===": "",
+    "upgrade:normal": "hardhat run scripts/normal/upgrade.ts --network hashkeyMainnet",
+    "upgrade:normal:testnet": "hardhat run scripts/normal/upgrade.ts --network hashkeyTestnet"
   },
   "keywords": ["staking", "hsk", "defi", "ethereum", "smart-contracts"],
   "author": "",
