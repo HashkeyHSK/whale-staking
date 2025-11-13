@@ -5,8 +5,15 @@
 ### 1. 部署合约
 
 ```bash
-npm run deploy:testnet
+# 部署时需要提供开始和结束时间（Unix 时间戳，秒级）
+STAKE_START_TIME="1735689600" STAKE_END_TIME="1767225600" npm run deploy:testnet
 ```
+
+**提示**：
+- `STAKE_START_TIME`: 质押开始时间（Unix 时间戳，秒级）
+- `STAKE_END_TIME`: 质押结束时间（Unix 时间戳，秒级）
+- 可以使用在线工具转换：https://www.epochconverter.com/
+- 或者使用命令：`date +%s` 获取当前时间戳
 
 部署成功后，将代理合约地址保存到 `scripts/shared/constants.ts`。
 
@@ -60,6 +67,8 @@ POSITION_ID="1" npm run unstake:testnet
 
 ```
 scripts/
+├── README.md                 # 使用指南（本文件）
+│
 ├── shared/                    # 共享模块
 │   ├── constants.ts          # 配置和地址
 │   ├── types.ts              # 类型定义
@@ -74,6 +83,7 @@ scripts/
     ├── add-rewards.ts        # 添加奖励池
     ├── emergency-withdraw.ts # 紧急提取本金
     ├── withdraw-excess.ts    # 提取多余奖励
+    ├── verify-forge.ts       # 验证合约（使用 Foundry）
     ├── config/               # 配置管理
     │   ├── pause.ts          # 暂停合约
     │   ├── unpause.ts        # 恢复合约
@@ -106,9 +116,13 @@ export IMPLEMENTATION_ADDRESS="0x..."  # 实现合约地址（用于验证）
 export RPC_URL="https://testnet.hsk.xyz"  # RPC URL（可选）
 export VERIFIER_URL="https://testnet-explorer.hsk.xyz/api/"  # 验证器 URL（可选）
 
+# 部署相关（必需）
+export STAKE_START_TIME="1735689600"  # 质押开始时间（Unix 时间戳，秒级，部署时必需）
+export STAKE_END_TIME="1767225600"    # 质押结束时间（Unix 时间戳，秒级，部署时必需）
+
 # 配置相关
-export START_TIME="1735689600"      # 开始时间（Unix 时间戳，秒级）
-export END_TIME="1735689600"        # 结束时间（Unix 时间戳，秒级）
+export START_TIME="1735689600"      # 开始时间（Unix 时间戳，秒级，用于修改配置）
+export END_TIME="1735689600"        # 结束时间（Unix 时间戳，秒级，用于修改配置）
 export NEW_MIN_STAKE="1"            # 新的最小质押金额
 
 # 高级操作
@@ -187,7 +201,14 @@ npm run config:unpause:testnet
 POSITION_ID="1" npm run query:pending-reward:testnet
 ```
 
-**Q: 如何设置开始/结束时间？**
+**Q: 部署时如何设置开始/结束时间？**
+部署时必须提供 Unix 时间戳（秒级）：
+```bash
+# 部署时设置时间（例如：2025-01-01 00:00:00 UTC 开始，2026-01-01 00:00:00 UTC 结束）
+STAKE_START_TIME="1735689600" STAKE_END_TIME="1767225600" npm run deploy:testnet
+```
+
+**Q: 如何修改已部署合约的开始/结束时间？**
 使用 Unix 时间戳（秒级）：
 ```bash
 # 设置开始时间（例如：2025-01-01 00:00:00 UTC）

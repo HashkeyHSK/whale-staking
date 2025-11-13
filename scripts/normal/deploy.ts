@@ -7,6 +7,13 @@ import { printSeparator, printSuccess, printWarning } from "../shared/helpers.js
  * - Min stake: 1 HSK
  * - APY: 8%
  * - For regular users
+ * 
+ * Environment variables:
+ * - STAKE_START_TIME: Unix timestamp for stake start time (required, seconds)
+ * - STAKE_END_TIME: Unix timestamp for stake end time (required, seconds)
+ * 
+ * Example:
+ * STAKE_START_TIME="1735689600" STAKE_END_TIME="1767225600" npm run deploy:testnet
  */
 async function main() {
   const { ethers } = await hre.network.connect();
@@ -28,8 +35,47 @@ async function main() {
   const minStakeAmount = ethers.parseEther(NORMAL_STAKING_CONFIG.minStakeAmount);
   const rewardRate = NORMAL_STAKING_CONFIG.rewardRate;
   const whitelistMode = NORMAL_STAKING_CONFIG.whitelistMode;  // false for Normal Staking
-  const stakeStartTime = Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60); // 7 days later
-  const stakeEndTime = stakeStartTime + (365 * 24 * 60 * 60); // 1 year later
+  
+  // Read Unix timestamps from environment variables
+  const stakeStartTimeStr = process.env.STAKE_START_TIME;
+  const stakeEndTimeStr = process.env.STAKE_END_TIME;
+  
+  if (!stakeStartTimeStr) {
+    throw new Error(
+      "Please provide stake start time (Unix timestamp):\n" +
+      "Method 1: STAKE_START_TIME=\"1735689600\" npm run deploy:testnet\n" +
+      "Method 2: Set STAKE_START_TIME=1735689600 in .env file\n\n" +
+      "Tip: You can use online tools to convert date to Unix timestamp, e.g.:\n" +
+      "  - https://www.epochconverter.com/\n" +
+      "  - Or use command: date +%s"
+    );
+  }
+  
+  if (!stakeEndTimeStr) {
+    throw new Error(
+      "Please provide stake end time (Unix timestamp):\n" +
+      "Method 1: STAKE_END_TIME=\"1735689600\" npm run deploy:testnet\n" +
+      "Method 2: Set STAKE_END_TIME=1735689600 in .env file\n\n" +
+      "Tip: You can use online tools to convert date to Unix timestamp, e.g.:\n" +
+      "  - https://www.epochconverter.com/\n" +
+      "  - Or use command: date +%s"
+    );
+  }
+  
+  const stakeStartTime = parseInt(stakeStartTimeStr);
+  const stakeEndTime = parseInt(stakeEndTimeStr);
+  
+  if (isNaN(stakeStartTime) || stakeStartTime <= 0) {
+    throw new Error(`Invalid start timestamp: ${stakeStartTimeStr}, please provide a valid Unix timestamp (seconds)`);
+  }
+  
+  if (isNaN(stakeEndTime) || stakeEndTime <= 0) {
+    throw new Error(`Invalid end timestamp: ${stakeEndTimeStr}, please provide a valid Unix timestamp (seconds)`);
+  }
+  
+  if (stakeEndTime <= stakeStartTime) {
+    throw new Error("End time must be later than start time");
+  }
 
   console.log("\nInitialization parameters:");
   console.log(`  - Min stake amount: ${ethers.formatEther(minStakeAmount)} HSK`);
