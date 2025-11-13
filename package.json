@@ -10,26 +10,24 @@
     "clean": "hardhat clean",
     "dev:clean": "hardhat run scripts/dev/clean.ts",
     "build": "npm run clean && npm run compile",
-    
     "// === Testing ===": "",
-    "test": "hardhat test",
+    "test": "NODE_OPTIONS='--import tsx/esm' node --test --test-reporter spec 'test/**/*.test.ts'",
+    "test:node": "NODE_OPTIONS='--import tsx/esm' node --test --test-reporter spec 'test/**/*.test.ts'",
+    "test:mocha": "NODE_OPTIONS='--import tsx/esm' mocha 'test/**/*.test.ts' --timeout 100000 --recursive --require test/mocha-setup.ts",
     "dev:test": "hardhat run scripts/dev/test-all.ts",
     "coverage": "hardhat coverage",
     "dev:coverage": "hardhat run scripts/dev/coverage.ts",
     "test:integration:deploy": "hardhat run scripts/test/integration/deploy-test.ts",
     "test:integration:stake": "hardhat run scripts/test/integration/stake-test.ts",
     "test:integration:whitelist": "hardhat run scripts/test/integration/whitelist-test.ts",
-    
     "// === Tools ===": "",
     "tools:extract-abi": "hardhat run scripts/tools/extract-abi.ts",
     "tools:generate-types": "hardhat run scripts/tools/generate-types.ts",
     "tools:compare-contracts": "hardhat run scripts/tools/compare-contracts.ts",
-    
     "// === Deployment ===": "",
     "deploy": "hardhat run scripts/normal/deploy.ts --network hashkeyMainnet",
     "deploy:testnet": "hardhat run scripts/normal/deploy.ts --network hashkeyTestnet",
     "deploy:local": "hardhat run scripts/normal/deploy.ts --network hardhat",
-    
     "// === Verification ===": "",
     "verify": "hardhat run scripts/normal/verify.ts --network hashkeyMainnet",
     "verify:testnet": "hardhat run scripts/normal/verify.ts --network hashkeyTestnet",
@@ -37,7 +35,6 @@
     "verify:impl:testnet": "hardhat run scripts/normal/verify-implementation.ts --network hashkeyTestnet",
     "verify:forge": "hardhat run scripts/normal/verify-forge.ts --network hashkeyMainnet",
     "verify:forge:testnet": "hardhat run scripts/normal/verify-forge.ts --network hashkeyTestnet",
-    
     "// === Staking Operations ===": "",
     "stake": "hardhat run scripts/normal/stake.ts --network hashkeyMainnet",
     "stake:testnet": "hardhat run scripts/normal/stake.ts --network hashkeyTestnet",
@@ -48,12 +45,10 @@
     "claim": "hardhat run scripts/normal/claim-rewards.ts --network hashkeyMainnet",
     "claim:testnet": "hardhat run scripts/normal/claim-rewards.ts --network hashkeyTestnet",
     "claim:local": "hardhat run scripts/normal/claim-rewards.ts --network hardhat",
-    
     "// === Rewards Management ===": "",
     "rewards:add": "hardhat run scripts/normal/add-rewards.ts --network hashkeyMainnet",
     "rewards:add:testnet": "hardhat run scripts/normal/add-rewards.ts --network hashkeyTestnet",
     "rewards:add:local": "hardhat run scripts/normal/add-rewards.ts --network hardhat",
-    
     "// === Contract Configuration ===": "",
     "config:pause": "hardhat run scripts/normal/config/pause.ts --network hashkeyMainnet",
     "config:pause:testnet": "hardhat run scripts/normal/config/pause.ts --network hashkeyTestnet",
@@ -63,7 +58,6 @@
     "config:set-start-time:testnet": "hardhat run scripts/normal/config/set-start-time.ts --network hashkeyTestnet",
     "config:set-end-time": "hardhat run scripts/normal/config/set-end-time.ts --network hashkeyMainnet",
     "config:set-end-time:testnet": "hardhat run scripts/normal/config/set-end-time.ts --network hashkeyTestnet",
-    
     "// === Status Query ===": "",
     "query:status": "hardhat run scripts/normal/query/check-status.ts --network hashkeyMainnet",
     "query:status:testnet": "hardhat run scripts/normal/query/check-status.ts --network hashkeyTestnet",
@@ -73,7 +67,8 @@
     "query:stakes:local": "hardhat run scripts/normal/query/check-stakes.ts --network hardhat",
     "query:pending-reward": "hardhat run scripts/normal/query/pending-reward.ts --network hashkeyMainnet",
     "query:pending-reward:testnet": "hardhat run scripts/normal/query/pending-reward.ts --network hashkeyTestnet",
-    
+    "query:position-info": "hardhat run scripts/normal/query/position-info.ts --network hashkeyMainnet",
+    "query:position-info:testnet": "hardhat run scripts/normal/query/position-info.ts --network hashkeyTestnet",
     "// === Advanced Operations ===": "",
     "emergency-withdraw": "hardhat run scripts/normal/emergency-withdraw.ts --network hashkeyMainnet",
     "emergency-withdraw:testnet": "hardhat run scripts/normal/emergency-withdraw.ts --network hashkeyTestnet",
@@ -83,12 +78,17 @@
     "config:set-min-stake:testnet": "hardhat run scripts/normal/config/set-min-stake.ts --network hashkeyTestnet",
     "config:enable-emergency": "hardhat run scripts/normal/config/enable-emergency.ts --network hashkeyMainnet",
     "config:enable-emergency:testnet": "hardhat run scripts/normal/config/enable-emergency.ts --network hashkeyTestnet",
-    
     "// === Contract Upgrade ===": "",
     "upgrade:normal": "hardhat run scripts/normal/upgrade.ts --network hashkeyMainnet",
     "upgrade:normal:testnet": "hardhat run scripts/normal/upgrade.ts --network hashkeyTestnet"
   },
-  "keywords": ["staking", "hsk", "defi", "ethereum", "smart-contracts"],
+  "keywords": [
+    "staking",
+    "hsk",
+    "defi",
+    "ethereum",
+    "smart-contracts"
+  ],
   "author": "",
   "license": "ISC",
   "devDependencies": {
@@ -97,11 +97,16 @@
     "@nomicfoundation/hardhat-network-helpers": "^3.0.2",
     "@nomicfoundation/hardhat-verify": "^3.0.6",
     "@openzeppelin/contracts-upgradeable": "^5.4.0",
+    "@types/chai": "^5.2.3",
     "@types/mocha": "^10.0.10",
-    "@types/node": "^22.0.0",
+    "@types/node": "^22.19.1",
+    "chai": "^6.2.1",
     "dotenv": "^17.2.3",
     "ethers": "^6.15.0",
     "hardhat": "^3.0.12",
+    "mocha": "^11.7.5",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.20.6",
     "typescript": "^5.9.3"
   }
 }

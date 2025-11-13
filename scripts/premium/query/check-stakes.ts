@@ -98,16 +98,26 @@ async function main() {
       totalStaked += position.amount;
       
       // Query pending reward
+      // Note: pendingReward requires msg.sender to match position.owner
+      // So we need to use the correct signer if querying for a different user
       try {
-        const pending = await staking.pendingReward(position.positionId);
-        if (pending !== null && pending !== undefined) {
-          console.log(`  - Pending reward: ${ethers.formatEther(pending)} HSK`);
-          totalPending += pending;
+        // If querying for current user's positions, use current signer
+        // Otherwise, we can't query pending reward (would return 0)
+        if (targetAddress.toLowerCase() === user.address.toLowerCase()) {
+          const stakingWithSigner = staking.connect(user);
+          const pending = await stakingWithSigner.pendingReward(position.positionId);
+          if (pending !== null && pending !== undefined) {
+            console.log(`  - Pending reward: ${ethers.formatEther(pending)} HSK`);
+            totalPending += pending;
+          } else {
+            console.log(`  - Pending reward: 0 HSK`);
+          }
         } else {
-          console.log(`  - Pending reward: 0 HSK`);
+          console.log(`  - Pending reward: Cannot query (requires owner's account)`);
+          console.log(`    Note: pendingReward only works when called by position owner`);
         }
-      } catch (error) {
-        console.log(`  - Pending reward: Query failed`);
+      } catch (error: any) {
+        console.log(`  - Pending reward: Query failed - ${error.message}`);
       }
     }
     
