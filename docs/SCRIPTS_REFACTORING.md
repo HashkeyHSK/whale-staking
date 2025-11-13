@@ -199,10 +199,10 @@ scripts/
 │       ├── check-status.ts
 │       ├── check-stakes.ts
 │       └── pending-reward.ts
-├── premium/                  # 高级质押脚本
+├── premium/                  # 高级质押脚本（✅ 已完成）
 │   ├── deploy.ts             # 部署合约
 │   ├── upgrade.ts            # 升级合约
-│   ├── stake.ts              # 质押操作
+│   ├── stake.ts              # 质押操作（需白名单）
 │   ├── unstake.ts            # 解除质押
 │   ├── claim-rewards.ts      # 领取奖励
 │   ├── add-rewards.ts        # 添加奖励池
@@ -247,10 +247,16 @@ scripts/
 
 **说明**：
 - ✅ Normal Staking 相关脚本已完成（14 个）
-- ✅ Premium Staking 相关脚本已完成（22 个）
-- ✅ 测试脚本已完成（5 个）
+- ✅ Premium Staking 相关脚本已完成（23 个，包含白名单管理）
+- ✅ 测试脚本已完成（5 个，包含 Premium Staking 测试支持）
 - ✅ 开发脚本已完成（4 个）
 - ✅ 工具脚本已完成（3 个）
+
+**Premium Staking 脚本包含**：
+- 基础操作脚本：9 个
+- 白名单管理脚本：4 个
+- 配置管理脚本：6 个
+- 查询脚本：4 个
 
 ---
 
@@ -292,10 +298,18 @@ scripts/
 
 ### Premium Staking 脚本（✅ 已完成）
 
+**架构支持状态**：✅ 已完成
+- 共享模块已完全支持 Premium Staking
+- `PREMIUM_STAKING_CONFIG` 已定义
+- `getStakingAddress(StakingType.PREMIUM, network)` 已实现
+- 测试脚本已包含 Premium Staking 测试支持
+
+**脚本实现状态**：✅ 已完成
+
 | 脚本文件 | 状态 | 说明 |
 |---------|------|------|
 | `scripts/premium/deploy.ts` | ✅ 已完成 | 部署高级质押合约 |
-| `scripts/premium/stake.ts` | ✅ 已完成 | 质押操作 |
+| `scripts/premium/stake.ts` | ✅ 已完成 | 质押操作（需白名单检查） |
 | `scripts/premium/unstake.ts` | ✅ 已完成 | 解除质押 |
 | `scripts/premium/claim-rewards.ts` | ✅ 已完成 | 领取奖励 |
 | `scripts/premium/add-rewards.ts` | ✅ 已完成 | 添加奖励池 |
@@ -347,16 +361,27 @@ scripts/
 
 ### ✅ 脚本完成情况总结
 
-**总计**: 34 个脚本文件
+**当前已实现**: 57 个脚本文件
 
 - ✅ Normal Staking: 14 个脚本（包括 upgrade.ts）
-- ✅ Premium Staking: 22 个脚本（包括 upgrade.ts）
+- ✅ Premium Staking: 23 个脚本（包括 upgrade.ts 和白名单管理）
 - ✅ 开发脚本: 4 个脚本
-- ✅ 测试脚本: 5 个脚本
+- ✅ 测试脚本: 5 个脚本（包含 Premium Staking 测试支持）
 - ✅ 工具脚本: 3 个脚本
-- ✅ 共享模块: 4 个文件
+- ✅ 共享模块: 4 个文件（完全支持 Premium Staking）
 
-所有脚本已完成实现，支持完整的开发、测试、部署、升级和操作流程。
+**Premium Staking 脚本分类**：
+- ✅ 基础操作脚本：9 个（deploy, upgrade, stake, unstake, claim-rewards, add-rewards, emergency-withdraw, withdraw-excess, verify-forge）
+- ✅ 白名单管理脚本：4 个（add-batch, remove-batch, check-user, toggle-mode）
+- ✅ 配置管理脚本：6 个（pause, unpause, set-start-time, set-end-time, set-min-stake, enable-emergency）
+- ✅ 查询脚本：4 个（check-status, check-stakes, pending-reward, check-whitelist）
+
+**架构支持状态**：
+- ✅ Premium Staking 配置已定义（`PREMIUM_STAKING_CONFIG`）
+- ✅ Premium Staking 地址管理已实现（`getStakingAddress`）
+- ✅ Premium Staking 类型定义已实现（`StakingType.PREMIUM`）
+- ✅ Premium Staking 测试支持已实现（`fixtures.ts`）
+- ✅ Premium Staking 所有脚本已实现（23 个脚本）
 
 ---
 
@@ -390,21 +415,21 @@ scripts/
 
 ---
 
-### 第三步：实现高级质押脚本（⏳ 待实现）
+### 第三步：实现高级质押脚本（✅ 已完成）
 
-高级质押脚本与普通质押类似，但需要额外的白名单管理功能。可以参考 Normal Staking 的实现。
+高级质押脚本与普通质押类似，但需要额外的白名单管理功能。已参考 Normal Staking 的实现完成。
 
-#### 1. `scripts/premium/deploy.ts`
+#### 1. `scripts/premium/deploy.ts`（✅ 已完成）
 
-类似 `scripts/normal/deploy.ts`，但使用 `PREMIUM_STAKING_CONFIG`，并启用白名单模式。
+类似 `scripts/normal/deploy.ts`，使用 `PREMIUM_STAKING_CONFIG`，并启用白名单模式。
 
-#### 2. `scripts/premium/whitelist/add-batch.ts`
+#### 2. `scripts/premium/whitelist/add-batch.ts`（✅ 已完成）
 
-#### 3. `scripts/premium/whitelist/remove-batch.ts`
+#### 3. `scripts/premium/whitelist/remove-batch.ts`（✅ 已完成）
 
-#### 4. `scripts/premium/whitelist/toggle-mode.ts`
+#### 4. `scripts/premium/whitelist/toggle-mode.ts`（✅ 已完成）
 
-#### 5. `scripts/premium/whitelist/check-user.ts`
+#### 5. `scripts/premium/whitelist/check-user.ts`（✅ 已完成）
 
 ---
 
@@ -453,12 +478,15 @@ scripts/
 4. 创建 `scripts/normal/upgrade.ts`
 5. 创建查询脚本（config/ 和 query/ 目录下）
 
-### 步骤 4：实现高级质押脚本
+### 步骤 4：实现高级质押脚本（✅ 已完成）
 
-1. 创建 `scripts/premium/deploy.ts`
-2. 创建 `scripts/premium/stake.ts`
-3. 创建白名单管理脚本（whitelist/ 目录下，包含批量添加、批量移除、查询和切换模式）
-4. 创建查询脚本（config/ 和 query/ 目录下）
+1. ✅ 创建 `scripts/premium/deploy.ts`
+2. ✅ 创建 `scripts/premium/stake.ts`
+3. ✅ 创建白名单管理脚本（whitelist/ 目录下，包含批量添加、批量移除、查询和切换模式）
+4. ✅ 创建查询脚本（config/ 和 query/ 目录下）
+5. ✅ 创建所有基础操作脚本（upgrade, unstake, claim-rewards, add-rewards, emergency-withdraw, withdraw-excess, verify-forge）
+6. ✅ 创建所有配置管理脚本（pause, unpause, set-start-time, set-end-time, set-min-stake, enable-emergency）
+7. ✅ 创建所有查询脚本（check-status, check-stakes, pending-reward, check-whitelist）
 
 ### 步骤 5：创建开发和测试脚本
 

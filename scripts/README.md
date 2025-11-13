@@ -97,10 +97,10 @@ scripts/
 │       ├── check-stakes.ts   # 查询质押信息
 │       └── pending-reward.ts # 查询待领取奖励
 │
-├── premium/                   # 高级质押（功能同 normal，包含白名单管理）
+├── premium/                   # 高级质押（✅ 已完成）
 │   ├── deploy.ts             # 部署合约
 │   ├── upgrade.ts            # 升级合约
-│   ├── stake.ts              # 质押操作
+│   ├── stake.ts              # 质押操作（需白名单）
 │   ├── unstake.ts            # 解除质押
 │   ├── claim-rewards.ts      # 领取奖励
 │   ├── add-rewards.ts        # 添加奖励池
@@ -111,7 +111,7 @@ scripts/
 │   │   ├── add-batch.ts      # 批量添加白名单
 │   │   ├── remove-batch.ts   # 批量移除白名单
 │   │   ├── check-user.ts     # 查询用户白名单状态
-│   │   └── toggle-mode.ts   # 切换白名单模式
+│   │   └── toggle-mode.ts    # 切换白名单模式
 │   ├── config/               # 配置管理
 │   │   ├── pause.ts
 │   │   ├── unpause.ts
@@ -153,6 +153,7 @@ scripts/
 ```bash
 # 合约地址
 export NORMAL_STAKING_ADDRESS="0x..."
+export PREMIUM_STAKING_ADDRESS="0x..."
 
 # 操作相关
 export STAKE_AMOUNT="1"           # 质押金额
@@ -181,6 +182,10 @@ export CONFIRM_EMERGENCY="YES_I_UNDERSTAND"  # 确认启用紧急模式
 # 升级相关
 export PROXY_ADMIN_ADDRESS="0x..."  # ProxyAdmin 地址（升级时必需，通常是部署者地址）
 export NEW_IMPLEMENTATION_ADDRESS="0x..."  # 新实现合约地址（可选，不提供则自动部署）
+
+# 白名单相关（Premium Staking）
+export WHITELIST_ADDRESSES="0x123...,0x456..."  # 白名单地址列表（逗号分隔，最多100个）
+export ENABLE="true"  # 启用/禁用白名单模式（"true" 或 "false"）
 ```
 
 ### 合约地址配置
@@ -225,10 +230,21 @@ export const TESTNET_ADDRESSES: ContractAddresses = {
 - `npm run tools:generate-types` - 生成 TypeScript 类型
 - `npm run tools:compare-contracts` - 对比合约差异
 
-### 质押操作
+### 质押操作（Normal Staking）
 - `npm run stake:testnet` - 质押
 - `npm run unstake:testnet` - 解除质押
 - `npm run claim:testnet` - 领取奖励
+
+### 质押操作（Premium Staking）
+- `npm run stake:premium:testnet` - 质押（需白名单）
+- `npm run unstake:premium:testnet` - 解除质押
+- `npm run claim:premium:testnet` - 领取奖励
+
+### 白名单管理（Premium Staking）
+- `npm run whitelist:add-batch:premium:testnet` - 批量添加白名单
+- `npm run whitelist:remove-batch:premium:testnet` - 批量移除白名单
+- `npm run whitelist:check-user:premium:testnet` - 查询用户白名单状态
+- `npm run whitelist:toggle-mode:premium:testnet` - 切换白名单模式
 
 ### 奖励管理
 - `npm run rewards:add:testnet` - 添加奖励
@@ -242,10 +258,16 @@ export const TESTNET_ADDRESSES: ContractAddresses = {
 - `npm run config:set-min-stake:testnet` - 设置最小质押金额
 - `npm run config:enable-emergency:testnet` - 启用紧急模式（⚠️ 不可逆）
 
-### 状态查询
+### 状态查询（Normal Staking）
 - `npm run query:status:testnet` - 查询合约状态
 - `npm run query:stakes:testnet` - 查询质押信息
 - `npm run query:pending-reward:testnet` - 查询待领取奖励
+
+### 状态查询（Premium Staking）
+- `npm run query:status:premium:testnet` - 查询合约状态
+- `npm run query:stakes:premium:testnet` - 查询质押信息
+- `npm run query:pending-reward:premium:testnet` - 查询待领取奖励
+- `npm run query:check-whitelist:premium:testnet` - 查询白名单配置
 
 ### 紧急操作
 - `npm run emergency-withdraw:testnet` - 紧急提取本金（仅紧急模式）
@@ -253,10 +275,32 @@ export const TESTNET_ADDRESSES: ContractAddresses = {
 ## ⚠️ 重要提示
 
 1. **锁定期**: 固定 365 天
-2. **奖励率**: 8% APY (800 basis points)
-3. **最小质押**: 1 HSK（可通过 owner 修改）
-4. **白名单**: 关闭（所有用户可质押）
+2. **奖励率**: 
+   - Normal Staking: 8% APY (800 basis points)
+   - Premium Staking: 16% APY (1600 basis points)
+3. **最小质押**: 
+   - Normal Staking: 1 HSK（可通过 owner 修改）
+   - Premium Staking: 500,000 HSK（可通过 owner 修改）
+4. **白名单**: 
+   - Normal Staking: 关闭（所有用户可质押）
+   - Premium Staking: 启用（仅白名单用户可质押）
 5. **测试优先**: 先在测试网验证
+
+## 📊 脚本统计
+
+**当前已实现**: 57 个脚本文件
+- ✅ Normal Staking: 14 个脚本
+- ✅ Premium Staking: 23 个脚本（包含白名单管理）
+- ✅ 开发脚本: 4 个脚本
+- ✅ 测试脚本: 5 个脚本
+- ✅ 工具脚本: 3 个脚本
+- ✅ 共享模块: 4 个文件
+
+**Premium Staking 脚本包含**：
+- 基础操作脚本：9 个（deploy, upgrade, stake, unstake, claim-rewards, add-rewards, emergency-withdraw, withdraw-excess, verify-forge）
+- 白名单管理脚本：4 个（add-batch, remove-batch, check-user, toggle-mode）
+- 配置管理脚本：6 个（pause, unpause, set-start-time, set-end-time, set-min-stake, enable-emergency）
+- 查询脚本：4 个（check-status, check-stakes, pending-reward, check-whitelist）
 
 ## 🐛 常见问题
 
@@ -367,6 +411,37 @@ npm run tools:generate-types
 
 # 对比合约实现
 npm run tools:compare-contracts HSKStaking
+```
+
+**Q: 如何使用 Premium Staking 白名单功能？**
+```bash
+# 添加用户到白名单（批量，最多100个）
+WHITELIST_ADDRESSES="0x123...,0x456..." npm run whitelist:add-batch:premium:testnet
+
+# 从白名单移除用户
+WHITELIST_ADDRESSES="0x123...,0x456..." npm run whitelist:remove-batch:premium:testnet
+
+# 查询用户白名单状态
+USER_ADDRESS="0x123..." npm run whitelist:check-user:premium:testnet
+
+# 切换白名单模式（启用/禁用）
+ENABLE="true" npm run whitelist:toggle-mode:premium:testnet
+
+# 查询白名单配置和用户状态
+USER_ADDRESS="0x123...,0x456..." npm run query:check-whitelist:premium:testnet
+```
+
+**Q: Premium Staking 质押时提示不在白名单中？**
+```bash
+# 1. 检查用户是否在白名单中
+USER_ADDRESS="0x..." npm run whitelist:check-user:premium:testnet
+
+# 2. 如果不在，联系管理员添加到白名单
+# 管理员执行：
+WHITELIST_ADDRESSES="0x..." npm run whitelist:add-batch:premium:testnet
+
+# 3. 确认白名单模式已启用
+npm run query:status:premium:testnet
 ```
 
 ## 🎯 合约配置
