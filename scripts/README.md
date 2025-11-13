@@ -492,5 +492,5 @@ CONFIRM_EMERGENCY=YES_I_UNDERSTAND npm run config:enable-emergency:testnet
 
 ## 📖 完整文档
 
-详细说明请查看: `docs/SCRIPTS_REFACTORING.md`
+详细说明请查看: `docs/SCRIPTS_ARCHITECTURE.md`
 
