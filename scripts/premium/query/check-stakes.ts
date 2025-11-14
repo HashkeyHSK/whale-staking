@@ -1,6 +1,6 @@
 import hre from "hardhat";
 import { StakingType } from "../../shared/types.js";
-import { getStakingAddress, printSeparator, parsePosition } from "../../shared/helpers.js";
+import { getStakingAddress, printSeparator, parsePosition, getUserPositionIds } from "../../shared/helpers.js";
 
 /**
  * Query user staking information
@@ -24,32 +24,24 @@ async function main() {
   // Query all user positions
   console.log("\nQuerying all user positions...");
   
-  // Note: Since userPositions is a public mapping(address => uint256[])
-  // Solidity doesn't automatically generate a getter that returns the entire array
-  // Two solutions provided here:
+  // Get all position IDs for the user
+  const positionIds = await getUserPositionIds(staking, targetAddress);
   
-  // Solution 1: If contract has getUserPositions(address) helper function (recommended)
-  // const positionIds = await staking.getUserPositions(targetAddress);
-  
-  // Solution 2: Iterate to find (currently used, suitable when position count is low)
-  console.log("⚠️  Note: This operation may be slow when there are many positions");
-  console.log("Recommend adding getUserPositions(address) view function to contract for better efficiency\n");
-  
-  const nextPositionId = await staking.nextPositionId();
+  if (positionIds.length === 0) {
+    console.log("\nUser has no staking records");
+    return;
+  }
+
+  // Query position details for each position ID
   const userPositions = [];
-  
-  // Iterate through all positions to find those belonging to this user
-  for (let i = 1; i < Number(nextPositionId); i++) {
+  for (const positionId of positionIds) {
     try {
-      const positionRaw = await staking.positions(i);
+      const positionRaw = await staking.positions(positionId);
       const position = parsePosition(positionRaw);
-      
-      if (position.owner.toLowerCase() === targetAddress.toLowerCase()) {
-        userPositions.push({
-          positionId: i,
-          ...position
-        });
-      }
+      userPositions.push({
+        positionId: Number(positionId),
+        ...position
+      });
     } catch (error) {
       // Skip non-existent or invalid positions
       continue;

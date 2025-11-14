@@ -2,15 +2,9 @@
 
 ## 查询用户质押ID和待提取奖励
 
-### 问题背景
-
-前端需要知道用户有哪些质押ID，才能查询每个位置的待提取奖励。由于Solidity的`public mapping(address => uint256[])`只生成`userPositions(address, uint256 index)` getter函数，不能直接获取整个数组，所以需要通过遍历来获取。
-
 ### 解决方案
 
-我们提供了两种方法来获取用户的所有质押ID：
-
-#### 方法1: 通过 `userPositions` mapping 遍历（推荐）
+使用 `getUserPositionIds` 函数获取用户的所有质押ID：
 
 ```typescript
 import { ethers } from "ethers";
@@ -20,56 +14,21 @@ async function getUserPositionIds(
   stakingContract: ethers.Contract,
   userAddress: string
 ): Promise<bigint[]> {
-  const positionIds: bigint[] = [];
-  
-  // 遍历 userPositions mapping
-  let index = 0;
-  while (true) {
-    try {
-      const positionId = await stakingContract.userPositions(userAddress, index);
-      // Position IDs 从1开始，0表示没有更多位置
-      if (positionId === BigInt(0) || positionId === 0n) {
-        break;
-      }
-      positionIds.push(BigInt(positionId));
-      index++;
-    } catch (error) {
-      // 索引越界或其他错误，表示已到达末尾
-      break;
-    }
+  try {
+    // 直接调用合约函数，一次性获取所有 positionId
+    const positionIds = await stakingContract.getUserPositionIds(userAddress);
+    return positionIds.map((id: any) => BigInt(id));
+  } catch (error) {
+    console.error("Failed to get user position IDs:", error);
+    return [];
   }
-  
-  return positionIds;
 }
 ```
 
-#### 方法2: 遍历所有 positionId（备用方案）
-
-如果方法1没有找到任何位置，可以遍历所有positionId：
-
-```typescript
-async function getUserPositionIdsFallback(
-  stakingContract: ethers.Contract,
-  userAddress: string
-): Promise<bigint[]> {
-  const positionIds: bigint[] = [];
-  const nextPositionId = await stakingContract.nextPositionId();
-  
-  for (let i = 1; i < Number(nextPositionId); i++) {
-    try {
-      const position = await stakingContract.positions(BigInt(i));
-      if (position.owner && 
-          position.owner.toLowerCase() === userAddress.toLowerCase()) {
-        positionIds.push(BigInt(i));
-      }
-    } catch {
-      // 位置不存在或错误，继续
-    }
-  }
-  
-  return positionIds;
-}
-```
+**优点**：
+- ✅ 一次调用即可获取所有ID
+- ✅ 效率最高，gas消耗最少
+- ✅ 代码简洁，易于维护
 
 ### 完整示例：查询用户所有位置的待提取奖励
 
@@ -171,9 +130,8 @@ async function example() {
    - 如果地址不匹配，函数会返回 0（不会 revert）
    - **必须使用 signer 来调用 `pendingReward`**，不能只使用 provider
 
-2. **获取用户质押ID的两种方法**
-   - 方法1（推荐）：通过 `userPositions(userAddress, index)` 遍历
-   - 方法2（备用）：遍历所有 `positionId`（效率较低，但更可靠）
+2. **获取用户质押ID**
+   - 使用 `getUserPositionIds(userAddress)` 直接获取所有 positionId
 
 3. **前端实现建议**
    - 使用 React Hook 或 Vue Composable 封装查询逻辑
@@ -200,8 +158,10 @@ export function useUserStakingPositions(stakingAddress: string) {
     }
     
     async function fetchPositionIds() {
-      // 实现获取逻辑...
-      // 这里可以使用 wagmi 的 useContractReads 或直接调用合约
+      // 使用 getUserPositionIds 获取所有 positionId
+      const contract = new ethers.Contract(stakingAddress, stakingABI, provider);
+      const ids = await contract.getUserPositionIds(address);
+      setPositionIds(ids.map((id: any) => BigInt(id)));
     }
     
     fetchPositionIds();
@@ -229,8 +189,11 @@ export function useUserStakingPositions(stakingAddress: string) {
 ### 合约接口参考
 
 ```solidity
-// 获取用户第 index 个质押位置的ID
-function userPositions(address user, uint256 index) external view returns (uint256);
+// 一次性获取用户的所有 positionId
+function getUserPositionIds(address user) external view returns (uint256[] memory);
+
+// 计算指定金额的潜在奖励（用于质押前预览）
+function calculatePotentialReward(uint256 amount) external view returns (uint256);
 
 // 查询位置详情
 function positions(uint256 positionId) external view returns (Position memory);
@@ -238,8 +201,27 @@ function positions(uint256 positionId) external view returns (Position memory);
 // 查询待提取奖励（需要 msg.sender == position.owner）
 function pendingReward(uint256 positionId) external view returns (uint256);
 
-// 获取下一个位置ID（用于遍历）
+// 获取下一个位置ID
 function nextPositionId() external view returns (uint256);
+```
+
+### 计算潜在奖励
+
+在用户质押前，可以使用 `calculatePotentialReward` 函数预览潜在奖励：
+
+```typescript
+async function previewReward(
+  stakingContract: ethers.Contract,
+  stakeAmount: string // 例如 "100" 表示 100 HSK
+): Promise<string> {
+  const amountInWei = ethers.parseEther(stakeAmount);
+  const potentialReward = await stakingContract.calculatePotentialReward(amountInWei);
+  return ethers.formatEther(potentialReward);
+}
+
+// 使用示例
+const reward = await previewReward(stakingContract, "100");
+console.log(`质押 100 HSK，365天后可获得约 ${reward} HSK 奖励`);
 ```
 
 ### 性能优化建议

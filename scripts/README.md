@@ -350,7 +350,7 @@ END_TIME="1767225600" npm run config:set-end-time:testnet
 可以使用在线工具转换：https://www.epochconverter.com/
 
 **Q: 查询很慢**
-建议在合约中添加 `getUserPositions(address)` 函数
+使用 `getUserPositionIds(address)` 函数获取用户的所有 positionId
 
 **Q: 紧急模式是什么？**
 紧急模式用于应对严重安全问题：
@@ -369,23 +369,36 @@ npm run withdraw-excess:testnet
 ```
 
 **Q: 如何升级合约？**
-升级需要 ProxyAdmin 权限（通常是部署者地址）：
+升级脚本会自动检测 ProxyAdmin 类型并使用正确的方式执行升级：
 ```bash
 # 升级普通质押合约（自动部署新实现）
+# 脚本会自动从存储槽读取 ProxyAdmin 地址，无需手动指定
+npm run upgrade:normal:testnet
+
+# 如果 ProxyAdmin 地址与当前签名者不同，可以手动指定
 PROXY_ADMIN_ADDRESS="0x..." npm run upgrade:normal:testnet
 
 # 使用已部署的实现合约升级
 PROXY_ADMIN_ADDRESS="0x..." NEW_IMPLEMENTATION_ADDRESS="0x..." npm run upgrade:normal:testnet
 
 # 升级高级质押合约
-PROXY_ADMIN_ADDRESS="0x..." npm run upgrade:premium:testnet
+npm run upgrade:premium:testnet
 ```
+
+**升级脚本特性**：
+- ✅ **自动检测 ProxyAdmin**：从存储槽读取实际的 ProxyAdmin 地址
+- ✅ **支持两种模式**：自动识别 ProxyAdmin 合约或 EOA，使用正确的升级方式
+- ✅ **智能 Fallback**：如果 `upgrade()` 失败，自动尝试 `upgradeAndCall()`
+- ✅ **状态验证**：升级前后自动验证合约状态一致性
+- ✅ **浏览器链接**：升级成功后自动打印交易哈希和浏览器链接
+- ✅ **实现验证**：升级后自动验证新实现地址是否正确
 
 ⚠️ **升级注意事项**：
 - 确保新实现合约与现有存储布局兼容
 - 升级后所有状态数据会保留
 - 升级前建议先在测试网验证
-- 升级后需要验证新实现合约
+- 升级后需要验证新实现合约（脚本会提示命令）
+- 升级交易会显示在 ProxyAdmin 合约页面，而不是 Proxy 页面
 
 **Q: 如何使用开发脚本？**
 ```bash

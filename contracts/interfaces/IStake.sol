@@ -19,6 +19,10 @@ interface IStaking {
 
     function pendingReward(uint256 positionId) external view returns (uint256 reward);
 
+    function getUserPositionIds(address user) external view returns (uint256[] memory);
+
+    function calculatePotentialReward(uint256 amount) external view returns (uint256);
+
     event PositionCreated(
         address indexed user,
         uint256 indexed positionId,

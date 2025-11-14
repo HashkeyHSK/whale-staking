@@ -600,6 +600,55 @@ scripts/
 - [x] 支持 ProxyAdmin 合约和 EOA 两种模式
 - [x] 升级前状态验证
 - [x] 升级后状态验证
+- [x] 自动检测 ProxyAdmin 地址（从存储槽读取）
+- [x] 智能 Fallback 机制（upgrade() 失败时自动尝试 upgradeAndCall()）
+- [x] 升级成功后自动打印浏览器链接
+- [x] 自动验证实现地址和状态一致性
+
+#### 升级脚本详细说明
+
+**`scripts/normal/upgrade.ts`** 和 **`scripts/premium/upgrade.ts`** 实现了智能升级功能：
+
+**核心特性**：
+1. **自动检测 ProxyAdmin**：
+   - 从 EIP-1967 存储槽读取实际的 ProxyAdmin 地址
+   - 支持环境变量覆盖（`PROXY_ADMIN_ADDRESS`）
+   - 自动验证当前签名者是否为 ProxyAdmin 或 ProxyAdmin 的 owner
+
+2. **双模式支持**：
+   - **ProxyAdmin 合约模式**：使用 OpenZeppelin ProxyAdmin ABI 调用 `upgrade()` 或 `upgradeAndCall()`
+   - **EOA 模式**：直接调用 proxy 的 `upgradeTo()` 或 `upgradeToAndCall()`
+
+3. **智能 Fallback**：
+   - 如果 `upgrade()` 失败，自动尝试 `upgradeAndCall()`（使用空数据）
+   - 如果 `upgradeTo()` 失败，自动尝试 `upgradeToAndCall()`
+
+4. **状态验证**：
+   - 升级前记录所有关键状态（totalStaked, rewardPoolBalance, totalPendingRewards 等）
+   - 升级后验证状态是否保持一致
+   - 验证新实现地址是否正确设置
+
+5. **用户友好**：
+   - 升级成功后自动打印交易哈希和浏览器链接
+   - 提示升级后验证实现合约的命令
+   - 清晰的错误提示和警告信息
+
+**使用示例**：
+```bash
+# 自动检测 ProxyAdmin（推荐）
+npm run upgrade:normal:testnet
+
+# 手动指定 ProxyAdmin 地址
+PROXY_ADMIN_ADDRESS="0x..." npm run upgrade:normal:testnet
+
+# 使用已部署的实现合约
+PROXY_ADMIN_ADDRESS="0x..." NEW_IMPLEMENTATION_ADDRESS="0x..." npm run upgrade:normal:testnet
+```
+
+**注意事项**：
+- 升级交易会显示在 ProxyAdmin 合约页面，而不是 Proxy 页面
+- 确保新实现合约与现有存储布局兼容
+- 升级后需要验证新实现合约（脚本会提示命令）
 
 ### 工具脚本验证
 

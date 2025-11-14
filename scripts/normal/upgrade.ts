@@ -27,12 +27,28 @@ async function main() {
   console.log("Admin address:", admin.address);
   console.log("Proxy address:", proxyAddress);
 
-  // Get ProxyAdmin address
-  const proxyAdminAddress = process.env.PROXY_ADMIN_ADDRESS || admin.address;
-  console.log("ProxyAdmin address:", proxyAdminAddress);
+  // Get ProxyAdmin address from storage or env
+  // TransparentUpgradeableProxy stores admin at EIP-1967 admin slot
+  const ADMIN_SLOT = "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";
+  const adminValue = await ethers.provider.getStorage(proxyAddress, ADMIN_SLOT);
+  const actualProxyAdminAddress = "0x" + adminValue.slice(-40);
+  
+  const proxyAdminAddress = process.env.PROXY_ADMIN_ADDRESS || actualProxyAdminAddress;
+  console.log("ProxyAdmin address (from env/storage):", proxyAdminAddress);
+  console.log("Actual proxy admin (from storage):", actualProxyAdminAddress);
+  
+  if (proxyAdminAddress.toLowerCase() !== actualProxyAdminAddress.toLowerCase()) {
+    printWarning(`⚠️  Warning: Provided admin address (${proxyAdminAddress}) doesn't match actual proxy admin (${actualProxyAdminAddress})`);
+    console.log("Using actual proxy admin address for upgrade...");
+  }
 
   // Connect to proxy contract to get current implementation
-  const proxy = await ethers.getContractAt("NormalStakingProxy", proxyAddress);
+  // Use TransparentUpgradeableProxy interface for upgrade functions
+  const TransparentUpgradeableProxyABI = [
+    "function upgradeTo(address newImplementation) external",
+    "function upgradeToAndCall(address newImplementation, bytes calldata data) external payable"
+  ];
+  const proxy = new ethers.Contract(proxyAddress, TransparentUpgradeableProxyABI, admin);
   const staking = await ethers.getContractAt("HSKStaking", proxyAddress);
 
   // Query current implementation
@@ -96,11 +112,19 @@ async function main() {
   if (isContract) {
     // Admin is a ProxyAdmin contract
     console.log("\nProxyAdmin is a contract, using ProxyAdmin.upgrade()...");
-    const proxyAdmin = await ethers.getContractAt("ProxyAdmin", proxyAdminAddress);
+    
+    // Use OpenZeppelin ProxyAdmin ABI
+    const ProxyAdminABI = [
+      "function owner() external view returns (address)",
+      "function upgrade(address proxy, address implementation) external",
+      "function upgradeAndCall(address proxy, address implementation, bytes calldata data) external payable"
+    ];
+    const proxyAdmin = new ethers.Contract(proxyAdminAddress, ProxyAdminABI, admin);
     
     // Verify admin can upgrade
     try {
       const proxyAdminOwner = await proxyAdmin.owner();
+      console.log("ProxyAdmin owner:", proxyAdminOwner);
       if (proxyAdminOwner.toLowerCase() !== admin.address.toLowerCase()) {
         throw new Error(
           `Current signer (${admin.address}) is not the ProxyAdmin owner.\n` +
@@ -109,31 +133,74 @@ async function main() {
         );
       }
     } catch (error: any) {
-      // If owner() doesn't exist, try upgrade anyway
+      // If owner() doesn't exist or fails, try upgrade anyway
       console.log("⚠️  Could not verify ProxyAdmin owner, proceeding with upgrade...");
+      console.log("Error:", error.message);
     }
 
     console.log("\nExecuting upgrade via ProxyAdmin...");
-    const tx = await proxyAdmin.upgrade(proxyAddress, newImplementationAddress);
-    await waitForTransaction(tx, "Upgrade transaction (via ProxyAdmin)");
+    console.log(`  - ProxyAdmin address: ${proxyAdminAddress}`);
+    console.log(`  - Proxy address: ${proxyAddress}`);
+    console.log(`  - New implementation: ${newImplementationAddress}`);
+    
+    let upgradeTxHash: string;
+    try {
+      // Try upgrade first
+      const tx = await proxyAdmin.upgrade(proxyAddress, newImplementationAddress);
+      const receipt = await waitForTransaction(tx, "Upgrade transaction (via ProxyAdmin)");
+      upgradeTxHash = receipt.hash;
+    } catch (error: any) {
+      // If upgrade fails, try upgradeAndCall with empty data
+      console.log("⚠️  upgrade() failed, trying upgradeAndCall()...");
+      console.log("Error:", error.message);
+      const upgradeData = "0x";
+      const tx = await proxyAdmin.upgradeAndCall(proxyAddress, newImplementationAddress, upgradeData);
+      const receipt = await waitForTransaction(tx, "Upgrade transaction (via ProxyAdmin.upgradeAndCall)");
+      upgradeTxHash = receipt.hash;
+    }
+    
+    // Print explorer links
+    console.log("\n📋 Transaction Details:");
+    console.log(`  Transaction hash: ${upgradeTxHash}`);
+    console.log(`  View transaction: https://testnet-explorer.hsk.xyz/tx/${upgradeTxHash}`);
+    console.log(`  ProxyAdmin transactions: https://testnet-explorer.hsk.xyz/address/${proxyAdminAddress}?tab=txs`);
+    console.log(`  Proxy transactions: https://testnet-explorer.hsk.xyz/address/${proxyAddress}?tab=txs`);
   } else {
-    // Admin is EOA, call upgradeToAndCall directly on proxy
+    // Admin is EOA, call upgradeTo directly on proxy
     // Only admin can call this function
-    if (admin.address.toLowerCase() !== proxyAdminAddress.toLowerCase()) {
+    // Use actualProxyAdminAddress from storage, not the env variable
+    if (admin.address.toLowerCase() !== actualProxyAdminAddress.toLowerCase()) {
       throw new Error(
         `Current signer (${admin.address}) is not the proxy admin.\n` +
-        `Proxy admin: ${proxyAdminAddress}\n` +
-        `Please use the correct account or set PROXY_ADMIN_ADDRESS environment variable.`
+        `Proxy admin: ${actualProxyAdminAddress}\n` +
+        `Please use the correct account (the one that deployed the proxy).`
       );
     }
 
-    console.log("\nProxyAdmin is EOA, calling upgradeToAndCall directly...");
+    console.log("\nProxyAdmin is EOA, calling upgradeTo directly...");
     console.log("⚠️  Note: Only the admin address can call this function");
     
-    // For TransparentUpgradeableProxy, admin calls upgradeToAndCall directly
-    const upgradeData = "0x"; // Empty calldata for simple upgrade
-    const tx = await proxy.upgradeToAndCall(newImplementationAddress, upgradeData);
-    await waitForTransaction(tx, "Upgrade transaction (direct)");
+    // For TransparentUpgradeableProxy, admin calls upgradeTo directly for simple upgrades
+    // upgradeToAndCall is only needed if you want to call a function after upgrade
+    let upgradeTxHash: string;
+    try {
+      const tx = await proxy.upgradeTo(newImplementationAddress);
+      const receipt = await waitForTransaction(tx, "Upgrade transaction (direct)");
+      upgradeTxHash = receipt.hash;
+    } catch (error: any) {
+      // If upgradeTo fails, try upgradeToAndCall with empty data
+      console.log("⚠️  upgradeTo failed, trying upgradeToAndCall...");
+      const upgradeData = "0x"; // Empty calldata for simple upgrade
+      const tx = await proxy.upgradeToAndCall(newImplementationAddress, upgradeData);
+      const receipt = await waitForTransaction(tx, "Upgrade transaction (direct via upgradeToAndCall)");
+      upgradeTxHash = receipt.hash;
+    }
+    
+    // Print explorer links
+    console.log("\n📋 Transaction Details:");
+    console.log(`  Transaction hash: ${upgradeTxHash}`);
+    console.log(`  View transaction: https://testnet-explorer.hsk.xyz/tx/${upgradeTxHash}`);
+    console.log(`  Proxy transactions: https://testnet-explorer.hsk.xyz/address/${proxyAddress}?tab=txs`);
   }
 
   printSuccess("Proxy upgraded successfully!");

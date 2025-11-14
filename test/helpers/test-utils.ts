@@ -374,31 +374,15 @@ export function getEvent(
 }
 
 /**
- * Get all user positions by iterating through indices
- * Note: userPositions is a public mapping(address => uint256[]), 
- * which generates a getter function userPositions(address, uint256 index)
- * We need to iterate to get all positions
+ * Get all user position IDs
+ * Uses the getUserPositionIds contract function to get all position IDs for a user
  */
 export async function getUserPositions(
   staking: ethers.Contract,
   userAddress: string
 ): Promise<bigint[]> {
-  const positions: bigint[] = [];
-  const nextPositionId = await staking.nextPositionId();
-  
-  // Iterate through all positions to find those belonging to this user
-  for (let i = 0; i < Number(nextPositionId); i++) {
-    try {
-      const position = await staking.positions(BigInt(i));
-      if (position.owner.toLowerCase() === userAddress.toLowerCase()) {
-        positions.push(BigInt(i));
-      }
-    } catch {
-      // Position doesn't exist or error, continue
-    }
-  }
-  
-  return positions;
+  const positionIds = await staking.getUserPositionIds(userAddress);
+  return positionIds.map((id: any) => BigInt(id));
 }
 
 /**
