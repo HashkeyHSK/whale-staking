@@ -48,7 +48,14 @@ npm run query:status:testnet
 npm run query:stakes:testnet
 
 # 查询待领取奖励
+# 方式1: 查询指定位置的待领取奖励
 POSITION_ID="1" npm run query:pending-reward:testnet
+
+# 方式2: 查询用户所有位置的待领取奖励（不提供POSITION_ID）
+npm run query:pending-reward:testnet
+
+# 方式3: 查询指定用户的所有位置（需要该用户的账户签名）
+USER_ADDRESS="0x..." npm run query:pending-reward:testnet
 ```
 
 ### 6. 领取奖励
@@ -262,11 +269,17 @@ export const TESTNET_ADDRESSES: ContractAddresses = {
 - `npm run query:status:testnet` - 查询合约状态
 - `npm run query:stakes:testnet` - 查询质押信息
 - `npm run query:pending-reward:testnet` - 查询待领取奖励
+  - 不提供 `POSITION_ID` 时，会查询用户所有位置的待领取奖励
+  - 提供 `POSITION_ID` 时，只查询指定位置的待领取奖励
+  - 可通过 `USER_ADDRESS` 环境变量指定查询的用户地址
 
 ### 状态查询（Premium Staking）
 - `npm run query:status:premium:testnet` - 查询合约状态
 - `npm run query:stakes:premium:testnet` - 查询质押信息
 - `npm run query:pending-reward:premium:testnet` - 查询待领取奖励
+  - 不提供 `POSITION_ID` 时，会查询用户所有位置的待领取奖励
+  - 提供 `POSITION_ID` 时，只查询指定位置的待领取奖励
+  - 可通过 `USER_ADDRESS` 环境变量指定查询的用户地址
 - `npm run query:check-whitelist:premium:testnet` - 查询白名单配置
 
 ### 紧急操作
