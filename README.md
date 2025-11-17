@@ -56,7 +56,7 @@ HSKStaking (主实现合约)
 ├── IStaking (接口定义)
 ├── StakingStorage (存储层)
 │   ├── Initializable (初始化控制)
-│   └── OwnableUpgradeable (所有权管理)
+│   └── Ownable2StepUpgradeable (两步所有权管理)
 ├── StakingConstants (常量定义)
 ├── ReentrancyGuardUpgradeable (重入保护)
 └── PausableUpgradeable (暂停功能)
@@ -359,19 +359,24 @@ uint256 totalReward = (amount × annualRate × timeRatio) / (PRECISION × PRECIS
   - 奖励分配暂停
   - 用户只能提取本金（通过 `emergencyWithdraw`）
   - 新质押被阻止
-- 说明：若已满足解锁条件，正常 `unstake` 仍可执行，但奖励为 0；未到期可使用 `emergencyWithdraw`（仅本金）
+  - 解除质押（`unstake`）被禁用
+- 说明：紧急模式下只能使用 `emergencyWithdraw` 提取本金（放弃奖励），不能使用 `unstake`
 
 ### 暂停机制
 - 管理员可暂停合约（`pause()`）
 - 暂停时：
   - 质押功能被禁用
   - 奖励提取被禁用
-  - 解除质押功能不受影响
+  - 解除质押功能被禁用
 
 ### 访问控制
 - **Owner**: 合约所有者，负责所有管理功能（包括升级、参数配置等）
-- 使用 OpenZeppelin 的 OwnableUpgradeable 标准实现
-- 支持所有权转移（`transferOwnership`）和放弃所有权（`renounceOwnership`）
+- 使用 OpenZeppelin 的 Ownable2StepUpgradeable 标准实现（两步所有权转移）
+- 支持两步所有权转移：
+  - 第一步：当前 owner 调用 `transferOwnership(newOwner)` 设置待转移地址
+  - 第二步：新 owner 调用 `acceptOwnership()` 接受所有权
+- 支持放弃所有权（`renounceOwnership`）
+- 优势：防止地址错误、提供撤销机会、增强安全性
 
 ## 📝 部署指南
 

@@ -153,8 +153,13 @@ export async function deployNormalStaking(): Promise<{
       // But that's complex. For now, let's try to call transferOwnership directly through the proxy
       // The proxy will delegatecall to the implementation, and msg.sender will be the proxy
       // So we can call transferOwnership(deployer.address) through the proxy
+      // Step 1: Current owner (proxy) initiates ownership transfer
       const transferTx = await staking.transferOwnership(deployerAddress);
       await transferTx.wait();
+      
+      // Step 2: New owner (deployer) must accept ownership (Ownable2StepUpgradeable)
+      const acceptTx = await staking.connect(deployer).acceptOwnership();
+      await acceptTx.wait();
       
       // Verify ownership was transferred
       const newOwner = await staking.owner();

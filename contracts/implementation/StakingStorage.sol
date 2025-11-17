@@ -2,7 +2,7 @@
 pragma solidity ^0.8.27;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import "../interfaces/IStake.sol";
 
 /**
@@ -11,7 +11,7 @@ import "../interfaces/IStake.sol";
  * This contract contains all state variables used in the staking system
  * and handles their initialization
  */
-abstract contract StakingStorage is Initializable, OwnableUpgradeable {
+abstract contract StakingStorage is Initializable, Ownable2StepUpgradeable {
     uint256 public minStakeAmount;
     uint256 public totalStaked;
     uint256 public nextPositionId;
