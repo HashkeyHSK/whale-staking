@@ -91,7 +91,7 @@ async function main() {
   // Query staking information
   console.log("\nQuerying staking information...");
   // Note: userPositions is a public mapping, requires multiple calls to get array elements
-  // Or can add getUserPositions helper function to contract
+  // Use getUserPositionIds(address) to get all user position IDs
   try {
     // Get latest positionId (inferred from nextPositionId)
     const nextId = await staking.nextPositionId();

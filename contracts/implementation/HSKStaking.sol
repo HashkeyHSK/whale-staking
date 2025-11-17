@@ -193,6 +193,14 @@ contract HSKStaking is
         return _calculatePendingReward(position);
     }
 
+    function getUserPositionIds(address user) external view returns (uint256[] memory) {
+        return userPositions[user];
+    }
+
+    function calculatePotentialReward(uint256 amount) external view returns (uint256) {
+        return _calculateReward(amount, LOCK_PERIOD, rewardRate);
+    }
+
     function emergencyWithdraw(uint256 positionId) external nonReentrant {
         require(emergencyMode, "Not in emergency mode");
         

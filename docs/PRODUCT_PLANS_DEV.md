@@ -482,10 +482,35 @@ function _calculateTimeElapsed(Position memory position)
 
 ### 8.4 代理升级
 
+**升级机制**：
 - 使用 Transparent Proxy 代理模式
-- 升级由 ProxyAdmin 合约控制
-- 升级前需要充分测试
-- 注意存储布局兼容性
+- 升级由 ProxyAdmin 合约或 EOA 控制
+- 升级脚本会自动检测 ProxyAdmin 类型并使用正确的方式
+
+**升级脚本特性**：
+- ✅ 自动从 EIP-1967 存储槽读取实际的 ProxyAdmin 地址
+- ✅ 支持 ProxyAdmin 合约和 EOA 两种模式
+- ✅ 智能 Fallback：如果 `upgrade()` 失败，自动尝试 `upgradeAndCall()`
+- ✅ 升级前后自动验证状态一致性
+- ✅ 升级成功后自动打印浏览器链接
+
+**升级命令**：
+```bash
+# 自动检测 ProxyAdmin（推荐）
+npm run upgrade:normal:testnet
+
+# 手动指定 ProxyAdmin 地址
+PROXY_ADMIN_ADDRESS="0x..." npm run upgrade:normal:testnet
+
+# 使用已部署的实现合约
+PROXY_ADMIN_ADDRESS="0x..." NEW_IMPLEMENTATION_ADDRESS="0x..." npm run upgrade:normal:testnet
+```
+
+**注意事项**：
+- 升级前需要充分测试新实现合约
+- 确保新实现合约与现有存储布局兼容
+- 升级交易会显示在 ProxyAdmin 合约页面，而不是 Proxy 页面
+- 升级后需要验证新实现合约
 
 ### 8.5 事件监听
 

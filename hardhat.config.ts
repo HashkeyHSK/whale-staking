@@ -8,6 +8,9 @@ dotenvConfig();
 
 export default defineConfig({
   plugins: [hardhatEthers, hardhatIgnition],
+  paths: {
+    tests: "./test",
+  },
   solidity: {
     version: "0.8.27",
     settings: {
@@ -36,6 +39,11 @@ export default defineConfig({
       type: "edr-simulated" as const,
       chainId: 31337,
       allowUnlimitedContractSize: true,
+      accounts: {
+        mnemonic: "test test test test test test test test test test test junk",
+        count: 20,
+        accountsBalance: "1000000000000000000000000000000000", // 1e33 wei for each account (1 billion ETH)
+      },
     },
   },
   // @ts-ignore - mocha config
