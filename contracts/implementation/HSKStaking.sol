@@ -148,7 +148,7 @@ contract HSKStaking is
 
     function unstake(
         uint256 positionId
-    ) external override nonReentrant validPosition(positionId) {
+    ) external override nonReentrant whenNotPaused whenNotEmergency validPosition(positionId) {
         Position storage position = positions[positionId];
         
         if (position.isUnstaked) revert AlreadyUnstaked();

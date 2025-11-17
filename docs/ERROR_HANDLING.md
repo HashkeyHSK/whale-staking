@@ -301,7 +301,7 @@ Error: Contract paused
 **解决方法**：
 - 等待管理员解除暂停（通过 `unpause()` 函数）
 - 查询暂停状态：`await staking.paused()`
-- 解除质押（`unstake`）功能不受暂停影响
+- 注意：解除质押（`unstake`）功能在暂停状态下也被禁用
 
 ---
 

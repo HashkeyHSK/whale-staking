@@ -10,7 +10,7 @@
 
 1. **合约结构**: 
    - `HSKStaking.sol` - 主实现合约（继承 StakingStorage、StakingConstants、ReentrancyGuardUpgradeable、PausableUpgradeable）
-   - `StakingStorage.sol` - 存储层（继承 Initializable、OwnableUpgradeable）
+   - `StakingStorage.sol` - 存储层（继承 Initializable、Ownable2StepUpgradeable）
    - `StakingConstants.sol` - 常量定义合约（LOCK_PERIOD = 365 days）
    - `IStake.sol` - 接口定义
    - `NormalStakingProxy.sol` / `PremiumStakingProxy.sol` - 代理合约（Transparent Proxy）
