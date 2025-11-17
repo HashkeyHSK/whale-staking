@@ -58,12 +58,14 @@ export async function deployNormalStaking(): Promise<{
   // Actually, in TransparentUpgradeableProxy, when _data is provided, it's called via delegatecall
   // So msg.sender should be the admin (deployer), not the proxy!
   const minStake = ethers.parseEther(NORMAL_STAKING_CONFIG.minStakeAmount);
+  const maxTotalStaked = ethers.parseEther(NORMAL_STAKING_CONFIG.maxTotalStaked);
   const initData = implementation.interface.encodeFunctionData("initialize", [
     minStake,
     NORMAL_STAKING_CONFIG.rewardRate,
     now - 3600, // Start 1 hour ago (so tests can run immediately)
     now + 7 * 86400, // End in 7 days
     false, // Whitelist disabled
+    maxTotalStaked, // Max total staked (10 million HSK)
   ]);
   
   // Deploy proxy

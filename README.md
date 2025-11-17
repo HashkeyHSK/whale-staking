@@ -211,11 +211,36 @@ npx hardhat test
 - **说明**: 用户只能在 `stakeEndTime` 之前质押
 - **事件**: 触发 `StakeEndTimeUpdated` 事件
 
+#### `setMinStakeAmount(uint256 newAmount)`
+设置最小质押金额
+- **参数**: `newAmount` - 新的最小质押金额（wei）
+- **要求**: 
+  - 仅管理员可调用（`onlyOwner`）
+  - 非紧急模式（`whenNotEmergency`）
+- **事件**: 触发 `MinStakeAmountUpdated` 事件
+
+#### `setMaxTotalStaked(uint256 newAmount)`
+设置最大总质押量
+- **参数**: `newAmount` - 新的最大总质押量（wei，0 表示无限制）
+- **要求**: 仅管理员可调用（`onlyOwner`）
+- **事件**: 触发 `MaxTotalStakedUpdated` 事件
+- **说明**: 设置整个产品池的上限，所有用户质押金额总和不能超过此限制
+
 #### `updateRewardPool() payable`
 向奖励池充值
 - **参数**: 通过 `msg.value` 发送充值金额
 - **要求**: 仅管理员可调用（`onlyOwner`）
 - **效果**: 增加 `rewardPoolBalance`
+- **事件**: 触发 `RewardPoolUpdated` 事件
+
+#### `withdrawExcessRewardPool(uint256 amount)`
+提取奖励池多余资金
+- **参数**: `amount` - 提取金额
+- **要求**: 
+  - 仅管理员可调用（`onlyOwner`）
+  - `rewardPoolBalance >= totalPendingRewards` - 奖励池余额充足
+  - `amount <= excess` - 不能提取已分配的奖励
+- **效果**: 减少 `rewardPoolBalance`，转账到 owner
 - **事件**: 触发 `RewardPoolUpdated` 事件
 
 #### `enableEmergencyMode()`
@@ -427,12 +452,16 @@ npx hardhat run scripts/deployDualTier.ts --network <network>
 
 #### 部署后配置
 
-**注意**：部署脚本会自动设置质押开始时间为部署后7天。如需调整，可以使用以下脚本：
+**注意**：部署脚本需要提供 `STAKE_START_TIME` 和 `STAKE_END_TIME` 环境变量。如需调整，可以使用以下脚本：
 
 ```bash
 # 设置质押开始时间
-npx hardhat run scripts/setStakeStartTime.ts --network <network> \
+npx hardhat run scripts/normal/config/set-start-time.ts --network <network> \
   -- --contract <CONTRACT_ADDRESS> --timestamp <START_TIMESTAMP>
+
+# 设置质押结束时间
+npx hardhat run scripts/normal/config/set-end-time.ts --network <network> \
+  -- --contract <CONTRACT_ADDRESS> --timestamp <END_TIMESTAMP>
 ```
 
 其他配置：
@@ -446,11 +475,11 @@ npx hardhat run scripts/setStakeStartTime.ts --network <network> \
 2. **向奖励池充值**（两个产品需要独立的奖励池）
    ```bash
    # 普通 Staking 奖励池
-   npx hardhat run scripts/add-rewards.ts --network <network> \
+   npx hardhat run scripts/normal/add-rewards.ts --network <network> \
      -- --contract <NORMAL_STAKING_ADDRESS> --amount <AMOUNT>
    
    # Premium Staking 奖励池
-   npx hardhat run scripts/add-rewards.ts --network <network> \
+   npx hardhat run scripts/premium/add-rewards.ts --network <network> \
      -- --contract <PREMIUM_STAKING_ADDRESS> --amount <AMOUNT>
    ```
 
@@ -500,28 +529,32 @@ PROXY_ADMIN_ADDRESS="0x..." npm run upgrade:premium:testnet
 
 | 脚本 | 功能 |
 |------|------|
-| `deploy.ts` | 部署合约（标准部署） |
-| `deployNormalStaking.ts` | 部署普通 Staking 产品 |
-| `deployPremiumStaking.ts` | 部署 Premium Staking 产品 |
-| `deployDualTier.ts` | 一次性部署双层产品方案 |
-| `stake.ts` | 执行质押 |
-| `upgrade.ts` | 升级合约 |
-| `addToWhitelist.ts` | 添加白名单 |
-| `addToWhitelistBatch.ts` | 批量添加白名单 |
-| `checkStakes.ts` | 查询用户质押情况 |
-| `checkWhitelist.ts` | 检查白名单状态 |
-| `setMaxStake.ts` | 设置最大质押量 |
-| `setStakeStartTime.ts` | 设置质押开始时间 |
-| `setStakeEndTime.ts` | 设置质押截止时间 |
-| `add-rewards.ts` | 向奖励池充值 |
+| `normal/deploy.ts` | 部署普通 Staking 产品 |
+| `premium/deploy.ts` | 部署 Premium Staking 产品 |
+| `normal/stake.ts` | 执行质押（普通 Staking） |
+| `premium/stake.ts` | 执行质押（Premium Staking） |
+| `normal/upgrade.ts` | 升级合约（普通 Staking） |
+| `premium/upgrade.ts` | 升级合约（Premium Staking） |
+| `premium/whitelist/add-batch.ts` | 批量添加白名单 |
+| `normal/query/check-stakes.ts` | 查询用户质押情况 |
+| `premium/query/check-whitelist.ts` | 检查白名单状态 |
+| `normal/config/set-start-time.ts` | 设置质押开始时间 |
+| `normal/config/set-end-time.ts` | 设置质押截止时间 |
+| `normal/config/set-min-stake.ts` | 设置最小质押金额 |
+| `normal/add-rewards.ts` | 向奖励池充值（普通 Staking） |
+| `premium/add-rewards.ts` | 向奖励池充值（Premium Staking） |
+| `normal/withdraw-excess.ts` | 提取多余奖励池资金 |
+| `premium/withdraw-excess.ts` | 提取多余奖励池资金 |
 
-### 分析脚本
+### 查询脚本
 
 | 脚本 | 功能 |
 |------|------|
-| `analyzeStaking.ts` | 分析质押案例 |
-| `analyzeAPY.ts` | 分析 APY 计算 |
-| `checkLockPeriods.ts` | 查询锁定期选项 |
+| `normal/query/check-status.ts` | 查询合约状态 |
+| `normal/query/check-stakes.ts` | 查询用户质押情况 |
+| `normal/query/pending-reward.ts` | 查询待提取奖励 |
+| `normal/query/position-info.ts` | 查询位置详情 |
+| `premium/query/check-whitelist.ts` | 检查白名单状态 |
 
 ## 🧪 测试
 
@@ -590,9 +623,10 @@ npx hardhat coverage
 1. **质押时间窗口**：合约支持设置质押开始时间和结束时间。部署脚本默认设置开始时间为部署后7天，结束时间无限制。管理员可以通过 `setStakeStartTime` 和 `setStakeEndTime` 函数调整
 2. **奖励计算限制**：奖励只计算到锁定期结束，多质押的时间不会增加奖励
 3. **白名单模式**：合约支持白名单模式，可在部署时配置。双层产品方案中，普通 Staking 关闭白名单（开放），Premium Staking 启用白名单（需审核）
-4. **最小质押金额**：合约默认最小质押金额为 100 HSK，但产品部署时可配置（普通 Staking 产品配置为 1 HSK）
-5. **最大质押量**：合约默认最大总质押量为 10,000 HSK，但产品部署时可配置（普通 Staking 产品配置为 10,000,000 HSK）
-6. **奖励池**：确保奖励池有足够资金，否则新质押可能失败
+4. **最小质押金额**：产品部署时可配置（普通 Staking 产品配置为 1 HSK，Premium Staking 配置为 500,000 HSK），部署后可通过 `setMinStakeAmount` 修改
+5. **最大总质押量**：产品部署时可配置（普通 Staking 产品配置为 10,000,000 HSK，Premium Staking 配置为 20,000,000 HSK），部署后可通过 `setMaxTotalStaked` 修改。设置整个产品池的上限，所有用户质押金额总和不能超过此限制
+6. **奖励池**：确保奖励池有足够资金，否则新质押可能失败。合约会检查奖励池余额是否足够支付所有待发放奖励
+7. **奖励池提取**：管理员可以通过 `withdrawExcessRewardPool` 提取多余的奖励池资金（超过 totalPendingRewards 的部分）
 
 ### 双层产品方案配置
 
@@ -603,14 +637,14 @@ npx hardhat coverage
   - 年化收益：8%
   - 锁定期：365天
   - 白名单：关闭（开放）
-  - 最大总质押量：10,000,000 HSK
+  - 最大总质押量：10,000,000 HSK（池子上限）
 
 - **Premium Staking（高级质押）**：
   - 最小质押：500,000 HSK
   - 年化收益：16%
   - 锁定期：365天
   - 白名单：启用（需审核）
-  - 最大总质押量：20,000,000 HSK
+  - 最大总质押量：20,000,000 HSK（池子上限）
 
 详细产品方案请参考：
 - [产品方案详细文档](./docs/PRODUCT_PLANS.md) - **运营文档（推荐）**

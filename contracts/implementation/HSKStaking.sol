@@ -31,6 +31,7 @@ contract HSKStaking is
     event StakeStartTimeUpdated(uint256 oldStartTime, uint256 newStartTime);
     event StakeEndTimeUpdated(uint256 oldEndTime, uint256 newEndTime);
     event MinStakeAmountUpdated(uint256 oldAmount, uint256 newAmount);
+    event MaxTotalStakedUpdated(uint256 oldAmount, uint256 newAmount);
     event EmergencyModeEnabled(address indexed operator, uint256 timestamp);
     event WhitelistModeChanged(bool oldMode, bool newMode);
     error AlreadyUnstaked();
@@ -69,20 +70,22 @@ contract HSKStaking is
      * @param _stakeStartTime Timestamp when staking begins
      * @param _stakeEndTime Timestamp when staking ends
      * @param _whitelistMode Enable whitelist mode (false for Normal Staking, true for Premium Staking)
+     * @param _maxTotalStaked Maximum total staked amount (in wei, 0 means no limit)
      */
     function initialize(
         uint256 _minStakeAmount,
         uint256 _rewardRate,
         uint256 _stakeStartTime,
         uint256 _stakeEndTime,
-        bool _whitelistMode
+        bool _whitelistMode,
+        uint256 _maxTotalStaked
     ) external initializer {
         require(_stakeStartTime > 0, "Invalid start time");
         require(_stakeEndTime > _stakeStartTime, "End time must be after start time");
         
         __ReentrancyGuard_init();
         __Pausable_init();
-        __StakingStorage_init(msg.sender, _minStakeAmount, _rewardRate, _whitelistMode);
+        __StakingStorage_init(msg.sender, _minStakeAmount, _rewardRate, _whitelistMode, _maxTotalStaked);
         
         stakeStartTime = _stakeStartTime;
         stakeEndTime = _stakeEndTime;
@@ -106,6 +109,10 @@ contract HSKStaking is
 
         uint256 amount = msg.value;
         require(amount >= minStakeAmount, "Amount below minimum");
+
+        if (maxTotalStaked > 0) {
+            require(totalStaked + amount <= maxTotalStaked, "Max total staked exceeded");
+        }
 
         uint256 potentialReward = _calculateReward(
             amount,
@@ -240,6 +247,12 @@ contract HSKStaking is
         uint256 oldAmount = minStakeAmount;
         minStakeAmount = newAmount;
         emit MinStakeAmountUpdated(oldAmount, newAmount);
+    }
+
+    function setMaxTotalStaked(uint256 newAmount) external onlyOwner {
+        uint256 oldAmount = maxTotalStaked;
+        maxTotalStaked = newAmount;
+        emit MaxTotalStakedUpdated(oldAmount, newAmount);
     }
 
     function setStakeStartTime(uint256 newStartTime) external onlyOwner {

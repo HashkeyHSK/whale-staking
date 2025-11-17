@@ -124,17 +124,13 @@ mapping(address => bool) public whitelisted;         // 白名单mapping
 
 ```bash
 # 部署普通 Staking
-npx hardhat run scripts/deployNormalStaking.ts --network hashkeyTestnet
+STAKE_START_TIME="<timestamp>" STAKE_END_TIME="<timestamp>" npx hardhat run scripts/normal/deploy.ts --network hashkeyTestnet
 
 # 部署 Premium Staking
-npx hardhat run scripts/deployReStaking.ts --network hashkeyTestnet
+STAKE_START_TIME="<timestamp>" STAKE_END_TIME="<timestamp>" npx hardhat run scripts/premium/deploy.ts --network hashkeyTestnet
 ```
 
-#### 方式二：一次性部署
-
-```bash
-npx hardhat run scripts/deployDualTier.ts --network hashkeyTestnet
-```
+**注意**：部署脚本需要提供 `STAKE_START_TIME` 和 `STAKE_END_TIME` 环境变量（Unix 时间戳，秒）。
 
 ### 3.2 部署后配置清单
 
@@ -157,11 +153,15 @@ npx hardhat run scripts/deployDualTier.ts --network hashkeyTestnet
 
 ```bash
 # 检查配置参数和合约状态
-npx hardhat run scripts/checkStakes.ts --network hashkeyTestnet \
+npx hardhat run scripts/normal/query/check-status.ts --network hashkeyTestnet \
+  -- --contract <CONTRACT_ADDRESS>
+
+# 检查用户质押情况
+npx hardhat run scripts/normal/query/check-stakes.ts --network hashkeyTestnet \
   -- --contract <CONTRACT_ADDRESS> --user <USER_ADDRESS>
 
 # 检查白名单状态（Premium Staking）
-npx hardhat run scripts/checkWhitelist.ts --network hashkeyTestnet \
+npx hardhat run scripts/premium/query/check-whitelist.ts --network hashkeyTestnet \
   -- --contract <CONTRACT_ADDRESS> --user <USER_ADDRESS>
 ```
 
@@ -235,13 +235,13 @@ positions(uint256 positionId) view → Position
 ```
 直接查询指定 positionId 的位置信息。
 
-**方法2 - 通过 userPositions mapping**：
+**方法2 - 通过 getUserPositionIds 函数（推荐）**：
 ```solidity
-userPositions(address user, uint256 index) view → uint256 positionId
+getUserPositionIds(address user) view → uint256[] memory
 ```
-获取用户的第 index 个质押位置的 ID，然后通过 positions 查询详情。
+获取用户的所有质押位置 ID 数组，然后通过 positions 查询详情。
 
-- **说明**: `userPositions` 是 public mapping，需要遍历索引获取所有位置。
+- **说明**: 这是最便捷的方法，一次调用即可获取所有位置 ID。
 
 ### 4.2 管理员接口
 
@@ -349,8 +349,8 @@ userPositions(address user, uint256 index) view → uint256 positionId
 #### `positions(uint256 positionId) view → Position`
 获取指定位置的详细信息。
 
-#### `userPositions(address user, uint256 index) view → uint256`
-获取用户的第 index 个质押位置 ID（需要遍历）。
+#### `getUserPositionIds(address user) view → uint256[] memory`
+获取用户的所有质押位置 ID 数组（推荐使用）。
 
 ---
 
@@ -456,11 +456,6 @@ function _calculateTimeElapsed(Position memory position)
 - 管理员可暂停合约（`pause()`）
 - 暂停时：质押、奖励提取和解除质押都被禁用
 
-### 7.5 黑名单机制
-
-- 支持封禁恶意地址（`addToBlacklist()`）
-- 黑名单用户无法参与质押
-
 ---
 
 ## 八. 开发注意事项
@@ -478,11 +473,12 @@ function _calculateTimeElapsed(Position memory position)
 - 定期监控奖励池余额
 - 提前规划充值计划
 
-### 8.3 历史记录保存
+### 8.3 奖励池管理
 
-- 锁定期选项更新时，旧配置会保存在历史记录中
-- 已存在的质押位置不受配置更新影响
-- 使用历史记录中的 `rewardRate` 计算奖励
+- 合约在 `stake()` 时会检查奖励池余额是否充足
+- 需要确保奖励池有足够资金支付预期奖励
+- 管理员可以通过 `withdrawExcessRewardPool` 提取多余的奖励池资金
+- 定期监控奖励池余额和 totalPendingRewards
 
 ### 8.4 代理升级
 
@@ -519,11 +515,16 @@ PROXY_ADMIN_ADDRESS="0x..." NEW_IMPLEMENTATION_ADDRESS="0x..." npm run upgrade:n
 ### 8.5 事件监听
 
 重要事件：
-- `Staked(address indexed user, uint256 indexed positionId, uint256 amount, uint256 lockPeriod)`
-- `Unstaked(address indexed user, uint256 indexed positionId, uint256 amount, uint256 reward)`
-- `RewardClaimed(address indexed user, uint256 indexed positionId, uint256 reward)`
+- `PositionCreated(address indexed user, uint256 indexed positionId, uint256 amount, uint256 lockPeriod, uint256 timestamp)`
+- `PositionUnstaked(address indexed user, uint256 indexed positionId, uint256 amount, uint256 timestamp)`
+- `RewardClaimed(address indexed user, uint256 indexed positionId, uint256 amount, uint256 timestamp)`
 - `RewardPoolUpdated(uint256 newBalance)`
-- `EmergencyModeEnabled()` / `EmergencyModeDisabled()`
+- `EmergencyModeEnabled(address indexed operator, uint256 timestamp)`
+- `EmergencyWithdrawn(address indexed user, uint256 indexed positionId, uint256 amount, uint256 timestamp)`
+- `WhitelistStatusChanged(address indexed user, bool status)`
+- `StakeStartTimeUpdated(uint256 oldStartTime, uint256 newStartTime)`
+- `StakeEndTimeUpdated(uint256 oldEndTime, uint256 newEndTime)`
+- `MinStakeAmountUpdated(uint256 oldAmount, uint256 newAmount)`
 
 ---
 
@@ -551,8 +552,8 @@ PROXY_ADMIN_ADDRESS="0x..." NEW_IMPLEMENTATION_ADDRESS="0x..." npm run upgrade:n
 
 - [ ] 大量用户并发质押
 - [ ] 奖励池耗尽场景
-- [ ] 最大总质押量限制
 - [ ] 大量位置查询性能
+- [ ] 奖励池余额不足时的质押失败场景
 
 ### 9.4 安全测试
 
@@ -570,19 +571,19 @@ PROXY_ADMIN_ADDRESS="0x..." NEW_IMPLEMENTATION_ADDRESS="0x..." npm run upgrade:n
 #### 质押流程
 1. 检查白名单状态（Premium Staking）
 2. 检查质押时间窗口（`stakeStartTime` 和 `stakeEndTime`）
-3. 检查最大总质押量限制
-4. 调用 `stake()` 并发送 ETH（锁定期固定365天）
+3. 检查奖励池余额是否充足（合约会自动检查）
+4. 调用 `stake()` 并发送 HSK（锁定期固定365天）
 5. 监听 `PositionCreated` 事件
 
 #### 提取奖励流程
-1. 查询用户质押位置（`userPositions(user, index)`，需遍历）
-2. 查询待提取奖励（`pendingReward()`）
+1. 查询用户质押位置（`getUserPositionIds(user)`，推荐方法）
+2. 查询待提取奖励（`pendingReward(positionId)`）
 3. 调用 `claimReward(positionId)`
 4. 监听 `RewardClaimed` 事件
 
 #### 解除质押流程
 1. 检查锁定期是否结束（质押时间 + 365天）
-2. 查询用户质押位置（`userPositions` 或 `positions`）
+2. 查询用户质押位置（`getUserPositionIds(user)` 或 `positions(positionId)`）
 3. 调用 `unstake(positionId)`
 4. 监听 `PositionUnstaked` 和 `RewardClaimed` 事件
 
@@ -590,19 +591,21 @@ PROXY_ADMIN_ADDRESS="0x..." NEW_IMPLEMENTATION_ADDRESS="0x..." npm run upgrade:n
 
 - **总质押量**：`totalStaked()`
 - **奖励池余额**：`rewardPoolBalance()`
+- **总待发放奖励**：`totalPendingRewards()`
 - **锁定期**：`LOCK_PERIOD()` (固定365天)
 - **年化收益率**：`rewardRate()` (部署时设置，例如：800 = 8%)
-- **用户质押位置**：`userPositions(user, index)`（需遍历索引）
+- **用户质押位置**：`getUserPositionIds(user)`（推荐方法，返回所有位置ID数组）
 - **位置详情**：`positions(positionId)`
 - **待提取奖励**：`pendingReward(positionId)`
 
 ### 10.3 错误处理
 
 常见错误：
-- `InvalidAmount` - 质押金额不足
-- `NotWhitelisted` - 未在白名单中
+- `"Amount below minimum"` - 质押金额不足（小于 minStakeAmount）
+- `NotWhitelisted` - 未在白名单中（Premium Staking）
 - `StillLocked` - 锁定期未结束（365天）
-- `"Insufficient reward pool"` - 奖励池余额不足
+- `"Stake amount exceed"` - 奖励池余额不足（无法支付预期奖励）
+- `"Insufficient reward pool"` - 奖励池余额不足（提取奖励时）
 - `"Staking has not started yet"` - 质押时间窗口未开始
 - `"Staking period has ended"` - 质押时间窗口已结束
 - `"Contract is in emergency mode"` - 合约处于紧急模式

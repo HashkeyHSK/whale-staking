@@ -102,7 +102,7 @@ Error: Position not found
 - 质押位置不属于当前用户
 
 **解决方法**：
-- 查询用户的质押位置：`await staking.userPositions(userAddress, index)`（需遍历索引）
+- 查询用户的质押位置：`await staking.getUserPositionIds(userAddress)`（推荐方法）
 - 确认 `positionId` 是否正确
 - 确认是否为位置所有者
 

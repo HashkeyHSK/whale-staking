@@ -25,9 +25,11 @@ describe("Normal Staking - Deployment", () => {
   test("应该正确初始化合约参数", async () => {
     const minStake = await fixture.staking.minStakeAmount();
     const rewardRate = await fixture.staking.rewardRate();
+    const maxTotalStaked = await fixture.staking.maxTotalStaked();
 
     expectBigIntEqual(minStake, parseEther("1"), "Normal min stake should be 1 HSK");
     assert.strictEqual(rewardRate.toString(), "800", "Normal reward rate should be 8%");
+    expectBigIntEqual(maxTotalStaked, parseEther("10000000"), "Normal max total staked should be 10,000,000 HSK");
   });
 
   test("应该正确设置白名单模式为关闭", async () => {
@@ -71,6 +73,7 @@ describe("Normal Staking - Deployment", () => {
       now + 86400,
       now + 3600, // endTime before startTime
       false,
+      parseEther("10000000"), // Max total staked (10 million HSK)
     ]);
 
     await expectRevert(

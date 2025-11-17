@@ -98,6 +98,7 @@ scripts/
 │   │   ├── set-start-time.ts # 设置开始时间
 │   │   ├── set-end-time.ts   # 设置结束时间
 │   │   ├── set-min-stake.ts  # 设置最小质押金额
+│   │   ├── set-max-total-staked.ts # 设置最大总质押量
 │   │   └── enable-emergency.ts # 启用紧急模式
 │   └── query/                # 状态查询
 │       ├── check-status.ts   # 查询合约状态
@@ -125,6 +126,7 @@ scripts/
 │   │   ├── set-start-time.ts
 │   │   ├── set-end-time.ts
 │   │   ├── set-min-stake.ts
+│   │   ├── set-max-total-staked.ts
 │   │   └── enable-emergency.ts
 │   └── query/                # 状态查询
 │       ├── check-status.ts
@@ -181,6 +183,7 @@ export STAKE_END_TIME="1767225600"    # 质押结束时间（Unix 时间戳，�
 export START_TIME="1735689600"      # 开始时间（Unix 时间戳，秒级，用于修改配置）
 export END_TIME="1735689600"        # 结束时间（Unix 时间戳，秒级，用于修改配置）
 export NEW_MIN_STAKE="1"            # 新的最小质押金额
+export NEW_MAX_TOTAL_STAKED="10000000"  # 新的最大总质押量（HSK，0 表示无限制）
 
 # 高级操作
 export WITHDRAW_AMOUNT="100"       # 提取金额
@@ -263,6 +266,8 @@ export const TESTNET_ADDRESSES: ContractAddresses = {
 - `npm run config:set-start-time:testnet` - 设置开始时间
 - `npm run config:set-end-time:testnet` - 设置结束时间
 - `npm run config:set-min-stake:testnet` - 设置最小质押金额
+- `npm run config:set-max-total-staked:testnet` - 设置最大总质押量
+- `npm run config:set-max-total-staked:premium:testnet` - 设置最大总质押量（Premium）
 - `npm run config:enable-emergency:testnet` - 启用紧急模式（⚠️ 不可逆）
 
 ### 状态查询（Normal Staking）
@@ -294,26 +299,34 @@ export const TESTNET_ADDRESSES: ContractAddresses = {
 3. **最小质押**: 
    - Normal Staking: 1 HSK（可通过 owner 修改）
    - Premium Staking: 500,000 HSK（可通过 owner 修改）
-4. **白名单**: 
+4. **最大总质押量**: 
+   - Normal Staking: 10,000,000 HSK（可通过 owner 修改，0 表示无限制）
+   - Premium Staking: 20,000,000 HSK（可通过 owner 修改，0 表示无限制）
+5. **白名单**: 
    - Normal Staking: 关闭（所有用户可质押）
    - Premium Staking: 启用（仅白名单用户可质押）
-5. **测试优先**: 先在测试网验证
+6. **测试优先**: 先在测试网验证
 
 ## 📊 脚本统计
 
-**当前已实现**: 57 个脚本文件
-- ✅ Normal Staking: 14 个脚本
-- ✅ Premium Staking: 23 个脚本（包含白名单管理）
+**当前已实现**: 59 个脚本文件
+- ✅ Normal Staking: 15 个脚本
+- ✅ Premium Staking: 24 个脚本（包含白名单管理）
 - ✅ 开发脚本: 4 个脚本
 - ✅ 测试脚本: 5 个脚本
 - ✅ 工具脚本: 3 个脚本
 - ✅ 共享模块: 4 个文件
 
+**Normal Staking 脚本包含**：
+- 基础操作脚本：9 个（deploy, upgrade, stake, unstake, claim-rewards, add-rewards, emergency-withdraw, withdraw-excess, verify-forge）
+- 配置管理脚本：7 个（pause, unpause, set-start-time, set-end-time, set-min-stake, set-max-total-staked, enable-emergency）
+- 查询脚本：4 个（check-status, check-stakes, pending-reward, position-info）
+
 **Premium Staking 脚本包含**：
 - 基础操作脚本：9 个（deploy, upgrade, stake, unstake, claim-rewards, add-rewards, emergency-withdraw, withdraw-excess, verify-forge）
 - 白名单管理脚本：4 个（add-batch, remove-batch, check-user, toggle-mode）
-- 配置管理脚本：6 个（pause, unpause, set-start-time, set-end-time, set-min-stake, enable-emergency）
-- 查询脚本：4 个（check-status, check-stakes, pending-reward, check-whitelist）
+- 配置管理脚本：7 个（pause, unpause, set-start-time, set-end-time, set-min-stake, set-max-total-staked, enable-emergency）
+- 查询脚本：5 个（check-status, check-stakes, pending-reward, position-info, check-whitelist）
 
 ## 🐛 常见问题
 
@@ -367,6 +380,24 @@ WITHDRAW_AMOUNT="1000" npm run withdraw-excess:testnet
 # 提取所有可用余额（不指定金额）
 npm run withdraw-excess:testnet
 ```
+
+**Q: 如何设置最大总质押量？**
+最大总质押量是整个产品池的上限，所有用户质押金额总和不能超过此限制：
+```bash
+# 设置 Normal Staking 最大总质押量为 15,000,000 HSK
+NEW_MAX_TOTAL_STAKED="15000000" npm run config:set-max-total-staked:testnet
+
+# 设置 Premium Staking 最大总质押量为 25,000,000 HSK
+NEW_MAX_TOTAL_STAKED="25000000" npm run config:set-max-total-staked:premium:testnet
+
+# 移除限制（设置为 0）
+NEW_MAX_TOTAL_STAKED="0" npm run config:set-max-total-staked:testnet
+```
+
+**注意**：
+- 设置的最大总质押量不能小于当前总质押量
+- 设置为 0 表示无限制
+- 查询合约状态时会显示最大总质押量和剩余容量
 
 **Q: 如何升级合约？**
 升级脚本会自动检测 ProxyAdmin 类型并使用正确的方式执行升级：
@@ -472,12 +503,25 @@ npm run query:status:premium:testnet
 
 ## 🎯 合约配置
 
+### Normal Staking
+
 | 配置项 | 值 | 说明 |
 |-------|---|------|
 | 最小质押 | 1 HSK | 可通过 owner 修改 |
+| 最大总质押量 | 10,000,000 HSK | 可通过 owner 修改（0 表示无限制） |
 | 年化收益 | 8% | 固定在初始化时设置 |
 | 锁定期 | 365 天 | 合约常量，不可修改 |
 | 白名单 | 关闭 | 所有用户可质押 |
+
+### Premium Staking
+
+| 配置项 | 值 | 说明 |
+|-------|---|------|
+| 最小质押 | 500,000 HSK | 可通过 owner 修改 |
+| 最大总质押量 | 20,000,000 HSK | 可通过 owner 修改（0 表示无限制） |
+| 年化收益 | 16% | 固定在初始化时设置 |
+| 锁定期 | 365 天 | 合约常量，不可修改 |
+| 白名单 | 启用 | 仅白名单用户可质押 |
 
 ## 🔐 管理员操作
 
@@ -497,6 +541,9 @@ END_TIME="1735689600" npm run config:set-end-time:testnet
 
 # 设置最小质押金额
 NEW_MIN_STAKE="5" npm run config:set-min-stake:testnet
+
+# 设置最大总质押量（0 表示无限制）
+NEW_MAX_TOTAL_STAKED="15000000" npm run config:set-max-total-staked:testnet
 ```
 
 ### 奖励池管理

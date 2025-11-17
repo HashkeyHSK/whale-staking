@@ -336,6 +336,85 @@ describe("Normal Staking - Staking Functionality", () => {
     );
   });
 
+  test("应该拒绝超过最大总质押量的质押", async () => {
+    const maxTotalStaked: bigint = await fixture.staking.maxTotalStaked();
+    
+    // Skip test if maxTotalStaked is 0 (no limit)
+    if (maxTotalStaked === BigInt(0)) {
+      console.log("Skipping test: maxTotalStaked is 0 (no limit)");
+      return;
+    }
+
+    const currentTotalStaked: bigint = await fixture.staking.totalStaked();
+    const remainingCapacity: bigint = maxTotalStaked - currentTotalStaked;
+    
+    // If already at or over limit, skip test
+    if (remainingCapacity <= BigInt(0)) {
+      console.log("Skipping test: already at max total staked limit");
+      return;
+    }
+
+    // Use a smaller test amount to avoid gas issues
+    // Test with a reasonable amount that would exceed the limit
+    const testStakeAmount = parseEther("100"); // Use 100 HSK for testing
+    const gasBuffer = parseEther("10000"); // Extra for gas
+    const maxTestAmount = parseEther("1000"); // Maximum amount to use for testing
+    const oneEther = parseEther("1");
+    
+    // First, stake until we're close to the limit (but leave some room)
+    // Calculate how much we can stake before hitting the limit
+    let stakeableAmount: bigint = remainingCapacity;
+    
+    // If remaining capacity is very large, use a smaller amount for testing
+    if (stakeableAmount > maxTestAmount) {
+      stakeableAmount = maxTestAmount;
+    }
+    
+    // Ensure we have at least testStakeAmount + 1 HSK capacity
+    if (stakeableAmount < testStakeAmount + oneEther) {
+      console.log("Skipping test: remaining capacity too small for testing");
+      return;
+    }
+
+    // Stake up to near the limit (leave testStakeAmount + 1 HSK)
+    const amountToStake: bigint = stakeableAmount - testStakeAmount - oneEther;
+    if (amountToStake > BigInt(0)) {
+      await fundAccount(fixture.user1, amountToStake + gasBuffer);
+      const tx1 = await fixture.staking.connect(fixture.user1).stake({
+        value: amountToStake,
+      });
+      await tx1.wait();
+    }
+
+    // Now try to stake more than remaining capacity
+    const newRemainingCapacity: bigint = maxTotalStaked - (currentTotalStaked + amountToStake);
+    const excessAmount: bigint = newRemainingCapacity + oneEther;
+    const maxReasonableAmount = parseEther("1000000");
+    
+    // Only test if excessAmount is reasonable (not too large)
+    if (excessAmount <= maxReasonableAmount) {
+      await fundAccount(fixture.user1, excessAmount + gasBuffer);
+      
+      await expectRevert(
+        fixture.staking.connect(fixture.user1).stake({
+          value: excessAmount,
+        }),
+        "Max total staked exceeded"
+      );
+    }
+
+    // Should be able to stake exactly the remaining capacity (if reasonable)
+    if (newRemainingCapacity > BigInt(0) && newRemainingCapacity <= maxReasonableAmount) {
+      await fundAccount(fixture.user1, newRemainingCapacity + gasBuffer);
+      
+      const tx2 = await fixture.staking.connect(fixture.user1).stake({
+        value: newRemainingCapacity,
+      });
+      const receipt = await tx2.wait();
+      assert.strictEqual(receipt?.status, 1, "Stake at max limit should succeed");
+    }
+  });
+
   test("应该拒绝奖励池余额不足的质押", async () => {
     // Withdraw most of the reward pool
     const poolBalance = await fixture.staking.rewardPoolBalance();

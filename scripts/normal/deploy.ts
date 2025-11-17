@@ -35,6 +35,7 @@ async function main() {
   const minStakeAmount = ethers.parseEther(NORMAL_STAKING_CONFIG.minStakeAmount);
   const rewardRate = NORMAL_STAKING_CONFIG.rewardRate;
   const whitelistMode = NORMAL_STAKING_CONFIG.whitelistMode;  // false for Normal Staking
+  const maxTotalStaked = ethers.parseEther(NORMAL_STAKING_CONFIG.maxTotalStaked);
   
   // Read Unix timestamps from environment variables
   const stakeStartTimeStr = process.env.STAKE_START_TIME;
@@ -80,6 +81,7 @@ async function main() {
   console.log("\nInitialization parameters:");
   console.log(`  - Min stake amount: ${ethers.formatEther(minStakeAmount)} HSK`);
   console.log(`  - APY: ${rewardRate / 100}%`);
+  console.log(`  - Max total staked: ${ethers.formatEther(maxTotalStaked)} HSK`);
   console.log(`  - Stake start time: ${new Date(stakeStartTime * 1000).toISOString()}`);
   console.log(`  - Stake end time: ${new Date(stakeEndTime * 1000).toISOString()}`);
   console.log(`  - Lock period: 365 days (fixed)`);
@@ -92,6 +94,7 @@ async function main() {
     stakeStartTime,
     stakeEndTime,
     whitelistMode,  // false - whitelist disabled, everyone can stake
+    maxTotalStaked, // Maximum total staked amount (10 million HSK)
   ]);
 
   // 4. Deploy Transparent Proxy contract

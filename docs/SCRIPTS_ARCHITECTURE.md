@@ -107,7 +107,7 @@
 
 **状态查询**
 - `positions(uint256 positionId)`: 查询 position 详情
-- `userPositions(address user)`: 查询用户的所有 positionId 数组
+- `getUserPositionIds(address user)`: 查询用户的所有 positionId 数组（推荐方法）
 - `whitelisted(address user)`: 查询用户是否在白名单中
 - `minStakeAmount()`: 查询最小质押金额
 - `rewardRate()`: 查询奖励率（basis points）
