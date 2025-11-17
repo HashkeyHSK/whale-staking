@@ -16,13 +16,13 @@ describe("Normal Staking - Deployment", () => {
     fixture = await createTestFixture();
   });
 
-  test("应该正确部署 Normal Staking 合约", async () => {
+  test("should deploy Normal Staking contract correctly", async () => {
     assert.ok(fixture.staking !== undefined, "Staking contract should be deployed");
     const address = await fixture.staking.getAddress();
     assert.ok(address !== undefined && address !== "", "Staking contract should have an address");
   });
 
-  test("应该正确初始化合约参数", async () => {
+  test("should initialize contract parameters correctly", async () => {
     const minStake = await fixture.staking.minStakeAmount();
     const rewardRate = await fixture.staking.rewardRate();
     const maxTotalStaked = await fixture.staking.maxTotalStaked();
@@ -32,12 +32,12 @@ describe("Normal Staking - Deployment", () => {
     expectBigIntEqual(maxTotalStaked, parseEther("10000000"), "Normal max total staked should be 10,000,000 HSK");
   });
 
-  test("应该正确设置白名单模式为关闭", async () => {
+  test("should set whitelist mode to disabled correctly", async () => {
     const whitelistMode = await fixture.staking.onlyWhitelistCanStake();
     assert.strictEqual(whitelistMode, false, "Whitelist mode should be disabled");
   });
 
-  test("应该正确设置质押时间窗口", async () => {
+  test("should set staking time window correctly", async () => {
     const startTime = await fixture.staking.stakeStartTime();
     const endTime = await fixture.staking.stakeEndTime();
 
@@ -45,7 +45,7 @@ describe("Normal Staking - Deployment", () => {
     assert.ok(endTime > startTime, "End time should be greater than start time");
   });
 
-  test("应该正确初始化状态变量", async () => {
+  test("should initialize state variables correctly", async () => {
     const totalStaked = await fixture.staking.totalStaked();
     const nextPositionId = await fixture.staking.nextPositionId();
 
@@ -54,7 +54,7 @@ describe("Normal Staking - Deployment", () => {
     assert.strictEqual(nextPositionId.toString(), "1", "Next position ID should start at 1");
   });
 
-  test("应该拒绝无效的初始化参数", async () => {
+  test("should reject invalid initialization parameters", async () => {
     // This test verifies that the contract rejects invalid initialization
     // Since we're using a proxy, we test by trying to deploy with invalid params
     const ethers = await getEthers();
@@ -81,7 +81,7 @@ describe("Normal Staking - Deployment", () => {
     );
   });
 
-  test("应该正确设置 owner", async () => {
+  test("should set owner correctly", async () => {
     const owner = await fixture.staking.owner();
     expectAddressEqual(
       owner,

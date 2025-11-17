@@ -15,7 +15,7 @@ describe("Premium Staking - Whitelist Management", () => {
     fixture = await createPremiumTestFixture();
   });
 
-  test("Owner 应该能够批量添加白名单", async () => {
+  test("Owner should be able to batch add whitelist", async () => {
     const user1Address = await fixture.user1.getAddress();
     const user2Address = await fixture.user2.getAddress();
     
@@ -42,7 +42,7 @@ describe("Premium Staking - Whitelist Management", () => {
     }
   });
 
-  test("Owner 应该能够批量移除白名单", async () => {
+  test("Owner should be able to batch remove whitelist", async () => {
     const user1Address = await fixture.user1.getAddress();
     
     // First add to whitelist
@@ -59,7 +59,7 @@ describe("Premium Staking - Whitelist Management", () => {
     assert.strictEqual(receipt?.status, 1, "Remove whitelist transaction should succeed");
   });
 
-  test("应该正确更新 whitelisted 映射", async () => {
+  test("should update whitelisted mapping correctly", async () => {
     const user1Address = await fixture.user1.getAddress();
     
     // Add to whitelist
@@ -113,7 +113,7 @@ describe("Premium Staking - Whitelist Management", () => {
     assert.strictEqual(isWhitelistedAfter, false, "User should not be whitelisted");
   });
 
-  test("应该正确触发 WhitelistStatusChanged 事件", async () => {
+  test("should emit WhitelistStatusChanged event correctly", async () => {
     const user1Address = await fixture.user1.getAddress();
     
     const tx = await fixture.staking
@@ -140,7 +140,7 @@ describe("Premium Staking - Whitelist Management", () => {
     assert.strictEqual(receipt?.status, 1, "Transaction should succeed");
   });
 
-  test("应该拒绝非 owner 管理白名单", async () => {
+  test("should reject whitelist management from non-owner", async () => {
     const user1Address = await fixture.user1.getAddress();
     
     await expectRevert(
@@ -151,7 +151,7 @@ describe("Premium Staking - Whitelist Management", () => {
     );
   });
 
-  test("应该拒绝超过 100 个地址的批量操作", async () => {
+  test("should reject batch operations exceeding 100 addresses", async () => {
     const addresses: string[] = [];
     const signers = await getEthers().then(e => e.getSigners());
     
@@ -173,7 +173,7 @@ describe("Premium Staking - Whitelist Management", () => {
     );
   });
 
-  test("Owner 应该能够切换白名单模式", async () => {
+  test("Owner should be able to toggle whitelist mode", async () => {
     const initialMode = await fixture.staking.onlyWhitelistCanStake();
     assert.strictEqual(initialMode, true, "Initial mode should be enabled");
     
@@ -218,7 +218,7 @@ describe("Premium Staking - Whitelist Management", () => {
       .setWhitelistOnlyMode(true);
   });
 
-  test("应该正确触发 WhitelistModeChanged 事件", async () => {
+  test("should emit WhitelistModeChanged event correctly", async () => {
     const tx = await fixture.staking
       .connect(fixture.admin)
       .setWhitelistOnlyMode(false);
@@ -244,7 +244,7 @@ describe("Premium Staking - Whitelist Management", () => {
       .setWhitelistOnlyMode(true);
   });
 
-  test("应该拒绝非 owner 切换白名单模式", async () => {
+  test("should reject toggling whitelist mode from non-owner", async () => {
     await expectRevert(
       fixture.staking
         .connect(fixture.user1)
@@ -253,7 +253,7 @@ describe("Premium Staking - Whitelist Management", () => {
     );
   });
 
-  test("白名单用户应该能够质押", async () => {
+  test("whitelisted users should be able to stake", async () => {
     const user1Address = await fixture.user1.getAddress();
     
     // Add user1 to whitelist
@@ -291,7 +291,7 @@ describe("Premium Staking - Whitelist Management", () => {
     assert.strictEqual(receipt?.status, 1, "Stake transaction should succeed");
   });
 
-  test("非白名单用户应该无法质押", async () => {
+  test("non-whitelisted users should not be able to stake", async () => {
     const user2Address = await fixture.user2.getAddress();
     
     // Ensure user2 is not whitelisted
@@ -323,7 +323,7 @@ describe("Premium Staking - Whitelist Management", () => {
     );
   });
 
-  test("应该正确处理白名单模式关闭后的质押", async () => {
+  test("should handle staking after whitelist mode is disabled correctly", async () => {
     const user2Address = await fixture.user2.getAddress();
     
     // Disable whitelist mode

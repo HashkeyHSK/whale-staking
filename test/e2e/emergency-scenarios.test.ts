@@ -38,7 +38,7 @@ describe("Normal Staking - Emergency Scenarios", () => {
     }
   });
 
-  test("紧急模式启用后的用户提取流程", async () => {
+  test("user withdrawal flow after emergency mode enabled", async () => {
     // User stakes
     const stakeAmount = parseEther("1000");
     await fixture.staking.connect(fixture.user1).stake({
@@ -101,7 +101,7 @@ describe("Normal Staking - Emergency Scenarios", () => {
     );
   });
 
-  test("暂停和恢复流程", async () => {
+  test("pause and resume flow", async () => {
     // Pause contract
     const txPause = await fixture.staking.connect(fixture.admin).pause();
     const receiptPause = await txPause.wait();
@@ -155,7 +155,7 @@ describe("Normal Staking - Emergency Scenarios", () => {
     await fixture.staking.connect(fixture.user1).claimReward(positionId);
   });
 
-  test("奖励池管理流程", async () => {
+  test("reward pool management flow", async () => {
     // Add reward pool
     const rewardAmount = parseEther("10000");
     await fixture.staking.connect(fixture.admin).updateRewardPool({

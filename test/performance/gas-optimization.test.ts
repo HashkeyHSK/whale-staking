@@ -34,7 +34,7 @@ describe("Normal Staking - Gas Optimization", () => {
     }
   });
 
-  test("质押操作的 Gas 消耗", async () => {
+  test("gas consumption for staking operation", async () => {
     const stakeAmount = parseEther("10");
     const tx = await fixture.staking.connect(fixture.user1).stake({
       value: stakeAmount,
@@ -50,7 +50,7 @@ describe("Normal Staking - Gas Optimization", () => {
     }
   });
 
-  test("解除质押操作的 Gas 消耗", async () => {
+  test("gas consumption for unstaking operation", async () => {
     const stakeAmount = parseEther("100");
     await fixture.staking.connect(fixture.user1).stake({
       value: stakeAmount,
@@ -73,7 +73,7 @@ describe("Normal Staking - Gas Optimization", () => {
     }
   });
 
-  test("领取奖励操作的 Gas 消耗", async () => {
+  test("gas consumption for claim rewards operation", async () => {
     const stakeAmount = parseEther("1000");
     await fixture.staking.connect(fixture.user1).stake({
       value: stakeAmount,
@@ -96,7 +96,7 @@ describe("Normal Staking - Gas Optimization", () => {
     }
   });
 
-  test("批量操作的 Gas 消耗", async () => {
+  test("gas consumption for batch operations", async () => {
     // Test multiple stakes
     const stakeAmount = parseEther("10");
     const numStakes = 5;

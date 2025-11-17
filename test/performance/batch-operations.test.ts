@@ -42,7 +42,7 @@ describe("Normal Staking - Batch Operations Performance", () => {
     }
   });
 
-  test("批量质押性能", async () => {
+  test("batch staking performance", async () => {
     const stakeAmount = parseEther("10");
     const numStakes = 20;
 
@@ -86,7 +86,7 @@ describe("Normal Staking - Batch Operations Performance", () => {
     assert.fail("Some transactions failed");
   });
 
-  test("批量解除质押性能", async () => {
+  test("batch unstaking performance", async () => {
     const stakeAmount = parseEther("10");
     const numStakes = 10;
 
@@ -141,7 +141,7 @@ describe("Normal Staking - Batch Operations Performance", () => {
     expectBigIntEqual(totalStaked, BigInt(0));
   });
 
-  test("批量领取奖励性能", async () => {
+  test("batch claim rewards performance", async () => {
     const stakeAmount = parseEther("100");
     const numStakes = 10;
 
@@ -248,7 +248,7 @@ describe("Normal Staking - Batch Operations Performance", () => {
     assert.fail("Some transactions failed");
   });
 
-  test("多用户并发操作性能", async () => {
+  test("multi-user concurrent operations performance", async () => {
     const stakeAmount = parseEther("10");
     const stakesPerUser = 5;
 

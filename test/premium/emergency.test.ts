@@ -50,7 +50,7 @@ describe("Premium Staking - Emergency Withdrawal", () => {
     }
   });
 
-  test("应该能够在紧急模式下提取本金", async () => {
+  test("should allow emergency withdrawal of principal in emergency mode", async () => {
     const stakeAmount = parseEther("100");
     await fixture.staking.connect(fixture.user1).stake({
       value: stakeAmount,
@@ -97,7 +97,7 @@ describe("Premium Staking - Emergency Withdrawal", () => {
     );
   });
 
-  test("应该拒绝非紧急模式下的紧急提取", async () => {
+  test("should reject emergency withdrawal when not in emergency mode", async () => {
     const stakeAmount = parseEther("100");
     await fixture.staking.connect(fixture.user1).stake({
       value: stakeAmount,
@@ -112,7 +112,7 @@ describe("Premium Staking - Emergency Withdrawal", () => {
     );
   });
 
-  test("应该只提取本金，不含奖励", async () => {
+  test("should withdraw only principal, excluding rewards", async () => {
     const stakeAmount = parseEther("1000"); // Reduced for testing
     await fundAccount(fixture.user1, stakeAmount + parseEther("10000000")); // Extra for gas
     await fixture.staking.connect(fixture.user1).stake({
@@ -160,7 +160,7 @@ describe("Premium Staking - Emergency Withdrawal", () => {
     expectBigIntEqual(balanceIncrease, stakeAmount, "Should receive only stake amount");
   });
 
-  test("应该正确更新 totalStaked", async () => {
+  test("should update totalStaked correctly", async () => {
     const stakeAmount = parseEther("100");
     await fixture.staking.connect(fixture.user1).stake({
       value: stakeAmount,
@@ -201,7 +201,7 @@ describe("Premium Staking - Emergency Withdrawal", () => {
     );
   });
 
-  test("应该正确标记 position 为已解除", async () => {
+  test("should mark position as unstaked correctly", async () => {
     const stakeAmount = parseEther("100");
     await fixture.staking.connect(fixture.user1).stake({
       value: stakeAmount,
@@ -243,7 +243,7 @@ describe("Premium Staking - Emergency Withdrawal", () => {
     assert.strictEqual(position.isUnstaked, true);
   });
 
-  test("应该正确触发 EmergencyWithdrawn 事件", async () => {
+  test("should emit EmergencyWithdrawn event correctly", async () => {
     const stakeAmount = parseEther("100");
     await fixture.staking.connect(fixture.user1).stake({
       value: stakeAmount,
@@ -321,7 +321,7 @@ describe("Premium Staking - Emergency Withdrawal", () => {
     }
   });
 
-  test("应该拒绝非 position 所有者的紧急提取", async () => {
+  test("should reject emergency withdrawal from non-position owner", async () => {
     const stakeAmount = parseEther("100");
     await fixture.staking.connect(fixture.user1).stake({
       value: stakeAmount,
@@ -338,7 +338,7 @@ describe("Premium Staking - Emergency Withdrawal", () => {
     );
   });
 
-  test("应该拒绝不存在的 position", async () => {
+  test("should reject emergency withdrawal for non-existent position", async () => {
     const invalidPositionId = 99999;
 
     // Enable emergency mode
@@ -350,7 +350,7 @@ describe("Premium Staking - Emergency Withdrawal", () => {
     );
   });
 
-  test("应该拒绝已解除的 position", async () => {
+  test("should reject emergency withdrawal for already unstaked position", async () => {
     const stakeAmount = parseEther("100");
     await fixture.staking.connect(fixture.user1).stake({
       value: stakeAmount,
@@ -371,7 +371,7 @@ describe("Premium Staking - Emergency Withdrawal", () => {
     );
   });
 
-  test("应该正确更新 totalPendingRewards", async () => {
+  test("should update totalPendingRewards correctly", async () => {
     const stakeAmount = parseEther("100");
     await fixture.staking.connect(fixture.user1).stake({
       value: stakeAmount,

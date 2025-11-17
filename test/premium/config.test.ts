@@ -16,7 +16,7 @@ describe("Premium Staking - Configuration Management", () => {
     fixture = await createPremiumTestFixture();
   });
 
-  test("Owner 应该能够暂停合约", async () => {
+  test("Owner should be able to pause contract", async () => {
     // Verify admin is owner
     const owner = await fixture.staking.owner();
     const adminAddress = await fixture.admin.getAddress();
@@ -74,7 +74,7 @@ describe("Premium Staking - Configuration Management", () => {
     }
   });
 
-  test("Owner 应该能够恢复合约", async () => {
+  test("Owner should be able to unpause contract", async () => {
     await fixture.staking.connect(fixture.admin).pause();
     await fixture.staking.connect(fixture.admin).unpause();
 
@@ -82,7 +82,7 @@ describe("Premium Staking - Configuration Management", () => {
     assert.strictEqual(isPaused, false);
   });
 
-  test("应该正确触发 StakingPaused 事件", async () => {
+  test("should emit StakingPaused event correctly", async () => {
     const tx = await fixture.staking.connect(fixture.admin).pause();
     const receipt = await tx.wait();
 
@@ -113,7 +113,7 @@ describe("Premium Staking - Configuration Management", () => {
     }
   });
 
-  test("应该正确触发 StakingUnpaused 事件", async () => {
+  test("should emit StakingUnpaused event correctly", async () => {
     await fixture.staking.connect(fixture.admin).pause();
     
     const tx = await fixture.staking.connect(fixture.admin).unpause();
@@ -141,14 +141,14 @@ describe("Premium Staking - Configuration Management", () => {
     }
   });
 
-  test("应该拒绝非 owner 暂停合约", async () => {
+  test("should reject pausing contract from non-owner", async () => {
     await expectRevert(
       fixture.staking.connect(fixture.user1).pause(),
       "Ownable: caller is not the owner"
     );
   });
 
-  test("Owner 应该能够设置最小质押金额", async () => {
+  test("Owner should be able to set minimum stake amount", async () => {
     const newAmount = parseEther("600000");
     const oldAmount = await fixture.staking.minStakeAmount();
 
@@ -186,7 +186,7 @@ describe("Premium Staking - Configuration Management", () => {
     }
   });
 
-  test("应该正确触发 MinStakeAmountUpdated 事件", async () => {
+  test("should emit MinStakeAmountUpdated event correctly", async () => {
     const newAmount = parseEther("600000");
     const oldAmount = await fixture.staking.minStakeAmount();
 
@@ -217,7 +217,7 @@ describe("Premium Staking - Configuration Management", () => {
     }
   });
 
-  test("应该拒绝紧急模式下设置最小质押金额", async () => {
+  test("should reject setting minimum stake amount in emergency mode", async () => {
     await fixture.staking.connect(fixture.admin).enableEmergencyMode();
 
     await expectRevert(
@@ -228,7 +228,7 @@ describe("Premium Staking - Configuration Management", () => {
     );
   });
 
-  test("Owner 应该能够设置最大总质押量", async () => {
+  test("Owner should be able to set max total staked", async () => {
     const newAmount = parseEther("25000000"); // 15 million HSK
     const oldAmount = await fixture.staking.maxTotalStaked();
 
@@ -262,7 +262,7 @@ describe("Premium Staking - Configuration Management", () => {
     }
   });
 
-  test("应该正确触发 MaxTotalStakedUpdated 事件", async () => {
+  test("should emit MaxTotalStakedUpdated event correctly", async () => {
     const newAmount = parseEther("25000000");
     const oldAmount = await fixture.staking.maxTotalStaked();
 
@@ -290,7 +290,7 @@ describe("Premium Staking - Configuration Management", () => {
     }
   });
 
-  test("Owner 应该能够设置质押开始时间", async () => {
+  test("Owner should be able to set stake start time", async () => {
     const endTime = await fixture.staking.stakeEndTime();
     const currentTime = BigInt(Math.floor(Date.now() / 1000));
     // Set new start time to be before end time but after current time
@@ -326,7 +326,7 @@ describe("Premium Staking - Configuration Management", () => {
     }
   });
 
-  test("应该正确触发 StakeStartTimeUpdated 事件", async () => {
+  test("should emit StakeStartTimeUpdated event correctly", async () => {
     const endTime = await fixture.staking.stakeEndTime();
     const currentTime = BigInt(Math.floor(Date.now() / 1000));
     const newStartTime = endTime > currentTime + BigInt(86400 * 2) 
@@ -362,7 +362,7 @@ describe("Premium Staking - Configuration Management", () => {
     }
   });
 
-  test("应该拒绝无效的开始时间", async () => {
+  test("should reject invalid start time", async () => {
     const endTime = await fixture.staking.stakeEndTime();
     const invalidStartTime = endTime + BigInt(1); // After end time
 
@@ -372,7 +372,7 @@ describe("Premium Staking - Configuration Management", () => {
     );
   });
 
-  test("Owner 应该能够设置质押结束时间", async () => {
+  test("Owner should be able to set stake end time", async () => {
     const startTime = await fixture.staking.stakeStartTime();
     const currentTime = BigInt(Math.floor(Date.now() / 1000));
     // Set new end time to be after start time
@@ -408,7 +408,7 @@ describe("Premium Staking - Configuration Management", () => {
     }
   });
 
-  test("应该正确触发 StakeEndTimeUpdated 事件", async () => {
+  test("should emit StakeEndTimeUpdated event correctly", async () => {
     const startTime = await fixture.staking.stakeStartTime();
     const currentTime = BigInt(Math.floor(Date.now() / 1000));
     const newEndTime = startTime > currentTime 
@@ -444,7 +444,7 @@ describe("Premium Staking - Configuration Management", () => {
     }
   });
 
-  test("应该拒绝无效的结束时间", async () => {
+  test("should reject invalid end time", async () => {
     const startTime = await fixture.staking.stakeStartTime();
     const invalidEndTime = startTime - BigInt(1); // Before start time
 
@@ -454,7 +454,7 @@ describe("Premium Staking - Configuration Management", () => {
     );
   });
 
-  test("Owner 应该能够启用紧急模式", async () => {
+  test("Owner should be able to enable emergency mode", async () => {
     const tx = await fixture.staking.connect(fixture.admin).enableEmergencyMode();
     const receipt = await tx.wait();
     assert.strictEqual(receipt?.status, 1, "EnableEmergencyMode transaction should succeed");
@@ -479,7 +479,7 @@ describe("Premium Staking - Configuration Management", () => {
     }
   });
 
-  test("应该正确触发 EmergencyModeEnabled 事件", async () => {
+  test("should emit EmergencyModeEnabled event correctly", async () => {
     const tx = await fixture.staking.connect(fixture.admin).enableEmergencyMode();
     const receipt = await tx.wait();
 
@@ -505,14 +505,14 @@ describe("Premium Staking - Configuration Management", () => {
     }
   });
 
-  test("应该拒绝非 owner 启用紧急模式", async () => {
+  test("should reject enabling emergency mode from non-owner", async () => {
     await expectRevert(
       fixture.staking.connect(fixture.user1).enableEmergencyMode(),
       "Ownable: caller is not the owner"
     );
   });
 
-  test("紧急模式应该不可逆", async () => {
+  test("emergency mode should be irreversible", async () => {
     const txEnable = await fixture.staking.connect(fixture.admin).enableEmergencyMode();
     const receiptEnable = await txEnable.wait();
     assert.strictEqual(receiptEnable?.status, 1, "EnableEmergencyMode transaction should succeed");

@@ -17,7 +17,7 @@ describe("Normal Staking - Reward Pool Management", () => {
     await fundAccount(fixture.admin, parseEther("20000"));
   });
 
-  test("Owner 应该能够添加奖励池资金", async () => {
+  test("Owner should be able to add reward pool funds", async () => {
     const owner = await fixture.staking.owner();
     const adminAddress = await fixture.admin.getAddress();
     const proxyAddress = await fixture.staking.getAddress();
@@ -61,7 +61,7 @@ describe("Normal Staking - Reward Pool Management", () => {
     }
   });
 
-  test("应该正确更新 rewardPoolBalance", async () => {
+  test("should update rewardPoolBalance correctly", async () => {
     const rewardAmount = parseEther("1000");
     const initialBalance = await fixture.staking.rewardPoolBalance();
 
@@ -89,7 +89,7 @@ describe("Normal Staking - Reward Pool Management", () => {
     );
   });
 
-  test("应该正确触发 RewardPoolUpdated 事件", async () => {
+  test("should emit RewardPoolUpdated event correctly", async () => {
     const rewardAmount = parseEther("1000");
     const balanceBefore = await fixture.staking.rewardPoolBalance();
 
@@ -120,7 +120,7 @@ describe("Normal Staking - Reward Pool Management", () => {
     }
   });
 
-  test("应该拒绝非 owner 添加奖励池", async () => {
+  test("should reject adding reward pool from non-owner", async () => {
     await fundAccount(fixture.user1, parseEther("1000"));
 
     await expectRevert(
@@ -131,7 +131,7 @@ describe("Normal Staking - Reward Pool Management", () => {
     );
   });
 
-  test("Owner 应该能够提取多余奖励", async () => {
+  test("Owner should be able to withdraw excess rewards", async () => {
     // Add reward pool
     await fixture.staking.connect(fixture.admin).updateRewardPool({
       value: parseEther("10000"),
@@ -179,7 +179,7 @@ describe("Normal Staking - Reward Pool Management", () => {
     }
   });
 
-  test("应该拒绝提取已预留的奖励", async () => {
+  test("should reject withdrawing reserved rewards", async () => {
     // Add reward pool
     await fixture.staking.connect(fixture.admin).updateRewardPool({
       value: parseEther("10000"),
@@ -218,7 +218,7 @@ describe("Normal Staking - Reward Pool Management", () => {
     }
   });
 
-  test("应该拒绝非 owner 提取奖励", async () => {
+  test("should reject withdrawing rewards from non-owner", async () => {
     await fundAccount(fixture.user1, parseEther("1000"));
 
     await expectRevert(

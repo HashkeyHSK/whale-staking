@@ -52,7 +52,7 @@ describe("Premium Staking - Unstaking Functionality", () => {
     }
   });
 
-  test("应该正确解除质押（锁定期后）", async () => {
+  test("should unstake correctly after lock period", async () => {
     const stakeAmount = parseEther("100");
     await fixture.staking.connect(fixture.user1).stake({
       value: stakeAmount,
@@ -95,7 +95,7 @@ describe("Premium Staking - Unstaking Functionality", () => {
     }
   });
 
-  test("应该拒绝锁定期内的解除质押", async () => {
+  test("should reject unstaking during lock period", async () => {
     const stakeAmount = parseEther("100");
     await fixture.staking.connect(fixture.user1).stake({
       value: stakeAmount,
@@ -110,7 +110,7 @@ describe("Premium Staking - Unstaking Functionality", () => {
     );
   });
 
-  test("应该自动领取所有累积奖励", async () => {
+  test("should automatically claim all accumulated rewards", async () => {
     const stakeAmount = parseEther("1000"); // Reduced for testing
     await fundAccount(fixture.user1, stakeAmount + parseEther("100000000")); // Extra for gas
     await fixture.staking.connect(fixture.user1).stake({
@@ -158,7 +158,7 @@ describe("Premium Staking - Unstaking Functionality", () => {
     }
   });
 
-  test("应该正确返还本金", async () => {
+  test("should return principal correctly", async () => {
     const stakeAmount = parseEther("100");
     await fixture.staking.connect(fixture.user1).stake({
       value: stakeAmount,
@@ -202,7 +202,7 @@ describe("Premium Staking - Unstaking Functionality", () => {
     }
   });
 
-  test("应该正确更新 totalStaked", async () => {
+  test("should update totalStaked correctly", async () => {
     const stakeAmount = parseEther("100");
     const stakeTx = await fixture.staking.connect(fixture.user1).stake({
       value: stakeAmount,
@@ -261,7 +261,7 @@ describe("Premium Staking - Unstaking Functionality", () => {
     }
   });
 
-  test("应该正确标记 position 为已解除", async () => {
+  test("should mark position as unstaked correctly", async () => {
     const stakeAmount = parseEther("100");
     await fixture.staking.connect(fixture.user1).stake({
       value: stakeAmount,
@@ -290,7 +290,7 @@ describe("Premium Staking - Unstaking Functionality", () => {
     assert.strictEqual(position.isUnstaked, true);
   });
 
-  test("应该正确触发 PositionUnstaked 事件", async () => {
+  test("should emit PositionUnstaked event correctly", async () => {
     const stakeAmount = parseEther("100");
     await fixture.staking.connect(fixture.user1).stake({
       value: stakeAmount,
@@ -336,7 +336,7 @@ describe("Premium Staking - Unstaking Functionality", () => {
     }
   });
 
-  test("应该拒绝重复解除质押", async () => {
+  test("should reject duplicate unstaking", async () => {
     const stakeAmount = parseEther("100");
     await fixture.staking.connect(fixture.user1).stake({
       value: stakeAmount,
@@ -372,7 +372,7 @@ describe("Premium Staking - Unstaking Functionality", () => {
     );
   });
 
-  test("应该拒绝非 position 所有者的解除质押", async () => {
+  test("should reject unstaking from non-position owner", async () => {
     const stakeAmount = parseEther("100");
     await fixture.staking.connect(fixture.user1).stake({
       value: stakeAmount,
@@ -389,7 +389,7 @@ describe("Premium Staking - Unstaking Functionality", () => {
     );
   });
 
-  test("应该拒绝不存在的 position", async () => {
+  test("should reject unstaking non-existent position", async () => {
     const invalidPositionId = 99999;
 
     await expectRevert(
@@ -398,7 +398,7 @@ describe("Premium Staking - Unstaking Functionality", () => {
     );
   });
 
-  test("应该正确处理多个 position 的解除质押", async () => {
+  test("should handle unstaking multiple positions correctly", async () => {
     const stakeAmount1 = parseEther("100");
     const stakeAmount2 = parseEther("200");
 
@@ -452,7 +452,7 @@ describe("Premium Staking - Unstaking Functionality", () => {
     expectBigIntEqual(totalStaked, BigInt(0), "Total staked should be 0");
   });
 
-  test("应该拒绝暂停状态下的解除质押", async () => {
+  test("should reject unstaking when paused", async () => {
     const stakeAmount = parseEther("100");
     await fixture.staking.connect(fixture.user1).stake({
       value: stakeAmount,
@@ -502,7 +502,7 @@ describe("Premium Staking - Unstaking Functionality", () => {
     assert.strictEqual(unstakeReceipt?.status, 1, "Unstake should succeed after unpause");
   });
 
-  test("应该拒绝紧急状态下的解除质押", async () => {
+  test("should reject unstaking in emergency mode", async () => {
     const stakeAmount = parseEther("100");
     // Ensure user has enough balance
     await fundAccount(fixture.user1, stakeAmount + parseEther("10000000"));
