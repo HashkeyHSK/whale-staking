@@ -1,200 +1,188 @@
-# 双层 Staking 快速开始指南
+# Dual-Tier Staking Quick Start Guide
 
-## 🎯 快速部署
+## 🎯 Quick Deployment
 
-### 步骤 1: 编译合约
+### Step 1: Compile Contracts
 
 ```bash
+npm run compile
+# or
 npx hardhat compile
 ```
 
-### 步骤 2: 部署双层产品
+### Step 2: Deploy Dual-Tier Products
 
-选择以下任一方式：
-
-**方式一：一次性部署（推荐）**
+**Deploy Separately (Recommended)**
 
 ```bash
-npx hardhat run scripts/deployDualTier.ts --network hashkeyTestnet
+# Deploy Normal Staking (requires timestamps)
+STAKE_START_TIME="1735689600" STAKE_END_TIME="1767225600" npm run deploy:testnet
+
+# Deploy Premium Staking (requires timestamps)
+STAKE_START_TIME="1735689600" STAKE_END_TIME="1767225600" npm run deploy:premium:testnet
 ```
 
-**方式二：分别部署**
+**Note**: Must provide `STAKE_START_TIME` and `STAKE_END_TIME` environment variables at deployment (Unix timestamp, in seconds).
+
+After deployment, two contract addresses will be output, please save them:
 
 ```bash
-# 部署普通 Staking
-npx hardhat run scripts/deployNormalStaking.ts --network hashkeyTestnet
-
-# 部署 Premium Staking
-npx hardhat run scripts/deployPremiumStaking.ts --network hashkeyTestnet
-```
-
-部署后会输出两个合约地址，请保存：
-
-```bash
-# 示例输出
+# Example output
 export NORMAL_STAKING_ADDRESS=0x...
 export PREMIUM_STAKING_ADDRESS=0x...
 ```
 
-### 步骤 3: 配置 Premium Staking 白名单
+### Step 3: Configure Premium Staking Whitelist
 
-Premium Staking 产品需要白名单授权：
-
-```bash
-# 添加单个用户
-npx hardhat run scripts/addToWhitelist.ts --network hashkeyTestnet \
-  -- --contract $PREMIUM_STAKING_ADDRESS --user 0xYourUserAddress
-
-# 或批量添加
-npx hardhat run scripts/addToWhitelistBatch.ts --network hashkeyTestnet \
-  -- --contract $PREMIUM_STAKING_ADDRESS --users 0xUser1,0xUser2,0xUser3
-```
-
-### 步骤 4: 充值奖励池
-
-两个产品需要独立的奖励池：
+Premium Staking product requires whitelist authorization:
 
 ```bash
-# 为普通 Staking 充值（示例：1000 HSK）
-npx hardhat run scripts/add-rewards.ts --network hashkeyTestnet \
-  -- --contract $NORMAL_STAKING_ADDRESS --amount 1000
+# Batch add whitelist (max 100 addresses)
+WHITELIST_ADDRESSES="0x123...,0x456..." npm run whitelist:add-batch:premium:testnet
 
-# 为 Premium Staking 充值（示例：10000 HSK）
-npx hardhat run scripts/add-rewards.ts --network hashkeyTestnet \
-  -- --contract $PREMIUM_STAKING_ADDRESS --amount 10000
+# Batch remove whitelist
+WHITELIST_ADDRESSES="0x123...,0x456..." npm run whitelist:remove-batch:premium:testnet
 ```
 
-## 💰 用户质押示例
+### Step 4: Deposit to Reward Pools
 
-### 普通用户质押（普通 Staking）
+Both products need independent reward pools:
 
 ```bash
-# 质押 2000 HSK（锁定期固定365天，8% APY）
-npx hardhat run scripts/stake.ts --network hashkeyTestnet \
-  -- --contract $NORMAL_STAKING_ADDRESS \
-  --amount 2000
+# Deposit for Normal Staking (example: 10000 HSK)
+REWARD_AMOUNT="10000" npm run rewards:add:testnet
+
+# Deposit for Premium Staking (example: 20000 HSK)
+REWARD_AMOUNT="20000" npm run rewards:add:premium:testnet
 ```
 
-### 大户质押（Premium Staking）
+## 💰 User Staking Examples
+
+### Normal User Staking (Normal Staking)
 
 ```bash
-# 质押 600000 HSK（锁定期固定365天，16% APY）
-# 注意：需要先被添加到白名单
-npx hardhat run scripts/stake.ts --network hashkeyTestnet \
-  -- --contract $PREMIUM_STAKING_ADDRESS \
-  --amount 600000
+# Stake 2000 HSK (fixed 365-day lock period, 8% APY)
+STAKE_AMOUNT="2000" npm run stake:testnet
 ```
 
-## 📊 查询和监控
-
-### 查询用户质押情况
+### Whale Staking (Premium Staking)
 
 ```bash
-npx hardhat run scripts/checkStakes.ts --network hashkeyTestnet \
-  -- --contract $NORMAL_STAKING_ADDRESS \
-  --user 0xYourUserAddress
+# Stake 600000 HSK (fixed 365-day lock period, 16% APY)
+# Note: Must be added to whitelist first
+STAKE_AMOUNT="600000" npm run stake:premium:testnet
 ```
 
-### 查询合约配置
+## 📊 Queries and Monitoring
+
+### Query User Staking Status
 
 ```bash
-# 查看合约状态和配置
-npx hardhat run scripts/checkStakes.ts --network hashkeyTestnet \
-  -- --contract $NORMAL_STAKING_ADDRESS
+# Query user staking status
+npm run query:stakes:testnet
+
+# Query staking status for specific user
+USER_ADDRESS="0x..." npm run query:stakes:testnet
 ```
 
-**说明**: V2版本使用固定365天锁定期，无需查询锁定期选项。
-
-## ⚙️ 产品配置对比
-
-| 配置项 | 普通 Staking | Premium Staking |
-|--------|-------------|-----------|
-| 最小质押 | 1 HSK | 500,000 HSK |
-| 年化收益 | 8%（部署时配置） | 16%（部署时配置） |
-| 锁定期 | 365天（固定） | 365天（固定） |
-| 白名单 | 关闭 | 启用 |
-| 最大总质押 | 10,000,000 HSK（池子上限） | 20,000,000 HSK（池子上限） |
-
-## 🔧 管理员操作
-
-### 调整质押时间窗口
-
-**设置质押开始时间**：
+### Query Contract Configuration
 
 ```bash
-# 设置为当前时间（立即开始）
-const startTime = Math.floor(Date.now() / 1000);
-npx hardhat run scripts/setStakeStartTime.ts --network hashkeyTestnet \
-  -- --contract $CONTRACT_ADDRESS --startTime $startTime
+# View contract status and configuration
+npm run query:status:testnet
+
+# View Premium Staking contract status
+npm run query:status:premium:testnet
 ```
 
-**说明**：部署脚本默认设置开始时间为部署后7天，可以通过此脚本调整。
+**Note**: V2 version uses fixed 365-day lock period, no need to query lock period options.
 
-**设置质押截止时间**：
+## ⚙️ Product Configuration Comparison
+
+| Configuration | Normal Staking | Premium Staking |
+|---------------|---------------|----------------|
+| Minimum Stake | 1 HSK | 500,000 HSK |
+| Annual Yield | 8% (configured at deployment) | 16% (configured at deployment) |
+| Lock Period | 365 days (fixed) | 365 days (fixed) |
+| Whitelist | Disabled | Enabled |
+| Maximum Total Staked | 10,000,000 HSK (pool limit) | 20,000,000 HSK (pool limit) |
+
+## 🔧 Admin Operations
+
+### Adjust Staking Time Window
+
+**Set Staking Start Time**:
 
 ```bash
-# 设置 30 天后截止
-const endTime = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
-npx hardhat run scripts/setStakeEndTime.ts --network hashkeyTestnet \
-  -- --contract $CONTRACT_ADDRESS --endTime $endTime
+# Set staking start time (using Unix timestamp)
+START_TIME="1735689600" npm run config:set-start-time:testnet
 ```
 
-### 调整最大质押量
+**Note**: Must provide `STAKE_START_TIME` environment variable at deployment, can be adjusted via this script.
+
+**Set Staking End Time**:
 
 ```bash
-npx hardhat run scripts/setMaxStake.ts --network hashkeyTestnet \
-  -- --contract $CONTRACT_ADDRESS --max 20000000
+# Set staking end time (using Unix timestamp)
+END_TIME="1767225600" npm run config:set-end-time:testnet
 ```
 
-## 📝 注意事项
-
-1. **质押时间窗口**: 部署脚本默认设置开始时间为部署后7天，可以通过管理员函数调整
-2. **独立部署**: 两个产品是完全独立的合约实例
-3. **独立奖励池**: 每个产品需要独立的奖励池管理和充值
-4. **白名单管理**: Premium Staking 必须启用白名单，需要管理员授权
-5. **参数不可逆**: 已存在的质押位置不受配置更新影响
-6. **奖励计算**: 奖励计算逻辑相同，但收益率不同
-
-## 🆘 常见问题
-
-### Q: 如何修改现有脚本使用新的合约地址？
-
-A: 修改脚本中的合约地址，或使用命令行参数传入：
+### Adjust Maximum Total Staked
 
 ```bash
-npx hardhat run scripts/stake.ts --network hashkeyTestnet \
-  -- --contract <NEW_CONTRACT_ADDRESS> --amount 1000
+NEW_MAX_TOTAL_STAKED="20000000" npm run config:set-max-total-staked:testnet
 ```
 
-**说明**: V2版本使用固定365天锁定期，无需指定 period 参数。
+## 📝 Important Notes
 
-### Q: 如何检查白名单状态？
+1. **Staking Time Window**: Must provide `STAKE_START_TIME` and `STAKE_END_TIME` environment variables at deployment (Unix timestamp, in seconds), can be adjusted via admin functions
+2. **Independent Deployment**: Both products are completely independent contract instances
+3. **Independent Reward Pools**: Each product needs independent reward pool management and deposits
+4. **Whitelist Management**: Premium Staking must have whitelist enabled, requires admin authorization
+5. **Parameters are Irreversible**: Existing staking positions are not affected by configuration updates
+6. **Reward Calculation**: Reward calculation logic is the same, but yield rates differ
+
+## 🆘 Common Questions
+
+### Q: How to modify existing scripts to use new contract addresses?
+
+A: Modify contract addresses in scripts, or pass via command line parameters:
 
 ```bash
-npx hardhat run scripts/checkWhitelist.ts --network hashkeyTestnet \
-  -- --contract $PREMIUM_STAKING_ADDRESS --user 0xYourUserAddress
+# Use environment variables to specify contract address
+NORMAL_STAKING_ADDRESS="<NEW_CONTRACT_ADDRESS>" STAKE_AMOUNT="1000" npm run stake:testnet
 ```
 
-### Q: 如何修改锁定期或收益率？
+**Note**: V2 version uses fixed 365-day lock period, no need to specify period parameter.
 
-HSKStaking 采用固定锁定期（365天）和固定收益率设计，部署后不支持修改。
+### Q: How to check whitelist status?
 
-如需提供不同的锁定期或收益率配置，请部署新的合约实例。
+```bash
+# Query user whitelist status
+USER_ADDRESS="0x..." npm run whitelist:check-user:premium:testnet
 
-## 📚 更多文档
+# Query whitelist configuration and user status
+USER_ADDRESS="0x123...,0x456..." npm run query:check-whitelist:premium:testnet
+```
 
-- [主 README](../README.md)
-- [合约架构说明](./CONTRACT_ARCHITECTURE.md) - **合约架构详解（开发必读）**
-- [完整部署文档](./DUAL_TIER_STAKING.md) - 技术部署文档
-- [产品方案详细文档](./PRODUCT_PLANS.md) - **运营文档（推荐）**
-- [产品方案执行摘要](./PRODUCT_SUMMARY.md) - 快速了解
-- [产品开发文档](./PRODUCT_PLANS_DEV.md) - 开发团队文档
-- [技术常见问题](./TECHNICAL_FAQ.md) - 技术机制说明
-- [术语表](./GLOSSARY.md) - 术语定义
-- [错误处理指南](./ERROR_HANDLING.md) - 常见错误处理
+### Q: How to modify lock period or yield rate?
+
+HSKStaking uses fixed lock period (365 days) and fixed yield rate design, modification is not supported after deployment.
+
+If different lock periods or yield rate configurations are needed, deploy new contract instances.
+
+## 📚 More Documentation
+
+- [Main README](../README.md)
+- [Contract Architecture](./CONTRACT_ARCHITECTURE.md) - **Detailed contract architecture (required reading for developers)**
+- [Complete Deployment Documentation](./DUAL_TIER_STAKING.md) - Technical deployment documentation
+- [Product Plan Documentation](./PRODUCT_PLANS.md) - **Operations documentation (recommended)**
+- [Product Summary](./PRODUCT_SUMMARY.md) - Quick overview
+- [Product Development Documentation](./PRODUCT_PLANS_DEV.md) - Development team documentation
+- [Technical FAQ](./TECHNICAL_FAQ.md) - Technical mechanism explanations
+- [Error Handling Guide](./ERROR_HANDLING.md) - Common error handling
 
 ---
 
-**文档版本**: 1.0.0  
-**最后更新**: 2026-11
-
+**Document Version**: 1.0.0  
+**Maintainer**: HashKey Technical Team

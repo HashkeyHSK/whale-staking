@@ -1,411 +1,411 @@
-# Scripts 目录组织方案
+# Scripts Directory Organization Plan
 
-## 📋 目标
+## 📋 Objective
 
-将 `scripts/` 目录按照普通质押（Normal Staking）和高级质押（Premium Staking）进行分离，提高代码组织性和可维护性。
+Separate the `scripts/` directory by Normal Staking and Premium Staking to improve code organization and maintainability.
 
-## ⚠️ 重要说明 - 合约架构
+## ⚠️ Important Notes - Contract Architecture
 
-在开始之前，请了解以下关键信息：
+Before starting, please understand the following key information:
 
-### 合约架构特性
+### Contract Architecture Features
 
-1. **合约结构**: 
-   - `HSKStaking.sol` - 主实现合约（继承 StakingStorage、StakingConstants、ReentrancyGuardUpgradeable、PausableUpgradeable）
-   - `StakingStorage.sol` - 存储层（继承 Initializable、Ownable2StepUpgradeable）
-   - `StakingConstants.sol` - 常量定义合约
-   - `IStake.sol` - 接口定义
-   - `NormalStakingProxy.sol` / `PremiumStakingProxy.sol` - 代理合约
+1. **Contract Structure**: 
+   - `HSKStaking.sol` - Main implementation contract (inherits StakingStorage, StakingConstants, ReentrancyGuardUpgradeable, PausableUpgradeable)
+   - `StakingStorage.sol` - Storage layer (inherits Initializable, Ownable2StepUpgradeable)
+   - `StakingConstants.sol` - Constant definitions contract
+   - `IStake.sol` - Interface definition
+   - `NormalStakingProxy.sol` / `PremiumStakingProxy.sol` - Proxy contracts
 
-2. **代理模式**: Transparent Proxy（使用 OpenZeppelin 的 `TransparentUpgradeableProxy`）
-   - 可独立升级 Normal 和 Premium 质押池
-   - ProxyAdmin 用于管理代理合约升级
+2. **Proxy Pattern**: Transparent Proxy (using OpenZeppelin's `TransparentUpgradeableProxy`)
+   - Can independently upgrade Normal and Premium staking pools
+   - ProxyAdmin used to manage proxy contract upgrades
 
-3. **原生代币**: HSK 是链的原生代币（native token），类似于 ETH，不是 ERC20 代币
-   - 使用 `msg.value` 接收质押
-   - 使用 `call{value: amount}("")` 发送代币
+3. **Native Token**: HSK is the chain's native token (native token), similar to ETH, not an ERC20 token
+   - Uses `msg.value` to receive stakes
+   - Uses `call{value: amount}("")` to send tokens
 
-4. **锁定期**: 固定 365 天（`LOCK_PERIOD = 365 days`），在合约常量中定义，不可动态修改
+4. **Lock Period**: Fixed 365 days (`LOCK_PERIOD = 365 days`), defined in contract constants, cannot be dynamically modified
 
-5. **奖励率**: 在合约级别配置（`rewardRate` 状态变量），所有 position 共享同一个奖励率
-   - 使用 basis points 表示（800 = 8%，1600 = 16%）
+5. **Reward Rate**: Configured at contract level (`rewardRate` state variable), all positions share the same reward rate
+   - Expressed in basis points (800 = 8%, 1600 = 16%)
    - `BASIS_POINTS = 10000` (100% = 10000)
 
-6. **Position 结构**: 
+6. **Position Structure**: 
    
-   ⚠️ **注意**: Position 中不包含 `lockPeriod` 和 `rewardRate`，这些是合约级别的配置。
+   ⚠️ **Note**: Position does not contain `lockPeriod` and `rewardRate`, these are contract-level configurations.
 
-7. **合约常量** (StakingConstants.sol):
+7. **Contract Constants** (StakingConstants.sol):
    
 
-### 关键合约函数
+### Key Contract Functions
 
-**质押操作**
+**Staking Operations**
 - `stake() external payable returns (uint256)`: 
-  - 质押 HSK，使用 `msg.value` 发送原生代币
-  - 不需要传递 lockPeriod 参数（固定 365 天）
-  - 返回 positionId
-  - 需要满足：未暂停、在质押时间范围内、满足白名单要求（如启用）、非紧急模式
+  - Stake HSK, send native token using `msg.value`
+  - No need to pass lockPeriod parameter (fixed 365 days)
+  - Returns positionId
+  - Requires: not paused, within staking time range, meets whitelist requirements (if enabled), not in emergency mode
 - `unstake(uint256 positionId) external`: 
-  - 解除质押，自动领取所有累积奖励并返还本金
-  - 需要锁定期满（365 天）且 position 未被 unstake
+  - Unstake, automatically claim all accumulated rewards and return principal
+  - Requires lock period expired (365 days) and position not unstaked
 - `claimReward(uint256 positionId) external returns (uint256)`: 
-  - 领取指定位置的奖励，不解除质押
-  - 需要：未暂停、非紧急模式
-  - 返回领取的奖励金额
+  - Claim rewards for specified position, does not unstake
+  - Requires: not paused, not in emergency mode
+  - Returns claimed reward amount
 - `pendingReward(uint256 positionId) external view returns (uint256)`: 
-  - 查询指定位置的待领取奖励（只读函数）
-  - 紧急模式下返回 0
+  - Query pending rewards for specified position (read-only function)
+  - Returns 0 in emergency mode
 - `emergencyWithdraw(uint256 positionId) external`: 
-  - 紧急提取本金（仅在紧急模式下可用）
-  - 不含奖励，只返还本金
-  - 更新 totalPendingRewards 和 cachedAccruedRewards
+  - Emergency withdraw principal (only available in emergency mode)
+  - No rewards, only returns principal
+  - Updates totalPendingRewards and cachedAccruedRewards
 
-**奖励池管理**
+**Reward Pool Management**
 - `updateRewardPool() external payable`: 
-  - 向奖励池添加资金，使用 `msg.value` 发送 HSK
-  - 仅限 owner 调用
-  - 触发 `RewardPoolUpdated` 事件
+  - Add funds to reward pool, send HSK using `msg.value`
+  - Owner only
+  - Triggers `RewardPoolUpdated` event
 - `withdrawExcessRewardPool(uint256 amount) external`: 
-  - 提取多余的奖励池资金（超过 totalPendingRewards 的部分）
-  - 仅限 owner 调用
-  - 不能提取已预留的奖励
+  - Withdraw excess reward pool funds (portion exceeding totalPendingRewards)
+  - Owner only
+  - Cannot withdraw reserved rewards
 
-**白名单管理**
+**Whitelist Management**
 - `updateWhitelistBatch(address[] calldata users, bool status) external`: 
-  - 批量更新白名单（最多 100 个地址）
-  - 仅限 owner 调用
-  - `status = true` 添加，`status = false` 移除
-  - 触发 `WhitelistStatusChanged` 事件
+  - Batch update whitelist (max 100 addresses)
+  - Owner only
+  - `status = true` to add, `status = false` to remove
+  - Triggers `WhitelistStatusChanged` event
 - `setWhitelistOnlyMode(bool enabled) external`: 
-  - 启用/禁用白名单模式
-  - 仅限 owner 调用
-  - 触发 `WhitelistModeChanged` 事件
+  - Enable/disable whitelist mode
+  - Owner only
+  - Triggers `WhitelistModeChanged` event
 
-**合约配置**
+**Contract Configuration**
 - `setMinStakeAmount(uint256 newAmount) external`: 
-  - 设置最小质押金额
-  - 仅限 owner，且非紧急模式下可调用
+  - Set minimum staking amount
+  - Owner only, callable when not in emergency mode
 - `setStakeStartTime(uint256 newStartTime) external`: 
-  - 设置质押开始时间
-  - 需要 > 0 且 < stakeEndTime
-  - 仅限 owner 调用
+  - Set staking start time
+  - Requires > 0 and < stakeEndTime
+  - Owner only
 - `setStakeEndTime(uint256 newEndTime) external`: 
-  - 设置质押结束时间
-  - 需要 > block.timestamp 且 > stakeStartTime
-  - 仅限 owner 调用
+  - Set staking end time
+  - Requires > block.timestamp and > stakeStartTime
+  - Owner only
 - `pause() external`: 
-  - 暂停合约（禁止新质押和领取奖励）
-  - 仅限 owner 调用
+  - Pause contract (prohibits new staking and reward claiming)
+  - Owner only
 - `unpause() external`: 
-  - 恢复合约
-  - 仅限 owner 调用
+  - Resume contract
+  - Owner only
 - `enableEmergencyMode() external`: 
-  - 启用紧急模式（不可逆）
-  - 启用后用户只能调用 `emergencyWithdraw` 提取本金
-  - 仅限 owner 调用
+  - Enable emergency mode (irreversible)
+  - After enabling, users can only call `emergencyWithdraw` to withdraw principal
+  - Owner only
 
-**状态查询**
-- `positions(uint256 positionId)`: 查询 position 详情
-- `getUserPositionIds(address user)`: 查询用户的所有 positionId 数组（推荐方法）
-- `whitelisted(address user)`: 查询用户是否在白名单中
-- `minStakeAmount()`: 查询最小质押金额
-- `rewardRate()`: 查询奖励率（basis points）
-- `totalStaked()`: 查询总质押金额
-- `rewardPoolBalance()`: 查询奖励池余额
-- `totalPendingRewards()`: 查询总待领取奖励
-- `stakeStartTime()`: 查询质押开始时间
-- `stakeEndTime()`: 查询质押结束时间
-- `onlyWhitelistCanStake()`: 查询是否启用白名单模式
-- `emergencyMode()`: 查询是否处于紧急模式
-- `paused()`: 查询是否暂停
+**State Queries**
+- `positions(uint256 positionId)`: Query position details
+- `getUserPositionIds(address user)`: Query all positionId array for user (recommended method)
+- `whitelisted(address user)`: Query if user is in whitelist
+- `minStakeAmount()`: Query minimum staking amount
+- `rewardRate()`: Query reward rate (basis points)
+- `totalStaked()`: Query total staked amount
+- `rewardPoolBalance()`: Query reward pool balance
+- `totalPendingRewards()`: Query total pending rewards
+- `stakeStartTime()`: Query staking start time
+- `stakeEndTime()`: Query staking end time
+- `onlyWhitelistCanStake()`: Query if whitelist mode is enabled
+- `emergencyMode()`: Query if in emergency mode
+- `paused()`: Query if paused
 
-**合约事件**
-- `PositionCreated(address indexed user, uint256 indexed positionId, uint256 amount, uint256 lockPeriod, uint256 timestamp)`: 质押创建
-- `PositionUnstaked(address indexed user, uint256 indexed positionId, uint256 amount, uint256 timestamp)`: 解除质押
-- `RewardClaimed(address indexed user, uint256 indexed positionId, uint256 amount, uint256 timestamp)`: 奖励领取
-- `StakingPaused(address indexed operator, uint256 timestamp)`: 合约暂停
-- `StakingUnpaused(address indexed operator, uint256 timestamp)`: 合约恢复
-- `EmergencyWithdrawn(address indexed user, uint256 indexed positionId, uint256 amount, uint256 timestamp)`: 紧急提取
-- `WhitelistStatusChanged(address indexed user, bool status)`: 白名单状态变更
-- `WhitelistModeChanged(bool oldMode, bool newMode)`: 白名单模式变更
-- `RewardPoolUpdated(uint256 newBalance)`: 奖励池更新
-- `StakeStartTimeUpdated(uint256 oldStartTime, uint256 newStartTime)`: 开始时间更新
-- `StakeEndTimeUpdated(uint256 oldEndTime, uint256 newEndTime)`: 结束时间更新
-- `MinStakeAmountUpdated(uint256 oldAmount, uint256 newAmount)`: 最小质押金额更新
-- `EmergencyModeEnabled(address indexed operator, uint256 timestamp)`: 紧急模式启用
-- `Received(address indexed sender, uint256 amount)`: 接收原生代币
+**Contract Events**
+- `PositionCreated(address indexed user, uint256 indexed positionId, uint256 amount, uint256 lockPeriod, uint256 timestamp)`: Staking created
+- `PositionUnstaked(address indexed user, uint256 indexed positionId, uint256 amount, uint256 timestamp)`: Unstaked
+- `RewardClaimed(address indexed user, uint256 indexed positionId, uint256 amount, uint256 timestamp)`: Reward claimed
+- `StakingPaused(address indexed operator, uint256 timestamp)`: Contract paused
+- `StakingUnpaused(address indexed operator, uint256 timestamp)`: Contract resumed
+- `EmergencyWithdrawn(address indexed user, uint256 indexed positionId, uint256 amount, uint256 timestamp)`: Emergency withdrawal
+- `WhitelistStatusChanged(address indexed user, bool status)`: Whitelist status changed
+- `WhitelistModeChanged(bool oldMode, bool newMode)`: Whitelist mode changed
+- `RewardPoolUpdated(uint256 newBalance)`: Reward pool updated
+- `StakeStartTimeUpdated(uint256 oldStartTime, uint256 newStartTime)`: Start time updated
+- `StakeEndTimeUpdated(uint256 oldEndTime, uint256 newEndTime)`: End time updated
+- `MinStakeAmountUpdated(uint256 oldAmount, uint256 newAmount)`: Minimum staking amount updated
+- `EmergencyModeEnabled(address indexed operator, uint256 timestamp)`: Emergency mode enabled
+- `Received(address indexed sender, uint256 amount)`: Received native token
 
-**自定义错误**
-- `AlreadyUnstaked()`: Position 已经被 unstake
-- `StillLocked()`: 仍在锁定期内
-- `NoReward()`: 没有可领取的奖励
-- `PositionNotFound()`: Position 不存在或不属于调用者
-- `NotWhitelisted()`: 不在白名单中
+**Custom Errors**
+- `AlreadyUnstaked()`: Position already unstaked
+- `StillLocked()`: Still in lock period
+- `NoReward()`: No rewards to claim
+- `PositionNotFound()`: Position does not exist or does not belong to caller
+- `NotWhitelisted()`: Not in whitelist
 
-### 初始化参数
+### Initialization Parameters
 
-**参数说明**：
-- `_minStakeAmount`: 最小质押金额（wei 单位）
+**Parameter Description**:
+- `_minStakeAmount`: Minimum staking amount (wei unit)
   - Normal Staking: 1 HSK = `1e18` wei
   - Premium Staking: 500,000 HSK = `500000e18` wei
-- `_rewardRate`: 年化收益率（basis points）
+- `_rewardRate`: Annual yield rate (basis points)
   - Normal Staking: 800 (8% APY)
   - Premium Staking: 1600 (16% APY)
-- `_stakeStartTime`: 质押开始时间（Unix 时间戳）
-- `_stakeEndTime`: 质押结束时间（Unix 时间戳）
-- `_whitelistMode`: 白名单模式
-  - ✅ **Normal Staking**: `false`（所有用户可质押）
-  - ✅ **Premium Staking**: `true`（仅白名单用户可质押）
+- `_stakeStartTime`: Staking start time (Unix timestamp)
+- `_stakeEndTime`: Staking end time (Unix timestamp)
+- `_whitelistMode`: Whitelist mode
+  - ✅ **Normal Staking**: `false` (all users can stake)
+  - ✅ **Premium Staking**: `true` (only whitelisted users can stake)
 
-**白名单模式设计**：
+**Whitelist Mode Design**:
 
-现在可以在初始化时直接指定白名单模式，无需部署后再手动修改：
+Now can directly specify whitelist mode at initialization, no need to manually modify after deployment:
 
-**后续操作**：
-- **Normal Staking**: 无需额外操作，部署后即可开始质押
-- **Premium Staking**: 使用 `updateWhitelistBatch(addresses, true)` 添加授权用户
+**Subsequent Operations**:
+- **Normal Staking**: No additional operations needed, can start staking after deployment
+- **Premium Staking**: Use `updateWhitelistBatch(addresses, true)` to add authorized users
 
 ---
 
-## 🏗️ 当前目录结构
+## 🏗️ Current Directory Structure
 
 ```
 scripts/
-├── README.md                 # 使用指南
-├── shared/                   # 共享模块
-│   ├── constants.ts          # 配置和地址
-│   ├── types.ts              # 类型定义
-│   ├── helpers.ts            # 辅助函数
-│   └── utils.ts              # 工具函数
-├── normal/                   # 普通质押脚本
-│   ├── deploy.ts             # 部署合约
-│   ├── upgrade.ts            # 升级合约
-│   ├── stake.ts              # 质押操作
-│   ├── unstake.ts            # 解除质押
-│   ├── claim-rewards.ts      # 领取奖励
-│   ├── add-rewards.ts        # 添加奖励池
-│   ├── emergency-withdraw.ts # 紧急提取本金
-│   ├── withdraw-excess.ts    # 提取多余奖励
-│   ├── verify-forge.ts       # 验证合约
-│   ├── config/               # 配置管理
+├── README.md                 # Usage guide
+├── shared/                   # Shared modules
+│   ├── constants.ts          # Configuration and addresses
+│   ├── types.ts              # Type definitions
+│   ├── helpers.ts            # Helper functions
+│   └── utils.ts              # Utility functions
+├── normal/                   # Normal staking scripts
+│   ├── deploy.ts             # Deploy contract
+│   ├── upgrade.ts            # Upgrade contract
+│   ├── stake.ts              # Staking operation
+│   ├── unstake.ts            # Unstake
+│   ├── claim-rewards.ts      # Claim rewards
+│   ├── add-rewards.ts        # Add reward pool
+│   ├── emergency-withdraw.ts # Emergency withdraw principal
+│   ├── withdraw-excess.ts    # Withdraw excess rewards
+│   ├── verify-forge.ts       # Verify contract
+│   ├── config/               # Configuration management
 │   │   ├── pause.ts
 │   │   ├── unpause.ts
 │   │   ├── set-start-time.ts
 │   │   ├── set-end-time.ts
 │   │   ├── set-min-stake.ts
 │   │   └── enable-emergency.ts
-│   └── query/                # 状态查询
+│   └── query/                # State queries
 │       ├── check-status.ts
 │       ├── check-stakes.ts
 │       └── pending-reward.ts
-├── premium/                  # 高级质押脚本（✅ 已完成）
-│   ├── deploy.ts             # 部署合约
-│   ├── upgrade.ts            # 升级合约
-│   ├── stake.ts              # 质押操作（需白名单）
-│   ├── unstake.ts            # 解除质押
-│   ├── claim-rewards.ts      # 领取奖励
-│   ├── add-rewards.ts        # 添加奖励池
-│   ├── emergency-withdraw.ts # 紧急提取本金
-│   ├── withdraw-excess.ts    # 提取多余奖励
-│   ├── verify-forge.ts       # 验证合约
-│   ├── whitelist/            # 白名单管理
+├── premium/                  # Premium staking scripts (✅ Completed)
+│   ├── deploy.ts             # Deploy contract
+│   ├── upgrade.ts            # Upgrade contract
+│   ├── stake.ts              # Staking operation (requires whitelist)
+│   ├── unstake.ts            # Unstake
+│   ├── claim-rewards.ts      # Claim rewards
+│   ├── add-rewards.ts        # Add reward pool
+│   ├── emergency-withdraw.ts # Emergency withdraw principal
+│   ├── withdraw-excess.ts    # Withdraw excess rewards
+│   ├── verify-forge.ts       # Verify contract
+│   ├── whitelist/            # Whitelist management
 │   │   ├── add-batch.ts
 │   │   ├── remove-batch.ts
 │   │   ├── check-user.ts
 │   │   └── toggle-mode.ts
-│   ├── config/               # 配置管理
+│   ├── config/               # Configuration management
 │   │   ├── pause.ts
 │   │   ├── unpause.ts
 │   │   ├── set-start-time.ts
 │   │   ├── set-end-time.ts
 │   │   ├── set-min-stake.ts
 │   │   └── enable-emergency.ts
-│   └── query/                # 状态查询
+│   └── query/                # State queries
 │       ├── check-status.ts
 │       ├── check-stakes.ts
 │       ├── pending-reward.ts
 │       └── check-whitelist.ts
-├── dev/                      # 开发脚本
-│   ├── compile.ts            # 编译合约
-│   ├── clean.ts              # 清理编译产物
-│   ├── test-all.ts           # 运行所有测试
-│   └── coverage.ts           # 生成覆盖率报告
-├── test/                     # 测试脚本
-│   ├── helpers/              # 测试辅助函数
-│   │   ├── fixtures.ts       # 测试夹具
-│   │   └── test-utils.ts     # 测试工具
-│   └── integration/          # 集成测试
+├── dev/                      # Development scripts
+│   ├── compile.ts            # Compile contracts
+│   ├── clean.ts              # Clean build artifacts
+│   ├── test-all.ts           # Run all tests
+│   └── coverage.ts           # Generate coverage report
+├── test/                     # Test scripts
+│   ├── helpers/              # Test helper functions
+│   │   ├── fixtures.ts       # Test fixtures
+│   │   └── test-utils.ts     # Test utilities
+│   └── integration/          # Integration tests
 │       ├── deploy-test.ts
 │       ├── stake-test.ts
 │       └── whitelist-test.ts
-└── tools/                    # 工具脚本
-    ├── extract-abi.ts        # 提取 ABI
-    ├── generate-types.ts     # 生成类型
-    └── compare-contracts.ts  # 对比合约
+└── tools/                    # Tool scripts
+    ├── extract-abi.ts        # Extract ABI
+    ├── generate-types.ts      # Generate types
+    └── compare-contracts.ts   # Compare contracts
 ```
 
-**说明**：
-- ✅ Normal Staking 相关脚本已完成（14 个）
-- ✅ Premium Staking 相关脚本已完成（23 个，包含白名单管理）
-- ✅ 测试脚本已完成（5 个，包含 Premium Staking 测试支持）
-- ✅ 开发脚本已完成（4 个）
-- ✅ 工具脚本已完成（3 个）
+**Notes**:
+- ✅ Normal Staking related scripts completed (14 scripts)
+- ✅ Premium Staking related scripts completed (23 scripts, including whitelist management)
+- ✅ Test scripts completed (5 scripts, including Premium Staking test support)
+- ✅ Development scripts completed (4 scripts)
+- ✅ Tool scripts completed (3 scripts)
 
-**Premium Staking 脚本包含**：
-- 基础操作脚本：9 个
-- 白名单管理脚本：4 个
-- 配置管理脚本：6 个
-- 查询脚本：4 个
-
----
-
-## 📊 脚本映射表
-
-以下表格列出了脚本的完成状态：
-
-### Normal Staking 脚本（✅ 已完成）
-
-| 脚本文件 | 状态 | 说明 |
-|---------|------|------|
-| `scripts/normal/deploy.ts` | ✅ 已完成 | 部署普通质押合约 |
-| `scripts/normal/stake.ts` | ✅ 已完成 | 质押操作 |
-| `scripts/normal/unstake.ts` | ✅ 已完成 | 解除质押 |
-| `scripts/normal/claim-rewards.ts` | ✅ 已完成 | 领取奖励 |
-| `scripts/normal/add-rewards.ts` | ✅ 已完成 | 添加奖励池 |
-| `scripts/normal/emergency-withdraw.ts` | ✅ 已完成 | 紧急提取本金 |
-| `scripts/normal/withdraw-excess.ts` | ✅ 已完成 | 提取多余奖励 |
-| `scripts/normal/verify-forge.ts` | ✅ 已完成 | 验证合约（使用 Foundry） |
-| `scripts/normal/config/pause.ts` | ✅ 已完成 | 暂停合约 |
-| `scripts/normal/config/unpause.ts` | ✅ 已完成 | 恢复合约 |
-| `scripts/normal/config/set-start-time.ts` | ✅ 已完成 | 设置开始时间 |
-| `scripts/normal/config/set-end-time.ts` | ✅ 已完成 | 设置结束时间 |
-| `scripts/normal/config/set-min-stake.ts` | ✅ 已完成 | 设置最小质押金额 |
-| `scripts/normal/config/enable-emergency.ts` | ✅ 已完成 | 启用紧急模式 |
-| `scripts/normal/query/check-status.ts` | ✅ 已完成 | 查询合约状态 |
-| `scripts/normal/query/check-stakes.ts` | ✅ 已完成 | 查询质押信息 |
-| `scripts/normal/query/pending-reward.ts` | ✅ 已完成 | 查询待领取奖励 |
-| `scripts/normal/upgrade.ts` | ✅ 已完成 | 升级合约 |
-
-### 共享模块（✅ 已完成）
-
-| 脚本文件 | 状态 | 说明 |
-|---------|------|------|
-| `scripts/shared/constants.ts` | ✅ 已完成 | 配置和地址 |
-| `scripts/shared/types.ts` | ✅ 已完成 | 类型定义 |
-| `scripts/shared/helpers.ts` | ✅ 已完成 | 辅助函数 |
-| `scripts/shared/utils.ts` | ✅ 已完成 | 工具函数 |
-
-### Premium Staking 脚本（✅ 已完成）
-
-**架构支持状态**：✅ 已完成
-- 共享模块已完全支持 Premium Staking
-- `PREMIUM_STAKING_CONFIG` 已定义
-- `getStakingAddress(StakingType.PREMIUM, network)` 已实现
-- 测试脚本已包含 Premium Staking 测试支持
-
-**脚本实现状态**：✅ 已完成
-
-| 脚本文件 | 状态 | 说明 |
-|---------|------|------|
-| `scripts/premium/deploy.ts` | ✅ 已完成 | 部署高级质押合约 |
-| `scripts/premium/stake.ts` | ✅ 已完成 | 质押操作（需白名单检查） |
-| `scripts/premium/unstake.ts` | ✅ 已完成 | 解除质押 |
-| `scripts/premium/claim-rewards.ts` | ✅ 已完成 | 领取奖励 |
-| `scripts/premium/add-rewards.ts` | ✅ 已完成 | 添加奖励池 |
-| `scripts/premium/emergency-withdraw.ts` | ✅ 已完成 | 紧急提取本金 |
-| `scripts/premium/withdraw-excess.ts` | ✅ 已完成 | 提取多余奖励 |
-| `scripts/premium/verify-forge.ts` | ✅ 已完成 | 验证合约 |
-| `scripts/premium/upgrade.ts` | ✅ 已完成 | 升级合约 |
-| `scripts/premium/whitelist/add-batch.ts` | ✅ 已完成 | 批量添加白名单 |
-| `scripts/premium/whitelist/remove-batch.ts` | ✅ 已完成 | 批量移除白名单 |
-| `scripts/premium/whitelist/check-user.ts` | ✅ 已完成 | 查询用户白名单状态 |
-| `scripts/premium/whitelist/toggle-mode.ts` | ✅ 已完成 | 切换白名单模式 |
-| `scripts/premium/config/pause.ts` | ✅ 已完成 | 暂停合约 |
-| `scripts/premium/config/unpause.ts` | ✅ 已完成 | 恢复合约 |
-| `scripts/premium/config/set-start-time.ts` | ✅ 已完成 | 设置开始时间 |
-| `scripts/premium/config/set-end-time.ts` | ✅ 已完成 | 设置结束时间 |
-| `scripts/premium/config/set-min-stake.ts` | ✅ 已完成 | 设置最小质押金额 |
-| `scripts/premium/config/enable-emergency.ts` | ✅ 已完成 | 启用紧急模式 |
-| `scripts/premium/query/check-status.ts` | ✅ 已完成 | 查询合约状态 |
-| `scripts/premium/query/check-stakes.ts` | ✅ 已完成 | 查询质押信息 |
-| `scripts/premium/query/pending-reward.ts` | ✅ 已完成 | 查询待领取奖励 |
-| `scripts/premium/query/check-whitelist.ts` | ✅ 已完成 | 查询白名单配置 |
-
-### 开发脚本（✅ 已完成）
-
-| 脚本文件 | 状态 | 说明 |
-|---------|------|------|
-| `scripts/dev/compile.ts` | ✅ 已完成 | 编译合约 |
-| `scripts/dev/clean.ts` | ✅ 已完成 | 清理编译产物 |
-| `scripts/dev/coverage.ts` | ✅ 已完成 | 生成测试覆盖率报告 |
-| `scripts/dev/test-all.ts` | ✅ 已完成 | 运行所有测试 |
-
-### 测试脚本（✅ 已完成）
-
-| 脚本文件 | 状态 | 说明 |
-|---------|------|------|
-| `scripts/test/helpers/fixtures.ts` | ✅ 已完成 | 测试夹具和辅助函数 |
-| `scripts/test/helpers/test-utils.ts` | ✅ 已完成 | 测试工具函数 |
-| `scripts/test/integration/deploy-test.ts` | ✅ 已完成 | 部署集成测试 |
-| `scripts/test/integration/stake-test.ts` | ✅ 已完成 | 质押操作集成测试 |
-| `scripts/test/integration/whitelist-test.ts` | ✅ 已完成 | 白名单功能集成测试 |
-
-### 工具脚本（✅ 已完成）
-
-| 脚本文件 | 状态 | 说明 |
-|---------|------|------|
-| `scripts/tools/extract-abi.ts` | ✅ 已完成 | 提取 ABI |
-| `scripts/tools/generate-types.ts` | ✅ 已完成 | 生成 TypeScript 类型 |
-| `scripts/tools/compare-contracts.ts` | ✅ 已完成 | 对比合约差异 |
-
-### ✅ 脚本完成情况总结
-
-**当前已实现**: 57 个脚本文件
-
-- ✅ Normal Staking: 14 个脚本（包括 upgrade.ts）
-- ✅ Premium Staking: 23 个脚本（包括 upgrade.ts 和白名单管理）
-- ✅ 开发脚本: 4 个脚本
-- ✅ 测试脚本: 5 个脚本（包含 Premium Staking 测试支持）
-- ✅ 工具脚本: 3 个脚本
-- ✅ 共享模块: 4 个文件（完全支持 Premium Staking）
-
-**Premium Staking 脚本分类**：
-- ✅ 基础操作脚本：9 个（deploy, upgrade, stake, unstake, claim-rewards, add-rewards, emergency-withdraw, withdraw-excess, verify-forge）
-- ✅ 白名单管理脚本：4 个（add-batch, remove-batch, check-user, toggle-mode）
-- ✅ 配置管理脚本：6 个（pause, unpause, set-start-time, set-end-time, set-min-stake, enable-emergency）
-- ✅ 查询脚本：4 个（check-status, check-stakes, pending-reward, check-whitelist）
-
-**架构支持状态**：
-- ✅ Premium Staking 配置已定义（`PREMIUM_STAKING_CONFIG`）
-- ✅ Premium Staking 地址管理已实现（`getStakingAddress`）
-- ✅ Premium Staking 类型定义已实现（`StakingType.PREMIUM`）
-- ✅ Premium Staking 测试支持已实现（`fixtures.ts`）
-- ✅ Premium Staking 所有脚本已实现（23 个脚本）
+**Premium Staking Scripts Include**:
+- Basic operation scripts: 9 scripts
+- Whitelist management scripts: 4 scripts
+- Configuration management scripts: 6 scripts
+- Query scripts: 4 scripts
 
 ---
 
-## 📦 实现计划
+## 📊 Script Mapping Table
 
-以下内容可作为 Premium Staking 实现的参考。
+The following table lists script completion status:
 
-### 第一步：创建共享模块（✅ 已完成）
+### Normal Staking Scripts (✅ Completed)
 
-#### 1. `scripts/shared/constants.ts`（✅ 已完成）
+| Script File | Status | Description |
+|------------|--------|-------------|
+| `scripts/normal/deploy.ts` | ✅ Completed | Deploy normal staking contract |
+| `scripts/normal/stake.ts` | ✅ Completed | Staking operation |
+| `scripts/normal/unstake.ts` | ✅ Completed | Unstake |
+| `scripts/normal/claim-rewards.ts` | ✅ Completed | Claim rewards |
+| `scripts/normal/add-rewards.ts` | ✅ Completed | Add reward pool |
+| `scripts/normal/emergency-withdraw.ts` | ✅ Completed | Emergency withdraw principal |
+| `scripts/normal/withdraw-excess.ts` | ✅ Completed | Withdraw excess rewards |
+| `scripts/normal/verify-forge.ts` | ✅ Completed | Verify contract (using Foundry) |
+| `scripts/normal/config/pause.ts` | ✅ Completed | Pause contract |
+| `scripts/normal/config/unpause.ts` | ✅ Completed | Resume contract |
+| `scripts/normal/config/set-start-time.ts` | ✅ Completed | Set start time |
+| `scripts/normal/config/set-end-time.ts` | ✅ Completed | Set end time |
+| `scripts/normal/config/set-min-stake.ts` | ✅ Completed | Set minimum staking amount |
+| `scripts/normal/config/enable-emergency.ts` | ✅ Completed | Enable emergency mode |
+| `scripts/normal/query/check-status.ts` | ✅ Completed | Query contract status |
+| `scripts/normal/query/check-stakes.ts` | ✅ Completed | Query staking information |
+| `scripts/normal/query/pending-reward.ts` | ✅ Completed | Query pending rewards |
+| `scripts/normal/upgrade.ts` | ✅ Completed | Upgrade contract |
+
+### Shared Modules (✅ Completed)
+
+| Script File | Status | Description |
+|------------|--------|-------------|
+| `scripts/shared/constants.ts` | ✅ Completed | Configuration and addresses |
+| `scripts/shared/types.ts` | ✅ Completed | Type definitions |
+| `scripts/shared/helpers.ts` | ✅ Completed | Helper functions |
+| `scripts/shared/utils.ts` | ✅ Completed | Utility functions |
+
+### Premium Staking Scripts (✅ Completed)
+
+**Architecture Support Status**: ✅ Completed
+- Shared modules fully support Premium Staking
+- `PREMIUM_STAKING_CONFIG` defined
+- `getStakingAddress(StakingType.PREMIUM, network)` implemented
+- Test scripts include Premium Staking test support
+
+**Script Implementation Status**: ✅ Completed
+
+| Script File | Status | Description |
+|------------|--------|-------------|
+| `scripts/premium/deploy.ts` | ✅ Completed | Deploy premium staking contract |
+| `scripts/premium/stake.ts` | ✅ Completed | Staking operation (requires whitelist check) |
+| `scripts/premium/unstake.ts` | ✅ Completed | Unstake |
+| `scripts/premium/claim-rewards.ts` | ✅ Completed | Claim rewards |
+| `scripts/premium/add-rewards.ts` | ✅ Completed | Add reward pool |
+| `scripts/premium/emergency-withdraw.ts` | ✅ Completed | Emergency withdraw principal |
+| `scripts/premium/withdraw-excess.ts` | ✅ Completed | Withdraw excess rewards |
+| `scripts/premium/verify-forge.ts` | ✅ Completed | Verify contract |
+| `scripts/premium/upgrade.ts` | ✅ Completed | Upgrade contract |
+| `scripts/premium/whitelist/add-batch.ts` | ✅ Completed | Batch add whitelist |
+| `scripts/premium/whitelist/remove-batch.ts` | ✅ Completed | Batch remove whitelist |
+| `scripts/premium/whitelist/check-user.ts` | ✅ Completed | Query user whitelist status |
+| `scripts/premium/whitelist/toggle-mode.ts` | ✅ Completed | Toggle whitelist mode |
+| `scripts/premium/config/pause.ts` | ✅ Completed | Pause contract |
+| `scripts/premium/config/unpause.ts` | ✅ Completed | Resume contract |
+| `scripts/premium/config/set-start-time.ts` | ✅ Completed | Set start time |
+| `scripts/premium/config/set-end-time.ts` | ✅ Completed | Set end time |
+| `scripts/premium/config/set-min-stake.ts` | ✅ Completed | Set minimum staking amount |
+| `scripts/premium/config/enable-emergency.ts` | ✅ Completed | Enable emergency mode |
+| `scripts/premium/query/check-status.ts` | ✅ Completed | Query contract status |
+| `scripts/premium/query/check-stakes.ts` | ✅ Completed | Query staking information |
+| `scripts/premium/query/pending-reward.ts` | ✅ Completed | Query pending rewards |
+| `scripts/premium/query/check-whitelist.ts` | ✅ Completed | Query whitelist configuration |
+
+### Development Scripts (✅ Completed)
+
+| Script File | Status | Description |
+|------------|--------|-------------|
+| `scripts/dev/compile.ts` | ✅ Completed | Compile contracts |
+| `scripts/dev/clean.ts` | ✅ Completed | Clean build artifacts |
+| `scripts/dev/coverage.ts` | ✅ Completed | Generate test coverage report |
+| `scripts/dev/test-all.ts` | ✅ Completed | Run all tests |
+
+### Test Scripts (✅ Completed)
+
+| Script File | Status | Description |
+|------------|--------|-------------|
+| `scripts/test/helpers/fixtures.ts` | ✅ Completed | Test fixtures and helper functions |
+| `scripts/test/helpers/test-utils.ts` | ✅ Completed | Test utility functions |
+| `scripts/test/integration/deploy-test.ts` | ✅ Completed | Deployment integration test |
+| `scripts/test/integration/stake-test.ts` | ✅ Completed | Staking operation integration test |
+| `scripts/test/integration/whitelist-test.ts` | ✅ Completed | Whitelist functionality integration test |
+
+### Tool Scripts (✅ Completed)
+
+| Script File | Status | Description |
+|------------|--------|-------------|
+| `scripts/tools/extract-abi.ts` | ✅ Completed | Extract ABI |
+| `scripts/tools/generate-types.ts` | ✅ Completed | Generate TypeScript types |
+| `scripts/tools/compare-contracts.ts` | ✅ Completed | Compare contract differences |
+
+### ✅ Script Completion Summary
+
+**Currently Implemented**: 57 script files
+
+- ✅ Normal Staking: 14 scripts (including upgrade.ts)
+- ✅ Premium Staking: 23 scripts (including upgrade.ts and whitelist management)
+- ✅ Development scripts: 4 scripts
+- ✅ Test scripts: 5 scripts (including Premium Staking test support)
+- ✅ Tool scripts: 3 scripts
+- ✅ Shared modules: 4 files (fully support Premium Staking)
+
+**Premium Staking Script Categories**:
+- ✅ Basic operation scripts: 9 scripts (deploy, upgrade, stake, unstake, claim-rewards, add-rewards, emergency-withdraw, withdraw-excess, verify-forge)
+- ✅ Whitelist management scripts: 4 scripts (add-batch, remove-batch, check-user, toggle-mode)
+- ✅ Configuration management scripts: 6 scripts (pause, unpause, set-start-time, set-end-time, set-min-stake, enable-emergency)
+- ✅ Query scripts: 4 scripts (check-status, check-stakes, pending-reward, check-whitelist)
+
+**Architecture Support Status**:
+- ✅ Premium Staking configuration defined (`PREMIUM_STAKING_CONFIG`)
+- ✅ Premium Staking address management implemented (`getStakingAddress`)
+- ✅ Premium Staking type definitions implemented (`StakingType.PREMIUM`)
+- ✅ Premium Staking test support implemented (`fixtures.ts`)
+- ✅ Premium Staking all scripts implemented (23 scripts)
+
+---
+
+## 📦 Implementation Plan
+
+The following content can serve as reference for Premium Staking implementation.
+
+### Step 1: Create Shared Modules (✅ Completed)
+
+#### 1. `scripts/shared/constants.ts` (✅ Completed)
 
 #### 2. `scripts/shared/types.ts`
 
 #### 3. `scripts/shared/helpers.ts`
 
-#### 4. `scripts/shared/utils.ts`（✅ 已完成）
+#### 4. `scripts/shared/utils.ts` (✅ Completed)
 
-通用工具函数位于 `scripts/shared/utils.ts`。
+General utility functions are located in `scripts/shared/utils.ts`.
 
 ---
 
-### 第二步：实现普通质押脚本（✅ 已完成）
+### Step 2: Implement Normal Staking Scripts (✅ Completed)
 
-#### 1. `scripts/normal/deploy.ts`（✅ 已完成）
+#### 1. `scripts/normal/deploy.ts` (✅ Completed)
 
 #### 2. `scripts/normal/stake.ts`
 
@@ -415,25 +415,25 @@ scripts/
 
 ---
 
-### 第三步：实现高级质押脚本（✅ 已完成）
+### Step 3: Implement Premium Staking Scripts (✅ Completed)
 
-高级质押脚本与普通质押类似，但需要额外的白名单管理功能。已参考 Normal Staking 的实现完成。
+Premium staking scripts are similar to normal staking but require additional whitelist management functionality. Completed by referencing Normal Staking implementation.
 
-#### 1. `scripts/premium/deploy.ts`（✅ 已完成）
+#### 1. `scripts/premium/deploy.ts` (✅ Completed)
 
-类似 `scripts/normal/deploy.ts`，使用 `PREMIUM_STAKING_CONFIG`，并启用白名单模式。
+Similar to `scripts/normal/deploy.ts`, uses `PREMIUM_STAKING_CONFIG`, and enables whitelist mode.
 
-#### 2. `scripts/premium/whitelist/add-batch.ts`（✅ 已完成）
+#### 2. `scripts/premium/whitelist/add-batch.ts` (✅ Completed)
 
-#### 3. `scripts/premium/whitelist/remove-batch.ts`（✅ 已完成）
+#### 3. `scripts/premium/whitelist/remove-batch.ts` (✅ Completed)
 
-#### 4. `scripts/premium/whitelist/toggle-mode.ts`（✅ 已完成）
+#### 4. `scripts/premium/whitelist/toggle-mode.ts` (✅ Completed)
 
-#### 5. `scripts/premium/whitelist/check-user.ts`（✅ 已完成）
+#### 5. `scripts/premium/whitelist/check-user.ts` (✅ Completed)
 
 ---
 
-### 第四步：创建开发和测试脚本
+### Step 4: Create Development and Test Scripts
 
 #### 1. `scripts/dev/compile.ts`
 
@@ -453,242 +453,245 @@ scripts/
 
 #### 9. `scripts/test/integration/whitelist-test.ts`
 
-#### 10. 工具脚本
+#### 10. Tool Scripts
 
-- `scripts/tools/extract-abi.ts` - 提取 ABI（TypeScript）
+- `scripts/tools/extract-abi.ts` - Extract ABI (TypeScript)
 
 ---
 
-## 📝 实现步骤
+## 📝 Implementation Steps
 
-### 步骤 1：创建目录结构
+### Step 1: Create Directory Structure
 
-### 步骤 2：创建共享模块
+### Step 2: Create Shared Modules
 
-1. 创建 `scripts/shared/constants.ts`
-2. 创建 `scripts/shared/types.ts`
-3. 创建 `scripts/shared/helpers.ts`
-4. 创建 `scripts/shared/utils.ts`
+1. Create `scripts/shared/constants.ts`
+2. Create `scripts/shared/types.ts`
+3. Create `scripts/shared/helpers.ts`
+4. Create `scripts/shared/utils.ts`
 
-### 步骤 3：实现普通质押脚本
+### Step 3: Implement Normal Staking Scripts
 
-1. 创建 `scripts/normal/deploy.ts`
-2. 创建 `scripts/normal/stake.ts`
-3. 创建 `scripts/normal/add-rewards.ts`
-4. 创建 `scripts/normal/upgrade.ts`
-5. 创建查询脚本（config/ 和 query/ 目录下）
+1. Create `scripts/normal/deploy.ts`
+2. Create `scripts/normal/stake.ts`
+3. Create `scripts/normal/add-rewards.ts`
+4. Create `scripts/normal/upgrade.ts`
+5. Create query scripts (under config/ and query/ directories)
 
-### 步骤 4：实现高级质押脚本（✅ 已完成）
+### Step 4: Implement Premium Staking Scripts (✅ Completed)
 
-1. ✅ 创建 `scripts/premium/deploy.ts`
-2. ✅ 创建 `scripts/premium/stake.ts`
-3. ✅ 创建白名单管理脚本（whitelist/ 目录下，包含批量添加、批量移除、查询和切换模式）
-4. ✅ 创建查询脚本（config/ 和 query/ 目录下）
-5. ✅ 创建所有基础操作脚本（upgrade, unstake, claim-rewards, add-rewards, emergency-withdraw, withdraw-excess, verify-forge）
-6. ✅ 创建所有配置管理脚本（pause, unpause, set-start-time, set-end-time, set-min-stake, enable-emergency）
-7. ✅ 创建所有查询脚本（check-status, check-stakes, pending-reward, check-whitelist）
+1. ✅ Create `scripts/premium/deploy.ts`
+2. ✅ Create `scripts/premium/stake.ts`
+3. ✅ Create whitelist management scripts (under whitelist/ directory, including batch add, batch remove, query, and toggle mode)
+4. ✅ Create query scripts (under config/ and query/ directories)
+5. ✅ Create all basic operation scripts (upgrade, unstake, claim-rewards, add-rewards, emergency-withdraw, withdraw-excess, verify-forge)
+6. ✅ Create all configuration management scripts (pause, unpause, set-start-time, set-end-time, set-min-stake, enable-emergency)
+7. ✅ Create all query scripts (check-status, check-stakes, pending-reward, check-whitelist)
 
-### 步骤 5：创建开发和测试脚本
+### Step 5: Create Development and Test Scripts
 
-1. 创建 `scripts/dev/compile.ts`
-2. 创建 `scripts/dev/clean.ts`
-3. 创建 `scripts/dev/test-all.ts`
-4. 创建 `scripts/dev/coverage.ts`
-5. 创建测试辅助函数：
+1. Create `scripts/dev/compile.ts`
+2. Create `scripts/dev/clean.ts`
+3. Create `scripts/dev/test-all.ts`
+4. Create `scripts/dev/coverage.ts`
+5. Create test helper functions:
    - `scripts/test/helpers/fixtures.ts`
    - `scripts/test/helpers/test-utils.ts`
-6. 创建集成测试：
+6. Create integration tests:
    - `scripts/test/integration/deploy-test.ts`
    - `scripts/test/integration/stake-test.ts`
    - `scripts/test/integration/whitelist-test.ts`
 
-### 步骤 6：创建工具脚本（✅ 已完成）
+### Step 6: Create Tool Scripts (✅ Completed)
 
-1. ✅ 创建 `scripts/tools/extract-abi.ts`（TypeScript）
-2. ✅ 创建 `scripts/tools/generate-types.ts`
-3. ✅ 创建 `scripts/tools/compare-contracts.ts`
+1. ✅ Create `scripts/tools/extract-abi.ts` (TypeScript)
+2. ✅ Create `scripts/tools/generate-types.ts`
+3. ✅ Create `scripts/tools/compare-contracts.ts`
 
-### 步骤 7：更新 package.json scripts
+### Step 7: Update package.json scripts
 
-更新 `package.json` 中的脚本命令：
+Update script commands in `package.json`:
 
-### 使用示例
+### Usage Examples
 
 ---
 
-## ✅ 验证清单
+## ✅ Verification Checklist
 
-完成后，请验证以下内容：
+After completion, please verify the following:
 
-### 基础验证
+### Basic Verification
 
-- [ ] 所有新脚本都能正常编译（`npm run build`）
-- [ ] TypeScript 类型检查通过（无编译错误）
-- [ ] 目录结构符合设计规范
-- [ ] 所有文件都有正确的导入路径
+- [ ] All new scripts compile successfully (`npm run build`)
+- [ ] TypeScript type checking passes (no compilation errors)
+- [ ] Directory structure conforms to design specifications
+- [ ] All files have correct import paths
 
-### 共享模块验证
+### Shared Module Verification
 
-- [ ] `scripts/shared/constants.ts` 正确导出常量配置
-- [ ] `scripts/shared/types.ts` 正确定义所有类型
-- [ ] `scripts/shared/helpers.ts` 辅助函数正常工作
-- [ ] `scripts/shared/utils.ts` 通用工具函数正常工作
+- [ ] `scripts/shared/constants.ts` correctly exports constant configurations
+- [ ] `scripts/shared/types.ts` correctly defines all types
+- [ ] `scripts/shared/helpers.ts` helper functions work correctly
+- [ ] `scripts/shared/utils.ts` general utility functions work correctly
 
-### 开发脚本验证
+### Development Script Verification
 
-- [x] `npm run compile` 能够成功编译合约
-- [x] `npm run dev:compile` 能够成功编译合约（通过脚本）
-- [x] `npm run clean` 能够清理编译产物
-- [x] `npm run dev:clean` 能够清理编译产物（通过脚本）
-- [x] `npm run build` 完整构建流程正常
-- [x] `npm run dev:test` 运行所有测试正常
-- [x] `npm run dev:coverage` 生成覆盖率报告正常
+- [x] `npm run compile` can successfully compile contracts
+- [x] `npm run dev:compile` can successfully compile contracts (via script)
+- [x] `npm run clean` can clean build artifacts
+- [x] `npm run dev:clean` can clean build artifacts (via script)
+- [x] `npm run build` complete build process works correctly
+- [x] `npm run dev:test` runs all tests correctly
+- [x] `npm run dev:coverage` generates coverage report correctly
 
-### 测试脚本验证
+### Test Script Verification
 
-- [x] `npm run test` 运行所有测试正常
-- [x] `npm run dev:test` 运行所有测试正常（通过脚本）
-- [x] `npm run test:integration:deploy` 部署集成测试通过
-- [x] `npm run test:integration:stake` 质押操作集成测试通过
-- [x] `npm run test:integration:whitelist` 白名单功能集成测试通过
-- [x] `npm run dev:coverage` 生成覆盖率报告
-- [x] 测试辅助函数（fixtures、test-utils）正常工作
-- [x] 所有测试用例都能正确执行
+- [x] `npm run test` runs all tests correctly
+- [x] `npm run dev:test` runs all tests correctly (via script)
+- [x] `npm run test:integration:deploy` deployment integration test passes
+- [x] `npm run test:integration:stake` staking operation integration test passes
+- [x] `npm run test:integration:whitelist` whitelist functionality integration test passes
+- [x] `npm run dev:coverage` generates coverage report
+- [x] Test helper functions (fixtures, test-utils) work correctly
+- [x] All test cases execute correctly
 
-### 部署脚本验证
+### Deployment Script Verification
 
-- [ ] Normal Staking 部署脚本能够成功部署合约
-- [ ] Premium Staking 部署脚本能够成功部署合约
-- [ ] 部署脚本正确配置合约参数
-- [ ] 测试网部署命令正常工作
+- [ ] Normal Staking deployment script can successfully deploy contract
+- [ ] Premium Staking deployment script can successfully deploy contract
+- [ ] Deployment scripts correctly configure contract parameters
+- [ ] Testnet deployment commands work correctly
 
-### 质押操作验证
+### Staking Operation Verification
 
-- [ ] Normal Staking 质押脚本能够正常执行
-- [ ] Premium Staking 质押脚本能够正常执行
-- [ ] 解除质押脚本正常工作
-- [ ] 领取奖励脚本正常工作
-- [ ] 添加奖励脚本正常工作
+- [ ] Normal Staking staking script executes correctly
+- [ ] Premium Staking staking script executes correctly
+- [ ] Unstaking script works correctly
+- [ ] Reward claiming script works correctly
+- [ ] Add rewards script works correctly
 
-### 白名单管理验证（Premium 专属）
+### Whitelist Management Verification (Premium Exclusive)
 
-- [ ] 批量添加用户到白名单正常
-- [ ] 批量移除用户正常
-- [ ] 查询用户白名单状态正常
-- [ ] 切换白名单模式正常
+- [ ] Batch add users to whitelist works correctly
+- [ ] Batch remove users works correctly
+- [ ] Query user whitelist status works correctly
+- [ ] Toggle whitelist mode works correctly
 
-### 配置管理验证
+### Configuration Management Verification
 
-- [ ] 暂停/恢复合约功能正常
-- [ ] 设置质押开始时间正常
-- [ ] 设置质押结束时间正常
-- [ ] 配置脚本权限检查正常
+- [ ] Pause/resume contract functionality works correctly
+- [ ] Set staking start time works correctly
+- [ ] Set staking end time works correctly
+- [ ] Configuration script permission checks work correctly
 
-### 查询脚本验证
+### Query Script Verification
 
-- [ ] 查询合约状态脚本正常
-- [ ] 查询质押信息脚本正常
-- [ ] 查询奖励信息脚本正常
-- [ ] 查询白名单配置脚本正常
-- [ ] 数据格式化输出正确
+- [ ] Query contract status script works correctly
+- [ ] Query staking information script works correctly
+- [ ] Query reward information script works correctly
+- [ ] Query whitelist configuration script works correctly
+- [ ] Data formatting output is correct
 
-### 升级和验证脚本
+### Upgrade and Verification Scripts
 
-- [x] 合约升级脚本能够成功升级
-- [x] 合约验证脚本正常工作
-- [x] 升级后状态保持正确
-- [x] 支持 ProxyAdmin 合约和 EOA 两种模式
-- [x] 升级前状态验证
-- [x] 升级后状态验证
-- [x] 自动检测 ProxyAdmin 地址（从存储槽读取）
-- [x] 智能 Fallback 机制（upgrade() 失败时自动尝试 upgradeAndCall()）
-- [x] 升级成功后自动打印浏览器链接
-- [x] 自动验证实现地址和状态一致性
+- [x] Contract upgrade script can successfully upgrade
+- [x] Contract verification script works correctly
+- [x] State remains correct after upgrade
+- [x] Supports both ProxyAdmin contract and EOA modes
+- [x] Pre-upgrade state verification
+- [x] Post-upgrade state verification
+- [x] Auto-detect ProxyAdmin address (read from storage slot)
+- [x] Smart Fallback mechanism (automatically try upgradeAndCall() if upgrade() fails)
+- [x] Automatically print browser link after successful upgrade
+- [x] Automatically verify implementation address and state consistency
 
-#### 升级脚本详细说明
+#### Upgrade Script Detailed Description
 
-**`scripts/normal/upgrade.ts`** 和 **`scripts/premium/upgrade.ts`** 实现了智能升级功能：
+**`scripts/normal/upgrade.ts`** and **`scripts/premium/upgrade.ts`** implement intelligent upgrade functionality:
 
-**核心特性**：
-1. **自动检测 ProxyAdmin**：
-   - 从 EIP-1967 存储槽读取实际的 ProxyAdmin 地址
-   - 支持环境变量覆盖（`PROXY_ADMIN_ADDRESS`）
-   - 自动验证当前签名者是否为 ProxyAdmin 或 ProxyAdmin 的 owner
+**Core Features**:
+1. **Auto-detect ProxyAdmin**:
+   - Read actual ProxyAdmin address from EIP-1967 storage slot
+   - Supports environment variable override (`PROXY_ADMIN_ADDRESS`)
+   - Automatically verify if current signer is ProxyAdmin or ProxyAdmin's owner
 
-2. **双模式支持**：
-   - **ProxyAdmin 合约模式**：使用 OpenZeppelin ProxyAdmin ABI 调用 `upgrade()` 或 `upgradeAndCall()`
-   - **EOA 模式**：直接调用 proxy 的 `upgradeTo()` 或 `upgradeToAndCall()`
+2. **Dual Mode Support**:
+   - **ProxyAdmin Contract Mode**: Use OpenZeppelin ProxyAdmin ABI to call `upgrade()` or `upgradeAndCall()`
+   - **EOA Mode**: Directly call proxy's `upgradeTo()` or `upgradeToAndCall()`
 
-3. **智能 Fallback**：
-   - 如果 `upgrade()` 失败，自动尝试 `upgradeAndCall()`（使用空数据）
-   - 如果 `upgradeTo()` 失败，自动尝试 `upgradeToAndCall()`
+3. **Smart Fallback**:
+   - If `upgrade()` fails, automatically try `upgradeAndCall()` (with empty data)
+   - If `upgradeTo()` fails, automatically try `upgradeToAndCall()`
 
-4. **状态验证**：
-   - 升级前记录所有关键状态（totalStaked, rewardPoolBalance, totalPendingRewards 等）
-   - 升级后验证状态是否保持一致
-   - 验证新实现地址是否正确设置
+4. **State Verification**:
+   - Record all key states before upgrade (totalStaked, rewardPoolBalance, totalPendingRewards, etc.)
+   - Verify state consistency after upgrade
+   - Verify new implementation address is correctly set
 
-5. **用户友好**：
-   - 升级成功后自动打印交易哈希和浏览器链接
-   - 提示升级后验证实现合约的命令
-   - 清晰的错误提示和警告信息
+5. **User Friendly**:
+   - Automatically print transaction hash and browser link after successful upgrade
+   - Prompt command to verify implementation contract after upgrade
+   - Clear error messages and warnings
 
-**使用示例**：
+**Usage Examples**:
 ```bash
-# 自动检测 ProxyAdmin（推荐）
+# Auto-detect ProxyAdmin (recommended)
 npm run upgrade:normal:testnet
 
-# 手动指定 ProxyAdmin 地址
+# Manually specify ProxyAdmin address
 PROXY_ADMIN_ADDRESS="0x..." npm run upgrade:normal:testnet
 
-# 使用已部署的实现合约
+# Use already deployed implementation contract
 PROXY_ADMIN_ADDRESS="0x..." NEW_IMPLEMENTATION_ADDRESS="0x..." npm run upgrade:normal:testnet
 ```
 
-**注意事项**：
-- 升级交易会显示在 ProxyAdmin 合约页面，而不是 Proxy 页面
-- 确保新实现合约与现有存储布局兼容
-- 升级后需要验证新实现合约（脚本会提示命令）
+**Notes**:
+- Upgrade transaction will appear on ProxyAdmin contract page, not Proxy page
+- Ensure new implementation contract is compatible with existing storage layout
+- Need to verify new implementation contract after upgrade (script will prompt command)
 
-### 工具脚本验证
+### Tool Script Verification
 
-- [x] ABI 提取工具正常工作（`npm run tools:extract-abi`）
-- [x] TypeScript 类型生成正常（`npm run tools:generate-types`）
-- [x] 合约对比工具正常（`npm run tools:compare-contracts`）
+- [x] ABI extraction tool works correctly (`npm run tools:extract-abi`)
+- [x] TypeScript type generation works correctly (`npm run tools:generate-types`)
+- [x] Contract comparison tool works correctly (`npm run tools:compare-contracts`)
 
-### package.json 验证
+### package.json Verification
 
-- [ ] 所有 npm scripts 正确指向新文件
-- [ ] 命令名称清晰易懂
-- [ ] 测试网和主网命令分离明确
-- [ ] 环境变量传递正常
+- [ ] All npm scripts correctly point to new files
+- [ ] Command names are clear and understandable
+- [ ] Testnet and mainnet commands are clearly separated
+- [ ] Environment variable passing works correctly
 
-### 文档验证
+### Documentation Verification
 
-- [ ] 每个子目录都有 README 说明
-- [ ] 所有脚本都有注释说明
-- [ ] 使用示例清晰准确
-- [ ] 文档完整
+- [ ] Each subdirectory has README documentation
+- [ ] All scripts have comment documentation
+- [ ] Usage examples are clear and accurate
+- [ ] Documentation is complete
+
+---
+
+## 📚 Additional Recommendations
+
+### 1. Add Configuration File
+
+Create `scripts/config.json` to store environment-related configurations:
+
+### 2. Add Environment Variable Support
+
+Create `.env.example`:
+
+### 3. Add README Files
+
+Add `README.md` in each subdirectory, explaining the purpose and usage of scripts in that directory.
+
+### 4. Add Script Templates
+
+Create script template files to facilitate quick creation of new scripts:
 
 ---
 
-## 📚 附加建议
-
-### 1. 添加配置文件
-
-创建 `scripts/config.json` 用于存储环境相关的配置：
-
-### 2. 添加环境变量支持
-
-创建 `.env.example`：
-
-### 3. 添加 README 文件
-
-在每个子目录下添加 `README.md`，说明该目录下脚本的用途和使用方法。
-
-### 4. 添加脚本模板
-
-创建脚本模板文件，便于快速创建新脚本：
-
----
+**Document Version**: 1.0.0  
+**Maintainer**: HashKey Technical Team
 

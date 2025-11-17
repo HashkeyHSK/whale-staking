@@ -1,53 +1,53 @@
-# 常见错误处理指南
+# Common Error Handling Guide
 
-本文档列出了使用 Whale Staking 合约时可能遇到的常见错误及其解决方法。
+This document lists common errors that may be encountered when using the Whale Staking contract and their solutions.
 
-## 用户操作错误
+## User Operation Errors
 
-### 1. "Insufficient stake amount" - 质押金额不足
+### 1. "Insufficient stake amount" - Insufficient Staking Amount
 
-**错误信息**：
+**Error Message**:
 ```
 Error: Insufficient stake amount
 ```
 
-**原因**：
-- 质押金额小于最小质押金额要求
+**Cause**:
+- Staking amount is less than the minimum staking amount requirement
 
-**解决方法**：
-- 检查最小质押金额要求：
-  - 普通 Staking：1 HSK
-  - Premium Staking：500,000 HSK
-- 确保发送的金额 >= 最小质押金额
+**Solution**:
+- Check minimum staking amount requirements:
+  - Normal Staking: 1 HSK
+  - Premium Staking: 500,000 HSK
+- Ensure sent amount >= minimum staking amount
 
-**示例**：
+**Example**:
 ```typescript
-// ❌ 错误：质押金额不足
+// ❌ Error: Insufficient staking amount
 await staking.stake({ value: ethers.parseEther("0.5") });
 
-// ✅ 正确：满足最小质押金额
+// ✅ Correct: Meets minimum staking amount
 await staking.stake({ value: ethers.parseEther("1") });
 ```
 
-**说明**: V2版本使用固定365天锁定期，stake() 函数无需传入 lockPeriod 参数。
+**Note**: V2 version uses fixed 365-day lock period, `stake()` function does not require `lockPeriod` parameter.
 
 ---
 
-### 2. "Not whitelisted" - 未在白名单中
+### 2. "Not whitelisted" - Not in Whitelist
 
-**错误信息**：
+**Error Message**:
 ```
 Error: Not whitelisted
 ```
 
-**原因**：
-- 合约启用了白名单模式
-- 当前地址不在白名单中
+**Cause**:
+- Contract has whitelist mode enabled
+- Current address is not in the whitelist
 
-**解决方法**：
-- 检查白名单模式状态：`await staking.onlyWhitelistCanStake()`
-- 如果是 Premium Staking，需要联系管理员添加到白名单
-- 使用脚本检查白名单状态：
+**Solution**:
+- Check whitelist mode status: `await staking.onlyWhitelistCanStake()`
+- If it's Premium Staking, contact admin to be added to whitelist
+- Use script to check whitelist status:
   ```bash
   npx hardhat run scripts/checkWhitelist.ts --network <network> \
     -- --contract <CONTRACT_ADDRESS> --user <USER_ADDRESS>
@@ -55,279 +55,279 @@ Error: Not whitelisted
 
 ---
 
-### 3. "Still locked" - 锁定期未结束
+### 3. "Still locked" - Lock Period Not Ended
 
-**错误信息**：
+**Error Message**:
 ```
 Error: Still locked
 ```
 
-**原因**：
-- 尝试在锁定期结束前解除质押
-- 当前时间 < 解锁时间（质押时间 + 365天）
+**Cause**:
+- Attempting to unstake before lock period ends
+- Current time < unlock time (staking time + 365 days)
 
-**解决方法**：
-- 查询质押位置信息，确认解锁时间
-- 等待锁定期结束（365天）
-- 锁定期内只能提取奖励，不能解除质押
+**Solution**:
+- Query staking position information to confirm unlock time
+- Wait for lock period to end (365 days)
+- Can only claim rewards during lock period, cannot unstake
 
-**示例**：
+**Example**:
 ```typescript
-// 注意: userPositions 是 mapping，需要遍历索引
+// Note: userPositions is a mapping, need to iterate through indices
 const position = await staking.positions(positionId);
-const LOCK_PERIOD = 365 * 24 * 60 * 60; // 365天
+const LOCK_PERIOD = 365 * 24 * 60 * 60; // 365 days
 const unlockTime = position.stakedAt + LOCK_PERIOD;
 const currentTime = Math.floor(Date.now() / 1000);
 const timeRemaining = unlockTime - currentTime;
 
 if (timeRemaining > 0) {
-  console.log(`还需等待 ${timeRemaining} 秒才能解除质押`);
-  console.log(`预计解锁时间: ${new Date(unlockTime * 1000).toLocaleString()}`);
+  console.log(`Need to wait ${timeRemaining} seconds before unstaking`);
+  console.log(`Expected unlock time: ${new Date(unlockTime * 1000).toLocaleString()}`);
 }
 ```
 
-**说明**: V2版本严格执行365天锁定期，无提前解锁机制。
+**Note**: V2 version strictly enforces 365-day lock period, no early unlock mechanism.
 
 ---
 
-### 4. "Position not found" - 质押位置不存在
+### 4. "Position not found" - Staking Position Not Found
 
-**错误信息**：
+**Error Message**:
 ```
 Error: Position not found
 ```
 
-**原因**：
-- 提供的 `positionId` 不存在
-- 质押位置不属于当前用户
+**Cause**:
+- Provided `positionId` does not exist
+- Staking position does not belong to current user
 
-**解决方法**：
-- 查询用户的质押位置：`await staking.getUserPositionIds(userAddress)`（推荐方法）
-- 确认 `positionId` 是否正确
-- 确认是否为位置所有者
+**Solution**:
+- Query user's staking positions: `await staking.getUserPositionIds(userAddress)` (recommended method)
+- Confirm `positionId` is correct
+- Confirm if you are the position owner
 
 ---
 
-### 5. "Already unstaked" - 已解除质押
+### 5. "Already unstaked" - Already Unstaked
 
-**错误信息**：
+**Error Message**:
 ```
 Error: Already unstaked
 ```
 
-**原因**：
-- 该质押位置已经解除质押
+**Cause**:
+- This staking position has already been unstaked
 
-**解决方法**：
-- 查询质押位置状态：`position.isUnstaked`
-- 使用其他有效的 `positionId`
+**Solution**:
+- Query staking position status: `position.isUnstaked`
+- Use other valid `positionId`
 
 ---
 
-### 6. "Stake amount exceed" - 质押金额超出奖励池支付能力
+### 6. "Stake amount exceed" - Staking Amount Exceeds Reward Pool Payment Capacity
 
-**错误信息**：
+**Error Message**:
 ```
 Error: Stake amount exceed
 ```
 
-**原因**：
-- 奖励池余额不足以支付预期奖励
-- 新质押时，合约会检查：`rewardPoolBalance >= totalPendingRewards + potentialReward`
-- 如果奖励池余额不足，无法创建新质押
+**Cause**:
+- Reward pool balance is insufficient to pay expected rewards
+- When staking, contract checks: `rewardPoolBalance >= totalPendingRewards + potentialReward`
+- If reward pool balance is insufficient, cannot create new staking
 
-**解决方法**：
-- 联系管理员充值奖励池（通过 `updateRewardPool()` 函数）
-- 查询奖励池余额：`await staking.rewardPoolBalance()`
-- 查询总待发放奖励：`await staking.totalPendingRewards()`
-- 等待管理员充值后再尝试质押
+**Solution**:
+- Contact admin to deposit to reward pool (via `updateRewardPool()` function)
+- Query reward pool balance: `await staking.rewardPoolBalance()`
+- Query total pending rewards: `await staking.totalPendingRewards()`
+- Wait for admin to deposit before attempting to stake again
 
 ---
 
-### 6b. "Insufficient reward pool" - 奖励池余额不足（提取时）
+### 6b. "Insufficient reward pool" - Insufficient Reward Pool Balance (When Withdrawing)
 
-**错误信息**：
+**Error Message**:
 ```
 Error: Insufficient reward pool
 ```
 
-**原因**：
-- 提取奖励或解除质押时，奖励池余额不足
-- 这是一个异常情况，通常不应该发生（因为质押时已经预留了奖励）
+**Cause**:
+- When claiming rewards or unstaking, reward pool balance is insufficient
+- This is an abnormal situation that should not normally occur (rewards are reserved when staking)
 
-**解决方法**：
-- 联系管理员立即充值奖励池
-- 这可能需要紧急处理
+**Solution**:
+- Contact admin to immediately deposit to reward pool
+- This may require emergency handling
 
 ---
 
-### 7. "Staking has not started yet" - 质押时间窗口未开始
+### 7. "Staking has not started yet" - Staking Time Window Not Started
 
-**错误信息**：
+**Error Message**:
 ```
 Error: Staking has not started yet
 ```
 
-**原因**：
-- 当前时间早于质押开始时间（`block.timestamp < stakeStartTime`）
-- 质押时间窗口还未开始
+**Cause**:
+- Current time is earlier than staking start time (`block.timestamp < stakeStartTime`)
+- Staking time window has not started
 
-**解决方法**：
-- 查询质押开始时间：`await staking.stakeStartTime()`
-- 等待质押开始时间到达后再尝试质押
-- 联系管理员确认质押开始时间
+**Solution**:
+- Query staking start time: `await staking.stakeStartTime()`
+- Wait for staking start time to arrive before attempting to stake
+- Contact admin to confirm staking start time
 
 ---
 
-### 8. "Staking period has ended" - 质押时间窗口已结束
+### 8. "Staking period has ended" - Staking Time Window Has Ended
 
-**错误信息**：
+**Error Message**:
 ```
 Error: Staking period has ended
 ```
 
-**原因**：
-- 当前时间晚于或等于质押结束时间（`block.timestamp >= stakeEndTime`）
-- 质押时间窗口已结束
+**Cause**:
+- Current time is later than or equal to staking end time (`block.timestamp >= stakeEndTime`)
+- Staking time window has ended
 
-**解决方法**：
-- 查询质押结束时间：`await staking.stakeEndTime()`
-- 联系管理员了解是否会延长质押时间窗口
-- 等待下一个质押周期
+**Solution**:
+- Query staking end time: `await staking.stakeEndTime()`
+- Contact admin to see if staking time window will be extended
+- Wait for next staking cycle
 
 ---
 
-## 管理员操作错误
+## Admin Operation Errors
 
-### 9. "Contract is in emergency mode" - 合约处于紧急模式
+### 9. "Contract is in emergency mode" - Contract in Emergency Mode
 
-**错误信息**：
+**Error Message**:
 ```
 Error: Contract is in emergency mode
 ```
 
-**原因**：
-- 合约处于紧急模式（`emergencyMode == true`）
-- 紧急模式下，新质押被阻止
+**Cause**:
+- Contract is in emergency mode (`emergencyMode == true`)
+- In emergency mode, new staking is blocked
 
-**解决方法**：
-- 等待管理员解除紧急模式
-- 使用 `emergencyWithdraw()` 提取本金（放弃奖励）
-- 联系管理员了解紧急情况
+**Solution**:
+- Wait for admin to disable emergency mode
+- Use `emergencyWithdraw()` to withdraw principal (giving up rewards)
+- Contact admin to understand emergency situation
 
 ---
 
-### 10. "OwnableUnauthorizedAccount" - 仅所有者可操作
+### 10. "OwnableUnauthorizedAccount" - Only Owner Can Operate
 
-**错误信息**：
+**Error Message**:
 ```
 Error: OwnableUnauthorizedAccount(address account)
 ```
 
-**原因**：
-- 尝试执行只有 Owner 才能执行的操作
-- 当前账户不是合约所有者
+**Cause**:
+- Attempting to execute operations that only Owner can perform
+- Current account is not the contract owner
 
-**解决方法**：
-- 确认当前账户是否为 Owner（使用 `owner()` 函数查询）
-- 使用 Owner 账户执行操作
+**Solution**:
+- Confirm if current account is Owner (query using `owner()` function)
+- Use Owner account to execute operations
 
-**管理员操作包括**：
-- 设置最小质押金额（`setMinStakeAmount`）
-- 设置质押时间窗口（`setStakeStartTime`, `setStakeEndTime`）
-- 管理白名单（`updateWhitelistBatch`, `setWhitelistOnlyMode`）
-- 充值/提取奖励池（`updateRewardPool`, `withdrawExcessRewardPool`）
-- 暂停/恢复合约（`pause`, `unpause`）
-- 启用紧急模式（`enableEmergencyMode`）
+**Admin Operations Include**:
+- Set minimum staking amount (`setMinStakeAmount`)
+- Set staking time window (`setStakeStartTime`, `setStakeEndTime`)
+- Manage whitelist (`updateWhitelistBatch`, `setWhitelistOnlyMode`)
+- Deposit/withdraw reward pool (`updateRewardPool`, `withdrawExcessRewardPool`)
+- Pause/resume contract (`pause`, `unpause`)
+- Enable emergency mode (`enableEmergencyMode`)
 
 ---
 
-## 紧急模式相关
+## Emergency Mode Related
 
-### 11. "Not in emergency mode" - 紧急模式未启用
+### 11. "Not in emergency mode" - Emergency Mode Not Enabled
 
-**错误信息**：
+**Error Message**:
 ```
 Error: Not in emergency mode
 ```
 
-**原因**：
-- 尝试使用 `emergencyWithdraw()` 紧急提取，但紧急模式未启用
+**Cause**:
+- Attempting to use `emergencyWithdraw()` for emergency withdrawal, but emergency mode is not enabled
 
-**解决方法**：
-- 管理员需要先启用紧急模式：`await staking.enableEmergencyMode()`
-- 普通用户无法启用紧急模式
-- 如果不是紧急情况，请使用正常的 `unstake()` 解除质押
+**Solution**:
+- Admin needs to enable emergency mode first: `await staking.enableEmergencyMode()`
+- Regular users cannot enable emergency mode
+- If not an emergency, use normal `unstake()` to unstake
 
 ---
 
-## 通用错误处理
+## General Error Handling
 
-### 12. "Transfer failed" - 转账失败
+### 12. "Transfer failed" - Transfer Failed
 
-**错误信息**：
+**Error Message**:
 ```
 Error: Transfer failed
 ```
 
-**原因**：
-- 合约向用户转账时失败（使用 low-level call）
-- 可能是接收地址是合约且没有 receive/fallback 函数
-- 可能是 Gas 不足
+**Cause**:
+- Contract failed to transfer to user (using low-level call)
+- May be receiving address is a contract without receive/fallback function
+- May be insufficient Gas
 
-**解决方法**：
-- 检查接收地址是否有效
-- 如果是合约地址，确保实现了 `receive()` 或 `fallback()` 函数
-- 确保有足够的 Gas
-- 重试操作
+**Solution**:
+- Check if receiving address is valid
+- If it's a contract address, ensure `receive()` or `fallback()` function is implemented
+- Ensure sufficient Gas
+- Retry operation
 
 ---
 
-### 13. "EnforcedPause" / "Contract paused" - 合约已暂停
+### 13. "EnforcedPause" / "Contract paused" - Contract Paused
 
-**错误信息**：
+**Error Message**:
 ```
 Error: EnforcedPause
 ```
-或
+or
 ```
 Error: Contract paused
 ```
 
-**原因**：
-- 合约被管理员暂停（通过 `pause()` 函数）
-- 暂停时，质押（`stake`）和奖励提取（`claimReward`）功能被禁用
+**Cause**:
+- Contract was paused by admin (via `pause()` function)
+- When paused, staking (`stake`) and reward claiming (`claimReward`) functions are disabled
 
-**解决方法**：
-- 等待管理员解除暂停（通过 `unpause()` 函数）
-- 查询暂停状态：`await staking.paused()`
-- 注意：解除质押（`unstake`）功能在暂停状态下也被禁用
+**Solution**:
+- Wait for admin to unpause (via `unpause()` function)
+- Query pause status: `await staking.paused()`
+- Note: Unstaking (`unstake`) function is also disabled when paused
 
 ---
 
-## 调试技巧
+## Debugging Tips
 
-### 查询合约状态
+### Query Contract Status
 
 ```typescript
-// 查询总质押量
+// Query total staked amount
 const totalStaked = await staking.totalStaked();
-console.log(`总质押量: ${ethers.formatEther(totalStaked)} HSK`);
+console.log(`Total staked: ${ethers.formatEther(totalStaked)} HSK`);
 
-// 查询奖励池余额
+// Query reward pool balance
 const rewardPool = await staking.rewardPoolBalance();
-console.log(`奖励池余额: ${ethers.formatEther(rewardPool)} HSK`);
+console.log(`Reward pool balance: ${ethers.formatEther(rewardPool)} HSK`);
 
-// 查询白名单模式
+// Query whitelist mode
 const whitelistMode = await staking.onlyWhitelistCanStake();
-console.log(`白名单模式: ${whitelistMode ? '启用' : '关闭'}`);
+console.log(`Whitelist mode: ${whitelistMode ? 'Enabled' : 'Disabled'}`);
 
-// 查询紧急模式
+// Query emergency mode
 const emergencyMode = await staking.emergencyMode();
-console.log(`紧急模式: ${emergencyMode ? '启用' : '关闭'}`);
+console.log(`Emergency mode: ${emergencyMode ? 'Enabled' : 'Disabled'}`);
 
-// 查询用户质押位置（需要遍历索引）
-// 注意: userPositions 是 mapping，需要通过索引逐个查询
+// Query user staking positions (need to iterate through indices)
+// Note: userPositions is a mapping, need to query one by one through indices
 let positionCount = 0;
 try {
   while (true) {
@@ -335,55 +335,55 @@ try {
     positionCount++;
   }
 } catch (e) {
-  // 当索引超出范围时会抛出异常
+  // Exception thrown when index is out of range
 }
-console.log(`用户质押位置数: ${positionCount}`);
+console.log(`User staking position count: ${positionCount}`);
 ```
 
-### 使用脚本检查
+### Use Scripts to Check
 
 ```bash
-# 检查用户质押情况
+# Check user staking status
 npx hardhat run scripts/checkStakes.ts --network <network> \
   -- --contract <CONTRACT_ADDRESS> --user <USER_ADDRESS>
 
-# 检查白名单状态
+# Check whitelist status
 npx hardhat run scripts/checkWhitelist.ts --network <network> \
   -- --contract <CONTRACT_ADDRESS> --user <USER_ADDRESS>
 ```
 
-**说明**: V2版本使用固定365天锁定期（`LOCK_PERIOD = 365 days`），无需检查锁定期选项。
+**Note**: V2 version uses fixed 365-day lock period (`LOCK_PERIOD = 365 days`), no need to check lock period options.
 
-### 查询合约常量
+### Query Contract Constants
 
 ```typescript
-// 查询固定锁定期（常量）
+// Query fixed lock period (constant)
 const LOCK_PERIOD = await staking.LOCK_PERIOD();
-console.log(`锁定期: ${LOCK_PERIOD / 86400} 天`); // 365天
+console.log(`Lock period: ${LOCK_PERIOD / 86400} days`); // 365 days
 
-// 查询年化收益率
+// Query annual yield rate
 const rewardRate = await staking.rewardRate();
-console.log(`年化收益率: ${rewardRate / 100}%`); // 800 = 8%, 1600 = 16%
+console.log(`Annual yield rate: ${rewardRate / 100}%`); // 800 = 8%, 1600 = 16%
 
-// 查询质押时间窗口
+// Query staking time window
 const stakeStartTime = await staking.stakeStartTime();
 const stakeEndTime = await staking.stakeEndTime();
-console.log(`质押开始时间: ${new Date(stakeStartTime * 1000).toLocaleString()}`);
-console.log(`质押结束时间: ${new Date(stakeEndTime * 1000).toLocaleString()}`);
+console.log(`Staking start time: ${new Date(stakeStartTime * 1000).toLocaleString()}`);
+console.log(`Staking end time: ${new Date(stakeEndTime * 1000).toLocaleString()}`);
 ```
 
 ---
 
-## 联系支持
+## Contact Support
 
-如果遇到本文档未涵盖的错误，请：
+If you encounter errors not covered in this document, please:
 
-1. 检查合约事件日志，获取详细错误信息
-2. 查询合约状态，确认配置是否正确
-3. 联系开发团队或管理员
+1. Check contract event logs to get detailed error information
+2. Query contract status to confirm configuration is correct
+3. Contact development team or admin
 
 ---
 
-**文档版本**: 1.0.0  
-**最后更新**: 2026-11
+**Document Version**: 1.0.0  
+**Maintainer**: HashKey Technical Team
 

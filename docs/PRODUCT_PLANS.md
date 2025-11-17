@@ -1,467 +1,464 @@
-# 双层 Staking 产品方案
+# Dual-Tier Staking Product Plan
 
-## 一. 产品概览
+## I. Product Overview
 
-本方案基于 Whale Staking 合约架构，提供两套独立的产品方案，分别面向不同用户群体：
+This plan is based on the Whale Staking contract architecture, providing two independent product schemes targeting different user groups:
 
-- **普通 Staking（委托质押）**：面向普通用户，低门槛、稳健收益
-- **Premium Staking（高级质押）**：面向大户/机构，高门槛、高收益
-
----
-
-## 二. 产品一：普通 Staking（委托质押）
-
-### 产品定位
-面向普通用户的委托质押产品，降低参与门槛，提供稳定的质押收益。
-
-### 目标用户
-- 普通散户投资者
-- 小额持有者
-- 希望获得稳定收益的用户
-
-### 核心参数
-
-| 参数项 | 配置值 | 说明 |
-|--------|--------|------|
-| **最小质押门槛** | 1 HSK | 用户每次质押的最低金额 |
-| **年化收益率** | 8% | 固定年化收益率（部署时配置） |
-| **锁定期** | 365天 | 固定365天锁定期 |
-| **白名单模式** | 关闭 | 所有用户均可自由参与质押 |
-| **最大总质押量** | 10,000,000 HSK | 整个产品池的上限（所有用户质押金额总和的上限，非单笔限制） |
-
-### 产品机制
-
-#### 1. 参与机制
-- **开放参与**：无需审核，任何用户都可以参与质押
-- **质押时间窗口**：只能在指定的时间窗口内进行质押（由管理员设置开始时间和结束时间）
-- **固定锁定期**：锁定期固定为 365天（不需要选择）
-- **多次质押**：同一用户可以进行多次质押，创建多个质押位置
-
-#### 2. 收益机制
-- **固定年化**：所有锁定期选项统一为 8% 年化收益率
-- **按秒计息**：奖励按实际质押秒数连续累积，精确到秒
-- **奖励上限**：奖励只计算到锁定期结束，超期质押不会增加奖励
-
-#### 3. 提取机制
-
-**解锁规则**：
-- **锁定期限制**：锁定期内（365天）不能解除质押，只能提取奖励
-- **解锁条件**：锁定期结束后（365天后）才能解除质押
-- **解锁时间计算**：解锁时间 = 质押时间 + 365天（例如：2026-11-01 质押，解锁时间 2027-11-01）
-
-**提取方式**：
-1. **奖励提取**（锁定期内）：
-   - 可以随时提取已累积的奖励
-   - 提取奖励后，质押位置仍然保留
-   - 本金继续锁定，继续获得奖励
-
-2. **解除质押**（锁定期结束后）：
-   - 锁定期结束后，可以解除质押
-   - 解除质押时，自动提取本金 + 全部累积奖励
-   - 解除质押后，该质押位置关闭，不再获得奖励
-
-3. **紧急提取**（特殊情况下）：
-   - 仅在管理员启用紧急模式时可用
-   - 可以随时提取，不受锁定期限制
-   - 只能提取本金，放弃全部奖励
-
-**提取金额**：
-- **奖励提取**：仅提取已累积的奖励金额
-- **解除质押**：本金 + 全部累积奖励（包括未提取的奖励）
-- **紧急提取**：仅本金，不包含奖励
-
-#### 4. 风险控制
-- **最小质押门槛**：设置合理的参与门槛（单笔质押的最低金额）
-- **最大总质押量限制**：整个产品池的上限（所有用户质押金额总和的上限），防止过度集中，确保系统稳定
-- **奖励池余额检查**：合约会检查奖励池余额是否足够支付所有待发放奖励，确保系统稳定
-- **紧急提取机制**：特殊情况下管理员可启用紧急模式，用户可随时提取本金（放弃奖励）
-
-### 适用场景
-✅ 适合长期持有 HSK 的用户  
-✅ 希望获得稳定收益的投资者  
-✅ 小额资金参与质押  
-✅ 不需要高收益但追求稳健的用户  
-
-### 运营建议
-- **推广策略**：强调低门槛、稳定收益，吸引普通用户参与
-- **用户教育**：重点说明锁定期和收益计算方式
-- **奖励池管理**：需要定期向奖励池充值，确保有足够资金支付奖励
-- **大户 DID 提醒**：质押金额达到 5万 HSK 时，提醒用户去 mint 大户 DID
+- **Normal Staking (Delegated Staking)**: For general users, low threshold, stable returns
+- **Premium Staking (Premium Staking)**: For whales/institutions, high threshold, high returns
 
 ---
 
-## 三. 产品二：Premium Staking（高级质押）
+## II. Product 1: Normal Staking (Delegated Staking)
 
-### 产品定位
-面向大户和机构的高级质押产品，提供高额收益，但需要较高的资金门槛和审核机制。
+### Product Positioning
+Delegated staking product for general users, lowering participation threshold, providing stable staking returns.
 
-### 目标用户
-- 大户投资者
-- 机构投资者
-- 高净值用户
+### Target Users
+- General retail investors
+- Small capital holders
+- Users seeking stable returns
 
-### 核心参数
+### Core Parameters
 
-| 参数项 | 配置值 | 说明 |
-|--------|--------|------|
-| **最小质押门槛** | 500,000 HSK | 用户每次质押的最低金额（50万 HSK） |
-| **年化收益率** | 16% | 固定年化收益率（部署时配置，链上自动计算） |
-| **锁定期** | 365天 | 固定365天锁定期 |
-| **白名单模式** | 启用 | 只有经过审核的用户才能参与质押 |
-| **最大总质押量** | 20,000,000 HSK | 整个产品池的上限（所有用户质押金额总和的上限，非单笔限制） |
+| Parameter | Configuration | Notes |
+|-----------|---------------|-------|
+| **Minimum Stake Threshold** | 1 HSK | Minimum amount per user stake |
+| **Annual Yield Rate** | 8% | Fixed annual yield rate (configured at deployment) |
+| **Lock Period** | 365 days | Fixed 365-day lock period |
+| **Whitelist Mode** | Disabled | All users can freely participate in staking |
+| **Maximum Total Staked** | 10,000,000 HSK | Upper limit for entire product pool (upper limit for sum of all users' staking amounts, not per-transaction limit) |
 
-### 产品机制
+### Product Mechanisms
 
-#### 1. 参与机制
-- **白名单审核**：用户需要先申请加入白名单，通过审核后才能参与质押
-- **质押时间窗口**：只能在指定的时间窗口内进行质押（由管理员设置开始时间和结束时间）
-- **高门槛设置**：最低质押金额为 50万 HSK，确保参与用户具有足够资金实力
-- **固定锁定期**：锁定期固定为 365天，鼓励长期质押
+#### 1. Participation Mechanism
+- **Open Participation**: No approval required, any user can participate in staking
+- **Staking Time Window**: Can only stake within specified time window (start and end times set by admin)
+- **Fixed Lock Period**: Lock period fixed at 365 days (no need to choose)
+- **Multiple Stakes**: Same user can stake multiple times, creating multiple staking positions
 
-#### 2. 收益机制
+#### 2. Reward Mechanism
+- **Fixed Annual Yield**: All lock period options unified to 8% annual yield rate
+- **Per-Second Interest**: Rewards accumulate continuously per actual staking seconds, precise to the second
+- **Reward Cap**: Rewards only calculated up to end of lock period, extra staking time does not increase rewards
 
-**收益规则**：
-- **固定年化**：所有锁定期选项统一为 16% 年化收益率（链上自动计算）
-- **按秒计息**：奖励按实际质押秒数连续累积，精确到秒
-- **奖励上限**：奖励只计算到锁定期结束，超期质押不会增加奖励
+#### 3. Withdrawal Mechanism
 
-#### 3. 提取机制
+**Unlock Rules**:
+- **Lock Period Restriction**: During lock period (365 days) cannot unstake, can only claim rewards
+- **Unlock Condition**: Can unstake after lock period ends (after 365 days)
+- **Unlock Time Calculation**: Unlock time = Staking time + 365 days (e.g., stake on 2026-11-01, unlock time 2027-11-01)
 
-**解锁规则**：
-- **锁定期限制**：锁定期内（365天）不能解除质押，只能提取奖励
-- **解锁条件**：锁定期结束后（365天后）才能解除质押
-- **解锁时间计算**：解锁时间 = 质押时间 + 365天（例如：2026-11-01 质押，解锁时间 2027-11-01）
+**Withdrawal Methods**:
+1. **Reward Claim** (during lock period):
+   - Can claim accumulated rewards at any time
+   - After claiming rewards, staking position remains
+   - Principal continues to be locked, continues to earn rewards
 
-**提取方式**：
-1. **奖励提取**（锁定期内）：
-   - 可以随时提取已累积的奖励
-   - 提取奖励后，质押位置仍然保留
-   - 本金继续锁定，继续获得奖励
+2. **Unstake** (after lock period ends):
+   - After lock period ends, can unstake
+   - When unstaking, automatically claim principal + all accumulated rewards
+   - After unstaking, staking position closes, no longer earns rewards
 
-2. **解除质押**（锁定期结束后）：
-   - 锁定期结束后，可以解除质押
-   - 解除质押时，自动提取本金 + 全部累积奖励
-   - 解除质押后，该质押位置关闭，不再获得奖励
+3. **Emergency Withdrawal** (under special circumstances):
+   - Only available after admin enables emergency mode
+   - Can withdraw at any time, not subject to lock period restrictions
+   - Can only withdraw principal, giving up all rewards
 
-3. **紧急提取**（特殊情况下）：
-   - 仅在管理员启用紧急模式时可用
-   - 可以随时提取，不受锁定期限制
-   - 只能提取本金，放弃全部奖励
+**Withdrawal Amounts**:
+- **Reward Claim**: Only claim accumulated reward amount
+- **Unstake**: Principal + all accumulated rewards (including unclaimed rewards)
+- **Emergency Withdrawal**: Principal only, no rewards
 
-**提取金额**：
-- **奖励提取**：仅提取已累积的奖励金额
-- **解除质押**：本金 + 全部累积奖励
-- **紧急提取**：仅本金，不包含奖励
+#### 4. Risk Control
+- **Minimum Stake Threshold**: Set reasonable participation threshold (minimum amount per stake)
+- **Maximum Total Staked Limit**: Upper limit for entire product pool (upper limit for sum of all users' staking amounts), prevents over-concentration, ensures system stability
+- **Reward Pool Balance Check**: Contract checks if reward pool balance is sufficient to pay all pending rewards, ensures system stability
+- **Emergency Withdrawal Mechanism**: Admin can enable emergency mode under special circumstances, users can withdraw principal at any time (giving up rewards)
 
-#### 4. 风险控制
-- **白名单审核**：严格的用户审核机制，确保资金安全
-- **高门槛限制**：通过高门槛筛选合格的投资者（单笔质押的最低金额）
-- **最大总质押量限制**：整个产品池的上限（所有用户质押金额总和的上限），控制产品规模，确保系统稳定
-- **奖励池余额检查**：合约会检查奖励池余额是否足够支付所有待发放奖励，确保系统稳定
-- **紧急提取机制**：特殊情况下管理员可启用紧急模式，用户可随时提取本金（放弃奖励）
+### Use Cases
+✅ Suitable for users holding HSK long-term  
+✅ Investors seeking stable returns  
+✅ Small capital participation in staking  
+✅ Users not needing high returns but pursuing stability  
 
-### 适用场景
-✅ 适合资金量较大的用户  
-✅ 追求高收益的投资者  
-✅ 愿意长期锁定的用户  
-✅ 通过审核的机构投资者  
-
-### 运营建议
-- **推广策略**：强调高收益（16% 年化）、高门槛，吸引优质大户和机构
-- **白名单管理**：建立完善的审核流程，确保白名单用户质量
-- **奖励池管理**：
-  - 需要充足的奖励池资金支持（16% APY 需要更多资金）
-  - 定期监控奖励池余额，确保有足够资金支付奖励
-- **用户沟通**：及时与大户沟通，提供专属服务
-- **大户 DID 提醒**：Premium Staking 用户均符合大户 DID 条件（最低门槛 50万 HSK），及时提醒用户去 mint 大户 DID
+### Operational Recommendations
+- **Promotion Strategy**: Emphasize low threshold, stable returns, attract general users to participate
+- **User Education**: Focus on explaining lock period and return calculation methods
+- **Reward Pool Management**: Need to regularly deposit to reward pool, ensure sufficient funds to pay rewards
+- **Whale DID Reminder**: When staking amount reaches 50,000 HSK, remind users to mint Whale DID
 
 ---
 
-## 四. 产品对比
+## III. Product 2: Premium Staking (Premium Staking)
 
-| 特性 | 普通 Staking | Premium Staking |
-|------|-------------|-----------|
-| **目标用户** | 普通用户 | 大户/机构 |
-| **最小质押** | 1 HSK | 500,000 HSK |
-| **年化收益** | 8% | 16% |
-| **锁定期** | 365天 | 365天 |
-| **参与方式** | 开放（无需审核） | 白名单（需审核） |
-| **最大总质押** | 1,000万 HSK（池子上限） | 2,000万 HSK（池子上限） |
-| **收益等级** | 稳健 | 高收益 |
+### Product Positioning
+Premium staking product for whales and institutions, providing high returns but requiring high capital threshold and approval mechanism.
 
----
+### Target Users
+- Whale investors
+- Institutional investors
+- High-net-worth users
 
-## 五. 产品设计逻辑
+### Core Parameters
 
-### 为什么设计两套产品？
+| Parameter | Configuration | Notes |
+|-----------|---------------|-------|
+| **Minimum Stake Threshold** | 500,000 HSK | Minimum amount per user stake (500K HSK) |
+| **Annual Yield Rate** | 16% | Fixed annual yield rate (configured at deployment, calculated automatically on-chain) |
+| **Lock Period** | 365 days | Fixed 365-day lock period |
+| **Whitelist Mode** | Enabled | Only approved users can participate in staking |
+| **Maximum Total Staked** | 20,000,000 HSK | Upper limit for entire product pool (upper limit for sum of all users' staking amounts, not per-transaction limit) |
 
-1. **用户分层**：不同资金量的用户有不同的需求和风险承受能力
-2. **收益差异化**：通过不同收益水平吸引不同用户群体
-3. **风险控制**：高收益产品需要更高的门槛和更严格的审核
-4. **资金管理**：通过产品分层，更好地管理不同规模的资金
+### Product Mechanisms
 
-### 为什么普通 Staking 是 8%？
+#### 1. Participation Mechanism
+- **Whitelist Approval**: Users need to apply to join whitelist first, can only participate after approval
+- **Staking Time Window**: Can only stake within specified time window (start and end times set by admin)
+- **High Threshold Setting**: Minimum staking amount is 500K HSK, ensures participating users have sufficient capital strength
+- **Fixed Lock Period**: Lock period fixed at 365 days, encourages long-term staking
 
-- **市场定位**：8% 是稳健的收益水平，适合普通用户
-- **风险可控**：较低收益意味着较低的风险和资金需求
-- **用户接受度**：普通用户更容易接受稳健的收益水平
+#### 2. Reward Mechanism
 
-### 为什么 Premium Staking 是 16%？
+**Reward Rules**:
+- **Fixed Annual Yield**: All lock period options unified to 16% annual yield rate (calculated automatically on-chain)
+- **Per-Second Interest**: Rewards accumulate continuously per actual staking seconds, precise to the second
+- **Reward Cap**: Rewards only calculated up to end of lock period, extra staking time does not increase rewards
 
-- **高门槛补偿**：高门槛需要相对较高的收益来吸引用户
-- **长期锁定**：鼓励用户长期锁定资金
-- **风险溢价**：收益覆盖更高的风险和资金成本
-- **市场定位**：16% 是合理的收益水平，适合大户和机构投资者
+#### 3. Withdrawal Mechanism
 
-### 为什么 Premium Staking 需要白名单？
+**Unlock Rules**:
+- **Lock Period Restriction**: During lock period (365 days) cannot unstake, can only claim rewards
+- **Unlock Condition**: Can unstake after lock period ends (after 365 days)
+- **Unlock Time Calculation**: Unlock time = Staking time + 365 days (e.g., stake on 2026-11-01, unlock time 2027-11-01)
 
-- **资金安全**：高收益产品需要确保参与用户的质量
-- **风险控制**：通过审核机制筛选合格的投资者
-- **合规要求**：可能需要满足某些合规要求
+**Withdrawal Methods**:
+1. **Reward Claim** (during lock period):
+   - Can claim accumulated rewards at any time
+   - After claiming rewards, staking position remains
+   - Principal continues to be locked, continues to earn rewards
 
----
+2. **Unstake** (after lock period ends):
+   - After lock period ends, can unstake
+   - When unstaking, automatically claim principal + all accumulated rewards
+   - After unstaking, staking position closes, no longer earns rewards
 
-## 六. 重要机制说明
+3. **Emergency Withdrawal** (under special circumstances):
+   - Only available after admin enables emergency mode
+   - Can withdraw at any time, not subject to lock period restrictions
+   - Can only withdraw principal, giving up all rewards
 
-### 1. 解锁机制
+**Withdrawal Amounts**:
+- **Reward Claim**: Only claim accumulated reward amount
+- **Unstake**: Principal + all accumulated rewards
+- **Emergency Withdrawal**: Principal only, no rewards
 
-**核心规则**：
-- **锁定期内**：不能解除质押，只能提取奖励
-- **锁定期结束后**：可以解除质押，提取本金 + 全部奖励
-- **解锁时间**：解锁时间 = 质押时间 + 锁定期
+#### 4. Risk Control
+- **Whitelist Approval**: Strict user approval mechanism, ensures fund security
+- **High Threshold Restriction**: Filters qualified investors through high threshold (minimum amount per stake)
+- **Maximum Total Staked Limit**: Upper limit for entire product pool (upper limit for sum of all users' staking amounts), controls product scale, ensures system stability
+- **Reward Pool Balance Check**: Contract checks if reward pool balance is sufficient to pay all pending rewards, ensures system stability
+- **Emergency Withdrawal Mechanism**: Admin can enable emergency mode under special circumstances, users can withdraw principal at any time (giving up rewards)
 
-**解锁条件**：
-- 必须等待锁定期完全结束
-- 锁定期内无法提前解除质押
-- 锁定期结束后可以随时解除质押（无时间限制）
+### Use Cases
+✅ Suitable for users with larger capital  
+✅ Investors pursuing high returns  
+✅ Users willing to lock long-term  
+✅ Approved institutional investors  
 
-**示例说明**：
-- 用户于 2026-11-01 00:00:00 质押，固定 365 天锁定期
-- 解锁时间：2027-11-01 00:00:00（365 天后）
-- 锁定期内（2026-11-01 至 2027-11-01）：只能提取奖励，不能解除质押
-- 锁定期结束后（2027-11-01 之后）：可以解除质押，提取本金 + 全部奖励
-
-**运营意义**：
-- 确保资金锁定，避免用户过早退出
-- 保护质押机制的有效性
-- 鼓励用户长期持有
-
-### 2. 奖励计算机制
-
-**核心规则**：奖励只计算到锁定期结束
-
-**示例说明**：
-- 用户选择 365 天锁定期，年化 8%
-- 实际质押了 400 天才提取
-- 奖励仍按 365 天计算：`本金 × 8% × (365/365) = 本金 × 8%`
-- **重要**：超过锁定期的时间不会产生额外奖励，奖励只计算到锁定期结束
-
-**运营意义**：
-- 鼓励用户按时提取，避免资金长期占用
-- 提高资金周转效率
-- 确保奖励池资金充足
-
-
-### 3. 白名单机制
-
-**普通 Staking**：
-- 白名单模式：关闭
-- 所有用户可自由参与
-- 无需审核
-
-**Premium Staking**：
-- 白名单模式：启用
-- 只有白名单用户才能质押
-- 需要管理员审核添加
-
-**运营建议**：
-- 建立白名单审核标准
-- 定期审核白名单用户
-- 及时添加/移除白名单用户
-
-### 4. 奖励池管理
-
-**独立奖励池**：
-- 两个产品有独立的奖励池
-- 需要分别管理和充值
-- 不能互相挪用
-
-**奖励池需求**：
-- **普通 Staking**：按 8% APY 计算所需奖励
-- **Premium Staking**：按 16% APY 计算所需奖励（需要更多资金）
-
-**运营建议**：
-- 定期检查奖励池余额
-- 确保有足够资金支付固定年化奖励（16% APY）
-- 提前规划奖励池充值计划
-
-### 5. 紧急提取机制
-
-**机制概述**：
-- 紧急提取是特殊情况下的一种提取方式
-- 仅在管理员启用紧急模式后可用
-- 允许用户在锁定期内提取本金，但放弃全部奖励
-
-**触发条件**：
-- 管理员必须启用紧急模式
-- 紧急模式启用后，用户可以随时使用紧急提取功能
-
-**功能说明**：
-- **紧急提取**：
-  - 不受锁定期限制，可以随时提取
-  - 只能提取本金，不包含奖励
-  - 提取后质押位置关闭
-
-- **紧急模式下的其他限制**：
-  - 暂停奖励分配
-  - 新质押被阻止
-  - 已满足解锁条件可正常解除质押，但奖励为 0；未到期可使用紧急提取（仅本金）
-
-**使用场景**：
-- 合约出现紧急情况或安全风险
-- 需要快速回收用户本金
-- 系统维护或升级
-- 不可预见的紧急情况
-
-**操作流程**：
-1. 管理员启用紧急模式
-2. 系统通知用户紧急模式已启用
-3. 用户可以选择紧急提取（提取本金，放弃奖励）
-4. 紧急情况解除后，管理员可以关闭紧急模式
-
-**运营建议**：
-- ⚠️ 谨慎使用紧急模式，仅在真正紧急情况下启用
-- ⚠️ 及时通知所有用户紧急模式已启用
-- ⚠️ 制定详细的应急处理流程
-- ⚠️ 明确告知用户紧急提取会放弃奖励
-- ⚠️ 确保用户充分理解紧急提取的后果
+### Operational Recommendations
+- **Promotion Strategy**: Emphasize high returns (16% annual), high threshold, attract quality whales and institutions
+- **Whitelist Management**: Establish complete approval process, ensure whitelist user quality
+- **Reward Pool Management**:
+  - Need sufficient reward pool fund support (16% APY requires more funds)
+  - Regularly monitor reward pool balance, ensure sufficient funds to pay rewards
+- **User Communication**: Timely communication with whales, provide exclusive services
+- **Whale DID Reminder**: Premium Staking users all meet Whale DID conditions (minimum threshold 500K HSK), timely remind users to mint Whale DID
 
 ---
 
-## 七. 运营策略建议
+## IV. Product Comparison
 
-### 普通 Staking 运营策略
-
-1. **用户获取**
-   - 强调低门槛（1 HSK 即可参与）
-   - 突出稳定收益（8% 年化）
-   - 降低参与难度（无需审核）
-
-2. **用户留存**
-   - 锁定期为 365天
-   - 定期发布收益报告
-   - 建立用户社群
-
-3. **奖励池管理**
-   - 定期监控奖励池余额
-   - 提前规划充值计划
-   - 确保奖励及时发放
-
-### Premium Staking 运营策略
-
-1. **用户获取**
-   - 定向邀请大户和机构
-   - 强调高收益（16% 年化）
-   - 提供专属服务
-
-2. **用户审核**
-   - 建立审核标准
-   - 验证用户资质
-   - 定期审核白名单
-
-3. **奖励池管理**
-   - 高收益需要更多资金支持（16% APY）
-   - 需要更严格的资金管理
-   - 定期评估奖励池充足性
+| Feature | Normal Staking | Premium Staking |
+|---------|---------------|----------------|
+| **Target Users** | General users | Whales/Institutions |
+| **Minimum Stake** | 1 HSK | 500,000 HSK |
+| **Annual Yield** | 8% | 16% |
+| **Lock Period** | 365 days | 365 days |
+| **Participation Method** | Open (no approval required) | Whitelist (requires approval) |
+| **Maximum Total Staked** | 10,000,000 HSK (pool limit) | 20,000,000 HSK (pool limit) |
+| **Return Level** | Stable | High returns |
 
 ---
 
-## 八. 关键指标监控
+## V. Product Design Logic
 
-### 普通 Staking 监控指标
+### Why Design Two Products?
 
-- **总质押量**：监控产品总质押金额
-- **用户数量**：统计参与用户数
-- **平均质押金额**：了解用户质押规模
-- **奖励池余额**：确保有足够资金支付奖励
-- **总待发放奖励**：监控 totalPendingRewards，确保奖励池余额充足
+1. **User Segmentation**: Users with different capital amounts have different needs and risk tolerance
+2. **Return Differentiation**: Attract different user groups through different return levels
+3. **Risk Control**: High-return products need higher thresholds and stricter approval
+4. **Fund Management**: Better manage funds of different scales through product segmentation
 
-### Premium Staking 监控指标
+### Why is Normal Staking 8%?
 
-- **总质押量**：监控产品总质押金额
-- **白名单用户数**：统计授权用户数量
-- **平均质押金额**：了解大户质押规模
-- **奖励池余额**：确保有足够资金支付奖励（需要更多）
-- **总待发放奖励**：监控 totalPendingRewards，确保奖励池余额充足
+- **Market Positioning**: 8% is a stable return level, suitable for general users
+- **Controllable Risk**: Lower returns mean lower risk and fund requirements
+- **User Acceptance**: General users more easily accept stable return levels
 
----
+### Why is Premium Staking 16%?
 
-## 九. 运营注意事项
+- **High Threshold Compensation**: High threshold needs relatively higher returns to attract users
+- **Long-Term Locking**: Encourages users to lock funds long-term
+- **Risk Premium**: Returns cover higher risks and capital costs
+- **Market Positioning**: 16% is a reasonable return level, suitable for whale and institutional investors
 
-### 1. 奖励池管理
-- ✅ 两个产品需要独立的奖励池
-- ✅ 定期检查奖励池余额
-- ✅ 提前规划充值计划
-- ⚠️ 确保有足够资金支付奖励
+### Why Does Premium Staking Need Whitelist?
 
-### 2. 白名单管理
-- ✅ 建立审核标准
-- ✅ 定期审核白名单用户
-- ✅ 及时添加/移除用户
-- ⚠️ 确保审核流程透明
-
-### 3. 用户沟通
-- ✅ 及时发布产品信息
-- ✅ 解答用户疑问
-- ✅ 提供使用指南
-- ⚠️ 保持沟通渠道畅通
-
-### 4. 风险控制
-- ✅ 监控产品总质押量和奖励池余额
-- ✅ 关注异常情况（奖励池余额不足、紧急模式等）
-- ✅ 制定应急预案
-- ⚠️ 确保系统稳定运行
-- ⚠️ 定期检查奖励池余额是否足够支付所有待发放奖励
-
+- **Fund Security**: High-return products need to ensure quality of participating users
+- **Risk Control**: Filter qualified investors through approval mechanism
+- **Compliance Requirements**: May need to meet certain compliance requirements
 
 ---
 
-## 十. 产品附加功能
+## VI. Important Mechanism Explanations
 
-### 大户 DID（去中心化身份）
+### 1. Unlock Mechanism
 
-**功能说明**：
-- 为质押金额 ≥ 5万 HSK 的用户提供专属的去中心化身份标识（DID）
-- 当用户质押金额达到 5万 HSK 时，系统自动提醒用户可以去 mint 大户 DID
-- 用户需要主动去 mint DID，系统只提供提醒，不自动 mint
+**Core Rules**:
+- **During lock period**: Cannot unstake, can only claim rewards
+- **After lock period ends**: Can unstake, withdraw principal + all rewards
+- **Unlock time**: Unlock time = Staking time + Lock period
+
+**Unlock Conditions**:
+- Must wait for lock period to fully end
+- Cannot unstake early during lock period
+- Can unstake at any time after lock period ends (no time limit)
+
+**Example**:
+- User stakes on 2026-11-01 00:00:00, fixed 365-day lock period
+- Unlock time: 2027-11-01 00:00:00 (365 days later)
+- During lock period (2026-11-01 to 2027-11-01): Can only claim rewards, cannot unstake
+- After lock period ends (after 2027-11-01): Can unstake, withdraw principal + all rewards
+
+**Operational Significance**:
+- Ensures fund locking, prevents users from exiting too early
+- Protects effectiveness of staking mechanism
+- Encourages users to hold long-term
+
+### 2. Reward Calculation Mechanism
+
+**Core Rule**: Rewards only calculated up to end of lock period
+
+**Example**:
+- User chooses 365-day lock period, 8% annual yield
+- Actually staked for 400 days before withdrawal
+- Rewards still calculated based on 365 days: `Principal × 8% × (365/365) = Principal × 8%`
+- **Important**: Time beyond lock period does not generate additional rewards, rewards only calculated up to end of lock period
+
+**Operational Significance**:
+- Encourages users to withdraw on time, avoids long-term fund occupation
+- Improves fund turnover efficiency
+- Ensures sufficient reward pool funds
+
+### 3. Whitelist Mechanism
+
+**Normal Staking**:
+- Whitelist mode: Disabled
+- All users can freely participate
+- No approval required
+
+**Premium Staking**:
+- Whitelist mode: Enabled
+- Only whitelisted users can stake
+- Requires admin approval to add
+
+**Operational Recommendations**:
+- Establish whitelist approval standards
+- Regularly review whitelist users
+- Promptly add/remove whitelist users
+
+### 4. Reward Pool Management
+
+**Independent Reward Pools**:
+- Both products have independent reward pools
+- Need to manage and deposit separately
+- Cannot be used interchangeably
+
+**Reward Pool Requirements**:
+- **Normal Staking**: Calculate required rewards based on 8% APY
+- **Premium Staking**: Calculate required rewards based on 16% APY (needs more funds)
+
+**Operational Recommendations**:
+- Regularly check reward pool balance
+- Ensure sufficient funds to pay fixed annual rewards (16% APY)
+- Plan reward pool deposit schedule in advance
+
+### 5. Emergency Withdrawal Mechanism
+
+**Mechanism Overview**:
+- Emergency withdrawal is a withdrawal method under special circumstances
+- Only available after admin enables emergency mode
+- Allows users to withdraw principal during lock period, but gives up all rewards
+
+**Trigger Conditions**:
+- Admin must enable emergency mode
+- After emergency mode is enabled, users can use emergency withdrawal function at any time
+
+**Function Description**:
+- **Emergency Withdrawal**:
+  - Not subject to lock period restrictions, can withdraw at any time
+  - Can only withdraw principal, does not include rewards
+  - Staking position closes after withdrawal
+
+- **Other Restrictions in Emergency Mode**:
+  - Reward distribution paused
+  - New staking blocked
+  - If unlock conditions are met, can unstake normally but rewards are 0; if not expired, can use emergency withdrawal (principal only)
+
+**Use Cases**:
+- Contract emergency situations or security risks
+- Need to quickly recover user principal
+- System maintenance or upgrades
+- Unforeseen emergency situations
+
+**Operation Process**:
+1. Admin enables emergency mode
+2. System notifies users that emergency mode is enabled
+3. Users can choose emergency withdrawal (withdraw principal, give up rewards)
+4. After emergency situation is resolved, admin can disable emergency mode
+
+**Operational Recommendations**:
+- ⚠️ Use emergency mode cautiously, only enable in truly emergency situations
+- ⚠️ Promptly notify all users that emergency mode is enabled
+- ⚠️ Develop detailed emergency handling procedures
+- ⚠️ Clearly inform users that emergency withdrawal will give up rewards
+- ⚠️ Ensure users fully understand consequences of emergency withdrawal
 
 ---
 
-## 十一. 总结
+## VII. Operational Strategy Recommendations
 
-双层 Staking 产品方案通过差异化的产品设计，满足不同用户群体的需求：
+### Normal Staking Operational Strategy
 
-- **普通 Staking**：低门槛、稳健收益，面向普通用户
-- **Premium Staking**：高门槛、高收益，面向大户和机构
+1. **User Acquisition**
+   - Emphasize low threshold (can participate with 1 HSK)
+   - Highlight stable returns (8% annual)
+   - Reduce participation difficulty (no approval required)
 
-通过合理的机制设计，既保证了产品的安全性，又提供了灵活的用户体验，为运营提供了清晰的运营策略和监控指标。
+2. **User Retention**
+   - Lock period is 365 days
+   - Regularly publish return reports
+   - Build user community
+
+3. **Reward Pool Management**
+   - Regularly monitor reward pool balance
+   - Plan deposit schedule in advance
+   - Ensure timely reward distribution
+
+### Premium Staking Operational Strategy
+
+1. **User Acquisition**
+   - Targeted invitations to whales and institutions
+   - Emphasize high returns (16% annual)
+   - Provide exclusive services
+
+2. **User Approval**
+   - Establish approval standards
+   - Verify user qualifications
+   - Regularly review whitelist
+
+3. **Reward Pool Management**
+   - High returns require more fund support (16% APY)
+   - Need stricter fund management
+   - Regularly assess reward pool sufficiency
 
 ---
 
-## 📚 相关文档
+## VIII. Key Metrics Monitoring
 
-- [主 README](../README.md)
-- [合约架构说明](./CONTRACT_ARCHITECTURE.md) - **合约架构详解（开发必读）**
-- [产品方案执行摘要](./PRODUCT_SUMMARY.md) - 快速了解
-- [双层产品方案文档](./DUAL_TIER_STAKING.md) - 技术部署文档
-- [产品开发文档](./PRODUCT_PLANS_DEV.md) - 开发团队文档
-- [快速开始指南](./QUICK_START_DUAL_TIER.md) - 快速部署指南
-- [技术常见问题](./TECHNICAL_FAQ.md) - 技术机制说明
-- [术语表](./GLOSSARY.md) - 术语定义
-- [错误处理指南](./ERROR_HANDLING.md) - 常见错误处理
+### Normal Staking Monitoring Metrics
+
+- **Total Staked**: Monitor total staking amount for product
+- **User Count**: Count participating users
+- **Average Staking Amount**: Understand user staking scale
+- **Reward Pool Balance**: Ensure sufficient funds to pay rewards
+- **Total Pending Rewards**: Monitor totalPendingRewards, ensure reward pool balance is sufficient
+
+### Premium Staking Monitoring Metrics
+
+- **Total Staked**: Monitor total staking amount for product
+- **Whitelist User Count**: Count authorized users
+- **Average Staking Amount**: Understand whale staking scale
+- **Reward Pool Balance**: Ensure sufficient funds to pay rewards (needs more)
+- **Total Pending Rewards**: Monitor totalPendingRewards, ensure reward pool balance is sufficient
 
 ---
 
-**文档版本**: 1.0.0  
-**最后更新**: 2026-11
+## IX. Operational Notes
+
+### 1. Reward Pool Management
+- ✅ Both products need independent reward pools
+- ✅ Regularly check reward pool balance
+- ✅ Plan deposit schedule in advance
+- ⚠️ Ensure sufficient funds to pay rewards
+
+### 2. Whitelist Management
+- ✅ Establish approval standards
+- ✅ Regularly review whitelist users
+- ✅ Promptly add/remove users
+- ⚠️ Ensure approval process transparency
+
+### 3. User Communication
+- ✅ Promptly publish product information
+- ✅ Answer user questions
+- ✅ Provide usage guides
+- ⚠️ Keep communication channels open
+
+### 4. Risk Control
+- ✅ Monitor product total staked amount and reward pool balance
+- ✅ Pay attention to anomalies (insufficient reward pool balance, emergency mode, etc.)
+- ✅ Develop emergency plans
+- ⚠️ Ensure system stable operation
+- ⚠️ Regularly check if reward pool balance is sufficient to pay all pending rewards
+
+---
+
+## X. Product Additional Features
+
+### Whale DID (Decentralized Identity)
+
+**Function Description**:
+- Provides exclusive decentralized identity identifier (DID) for users staking ≥ 50,000 HSK
+- When user staking amount reaches 50,000 HSK, system automatically reminds user to mint Whale DID
+- Users need to actively mint DID, system only provides reminder, does not auto-mint
+
+---
+
+## XI. Summary
+
+The dual-tier Staking product plan meets needs of different user groups through differentiated product design:
+
+- **Normal Staking**: Low threshold, stable returns, targeting general users
+- **Premium Staking**: High threshold, high returns, targeting whales and institutions
+
+Through reasonable mechanism design, both ensures product security and provides flexible user experience, providing clear operational strategies and monitoring metrics for operations.
+
+---
+
+## 📚 Related Documentation
+
+- [Main README](../README.md)
+- [Contract Architecture](./CONTRACT_ARCHITECTURE.md) - **Detailed contract architecture (required reading for developers)**
+- [Product Summary](./PRODUCT_SUMMARY.md) - Quick overview
+- [Dual-Tier Product Documentation](./DUAL_TIER_STAKING.md) - Technical deployment documentation
+- [Product Development Documentation](./PRODUCT_PLANS_DEV.md) - Development team documentation
+- [Quick Start Guide](./QUICK_START_DUAL_TIER.md) - Quick deployment guide
+- [Technical FAQ](./TECHNICAL_FAQ.md) - Technical mechanism explanations
+- [Error Handling Guide](./ERROR_HANDLING.md) - Common error handling
+
+---
+
+**Document Version**: 1.0.0  
+**Maintainer**: HashKey Technical Team
 
