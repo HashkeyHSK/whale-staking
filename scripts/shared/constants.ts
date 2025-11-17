@@ -78,7 +78,7 @@ export const NORMAL_STAKING_CONFIG = {
 };
 
 export const PREMIUM_STAKING_CONFIG = {
-  minStakeAmount: "500000",      // 500,000 HSK
+  minStakeAmount: "100",         // 100 HSK (temporarily reduced for testing, normally 500,000 HSK)
   rewardRate: 1600,              // 16% APY (basis points: 1600/10000 = 0.16 = 16%)
   whitelistMode: true,           // Whitelist mode enabled
   maxTotalStaked: "20000000",    // 20,000,000 HSK (20 million HSK pool cap)
