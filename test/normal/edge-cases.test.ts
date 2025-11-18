@@ -41,7 +41,7 @@ describe("Normal Staking - Edge Cases and Error Handling", () => {
     }
   });
 
-  test("应该正确处理最大金额的质押", async () => {
+  test("should handle maximum amount staking correctly", async () => {
     // Further reduce amount to avoid gas issues - use 1000 ETH instead of 10000 ETH
     const maxAmount = parseEther("1000"); // Reduced from 1000000 to avoid gas issues
     // Fund user with extra for gas
@@ -86,7 +86,7 @@ describe("Normal Staking - Edge Cases and Error Handling", () => {
     }
   });
 
-  test("应该正确处理最小金额的质押", async () => {
+  test("should handle minimum amount staking correctly", async () => {
     const minAmount = parseEther("1"); // Exactly minimum
     await fundAccount(fixture.user1, minAmount);
 
@@ -129,7 +129,7 @@ describe("Normal Staking - Edge Cases and Error Handling", () => {
     }
   });
 
-  test("应该正确处理零奖励的情况", async () => {
+  test("should handle zero reward case correctly", async () => {
     const stakeAmount = parseEther("10");
     const tx = await fixture.staking.connect(fixture.user1).stake({
       value: stakeAmount,
@@ -186,7 +186,7 @@ describe("Normal Staking - Edge Cases and Error Handling", () => {
     }
   });
 
-  test("应该正确处理时间边界", async () => {
+  test("should handle time boundaries correctly", async () => {
     const stakeAmount = parseEther("10");
 
     // Test at start time
@@ -219,7 +219,7 @@ describe("Normal Staking - Edge Cases and Error Handling", () => {
     }
   });
 
-  test("应该正确处理锁定期边界", async () => {
+  test("should handle lock period boundaries correctly", async () => {
     const stakeAmount = parseEther("100");
     await fixture.staking.connect(fixture.user1).stake({
       value: stakeAmount,
@@ -262,7 +262,7 @@ describe("Normal Staking - Edge Cases and Error Handling", () => {
     assert.strictEqual(position.isUnstaked, true);
   });
 
-  test("应该正确处理重入攻击", async () => {
+  test("should handle reentrancy attacks correctly", async () => {
     // The contract uses ReentrancyGuard, so reentrancy should be prevented
     const stakeAmount = parseEther("100");
     await fixture.staking.connect(fixture.user1).stake({
@@ -282,7 +282,7 @@ describe("Normal Staking - Edge Cases and Error Handling", () => {
     );
   });
 
-  test("应该正确处理多个用户并发操作", async () => {
+  test("should handle concurrent operations from multiple users correctly", async () => {
     const stakeAmount1 = parseEther("10");
     const stakeAmount2 = parseEther("20");
     const stakeAmount3 = parseEther("30");
@@ -341,7 +341,7 @@ describe("Normal Staking - Edge Cases and Error Handling", () => {
     }
   });
 
-  test("应该正确处理大量 position 的情况", async () => {
+  test("should handle large number of positions correctly", async () => {
     const stakeAmount = parseEther("10");
     const numPositions = 10;
 

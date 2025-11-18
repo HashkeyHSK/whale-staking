@@ -35,6 +35,7 @@ async function main() {
   const minStakeAmount = ethers.parseEther(NORMAL_STAKING_CONFIG.minStakeAmount);
   const rewardRate = NORMAL_STAKING_CONFIG.rewardRate;
   const whitelistMode = NORMAL_STAKING_CONFIG.whitelistMode;  // false for Normal Staking
+  const maxTotalStaked = ethers.parseEther(NORMAL_STAKING_CONFIG.maxTotalStaked);
   
   // Read Unix timestamps from environment variables
   const stakeStartTimeStr = process.env.STAKE_START_TIME;
@@ -80,6 +81,7 @@ async function main() {
   console.log("\nInitialization parameters:");
   console.log(`  - Min stake amount: ${ethers.formatEther(minStakeAmount)} HSK`);
   console.log(`  - APY: ${rewardRate / 100}%`);
+  console.log(`  - Max total staked: ${ethers.formatEther(maxTotalStaked)} HSK`);
   console.log(`  - Stake start time: ${new Date(stakeStartTime * 1000).toISOString()}`);
   console.log(`  - Stake end time: ${new Date(stakeEndTime * 1000).toISOString()}`);
   console.log(`  - Lock period: 365 days (fixed)`);
@@ -92,6 +94,7 @@ async function main() {
     stakeStartTime,
     stakeEndTime,
     whitelistMode,  // false - whitelist disabled, everyone can stake
+    maxTotalStaked, // Maximum total staked amount (10 million HSK)
   ]);
 
   // 4. Deploy Transparent Proxy contract
@@ -141,6 +144,26 @@ async function main() {
   console.log("  1. Use scripts/normal/add-rewards.ts to fund the reward pool");
   console.log("  2. Use scripts/normal/query/check-status.ts to check contract status");
   console.log("  3. Users can start staking after stake start time (no whitelist required)");
+  
+  // Check ownership and provide transfer instructions
+  const contractOwner = await staking.owner();
+  console.log("\n📋 Ownership Information:");
+  console.log(`  Current contract owner: ${contractOwner}`);
+  console.log(`  Proxy admin: ${deployer.address}`);
+  
+  if (contractOwner.toLowerCase() === proxyAddress.toLowerCase()) {
+    printWarning("Note: Contract owner is set to proxy address");
+    console.log("  To transfer ownership to deployer, use two-step process:");
+    console.log("  Step 1: npm run config:transfer-ownership:normal:testnet NEW_OWNER_ADDRESS=...");
+    console.log("  Step 2: npm run config:accept-ownership:normal:testnet");
+  } else if (contractOwner.toLowerCase() !== deployer.address.toLowerCase()) {
+    printWarning("Note: Contract owner differs from deployer");
+    console.log("  To transfer ownership to deployer, use two-step process:");
+    console.log("  Step 1: npm run config:transfer-ownership:normal:testnet NEW_OWNER_ADDRESS=...");
+    console.log("  Step 2: npm run config:accept-ownership:normal:testnet");
+  } else {
+    console.log("  ✅ Contract owner is already set to deployer");
+  }
   
   // Save deployment information
   console.log("\nPlease save the following address to scripts/shared/constants.ts:");

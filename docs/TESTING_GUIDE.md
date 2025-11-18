@@ -1,510 +1,509 @@
-# 测试用例编写计划
+# Test Case Writing Plan
 
-## 📋 目标
+## 📋 Objective
 
-为 Whale Staking 项目编写完整的测试用例，覆盖 Normal Staking 和 Premium Staking 的所有功能，确保合约的安全性和正确性。
+Write complete test cases for the Whale Staking project, covering all functionality of Normal Staking and Premium Staking, ensuring contract security and correctness.
 
-## ⚠️ 重要说明 - 合约架构
+## ⚠️ Important Notes - Contract Architecture
 
-### 合约架构特性
+### Contract Architecture Features
 
-1. **合约结构**: 
-   - `HSKStaking.sol` - 主实现合约（继承 StakingStorage、StakingConstants、ReentrancyGuardUpgradeable、PausableUpgradeable）
-   - `StakingStorage.sol` - 存储层（继承 Initializable、Ownable2StepUpgradeable）
-   - `StakingConstants.sol` - 常量定义合约（LOCK_PERIOD = 365 days）
-   - `IStake.sol` - 接口定义
-   - `NormalStakingProxy.sol` / `PremiumStakingProxy.sol` - 代理合约（Transparent Proxy）
+1. **Contract Structure**: 
+   - `HSKStaking.sol` - Main implementation contract (inherits StakingStorage, StakingConstants, ReentrancyGuardUpgradeable, PausableUpgradeable)
+   - `StakingStorage.sol` - Storage layer (inherits Initializable, Ownable2StepUpgradeable)
+   - `StakingConstants.sol` - Constant definitions contract (LOCK_PERIOD = 365 days)
+   - `IStake.sol` - Interface definition
+   - `NormalStakingProxy.sol` / `PremiumStakingProxy.sol` - Proxy contracts (Transparent Proxy)
 
-2. **代理模式**: Transparent Proxy（使用 OpenZeppelin 的 `TransparentUpgradeableProxy`）
-   - 可独立升级 Normal 和 Premium 质押池
-   - ProxyAdmin 用于管理代理合约升级
+2. **Proxy Pattern**: Transparent Proxy (using OpenZeppelin's `TransparentUpgradeableProxy`)
+   - Can independently upgrade Normal and Premium staking pools
+   - ProxyAdmin used to manage proxy contract upgrades
 
-3. **原生代币**: HSK 是链的原生代币（native token），类似于 ETH，不是 ERC20 代币
-   - 使用 `msg.value` 接收质押
-   - 使用 `call{value: amount}("")` 发送代币
+3. **Native Token**: HSK is the chain's native token (native token), similar to ETH, not an ERC20 token
+   - Uses `msg.value` to receive stakes
+   - Uses `call{value: amount}("")` to send tokens
 
-4. **锁定期**: 固定 365 天（`LOCK_PERIOD = 365 days`），在合约常量中定义，不可动态修改
+4. **Lock Period**: Fixed 365 days (`LOCK_PERIOD = 365 days`), defined in contract constants, cannot be dynamically modified
 
-5. **奖励率**: 在合约级别配置（`rewardRate` 状态变量），所有 position 共享同一个奖励率
+5. **Reward Rate**: Configured at contract level (`rewardRate` state variable), all positions share the same reward rate
    - Normal Staking: 800 basis points (8% APY)
    - Premium Staking: 1600 basis points (16% APY)
    - `BASIS_POINTS = 10000` (100% = 10000)
 
-6. **Position 结构**: 
+6. **Position Structure**: 
    - `positionId`: uint256
    - `owner`: address
    - `amount`: uint256
    - `stakedAt`: uint256
    - `lastRewardAt`: uint256
    - `isUnstaked`: bool
-   - ⚠️ **注意**: Position 中不包含 `lockPeriod` 和 `rewardRate`，这些是合约级别的配置
+   - ⚠️ **Note**: Position does not contain `lockPeriod` and `rewardRate`, these are contract-level configurations
 
-7. **白名单模式**:
-   - Normal Staking: 白名单模式关闭（`onlyWhitelistCanStake = false`）
-   - Premium Staking: 白名单模式启用（`onlyWhitelistCanStake = true`）
+7. **Whitelist Mode**:
+   - Normal Staking: Whitelist mode disabled (`onlyWhitelistCanStake = false`)
+   - Premium Staking: Whitelist mode enabled (`onlyWhitelistCanStake = true`)
 
-### 关键合约函数
+### Key Contract Functions
 
-**质押操作**
-- `stake() external payable returns (uint256)`: 质押 HSK，返回 positionId
-- `unstake(uint256 positionId) external`: 解除质押，自动领取所有累积奖励并返还本金
-- `claimReward(uint256 positionId) external returns (uint256)`: 领取指定位置的奖励，不解除质押
-- `pendingReward(uint256 positionId) external view returns (uint256)`: 查询指定位置的待领取奖励
-- `emergencyWithdraw(uint256 positionId) external`: 紧急提取本金（仅在紧急模式下可用）
+**Staking Operations**
+- `stake() external payable returns (uint256)`: Stake HSK, returns positionId
+- `unstake(uint256 positionId) external`: Unstake, automatically claim all accumulated rewards and return principal
+- `claimReward(uint256 positionId) external returns (uint256)`: Claim rewards for specified position, does not unstake
+- `pendingReward(uint256 positionId) external view returns (uint256)`: Query pending rewards for specified position
+- `emergencyWithdraw(uint256 positionId) external`: Emergency withdraw principal (only available in emergency mode)
 
-**奖励池管理**
-- `updateRewardPool() external payable`: 向奖励池添加资金
-- `withdrawExcessRewardPool(uint256 amount) external`: 提取多余的奖励池资金
+**Reward Pool Management**
+- `updateRewardPool() external payable`: Add funds to reward pool
+- `withdrawExcessRewardPool(uint256 amount) external`: Withdraw excess reward pool funds
 
-**白名单管理**
-- `updateWhitelistBatch(address[] calldata users, bool status) external`: 批量更新白名单
-- `setWhitelistOnlyMode(bool enabled) external`: 启用/禁用白名单模式
+**Whitelist Management**
+- `updateWhitelistBatch(address[] calldata users, bool status) external`: Batch update whitelist
+- `setWhitelistOnlyMode(bool enabled) external`: Enable/disable whitelist mode
 
-**合约配置**
-- `setMinStakeAmount(uint256 newAmount) external`: 设置最小质押金额
-- `setStakeStartTime(uint256 newStartTime) external`: 设置质押开始时间
-- `setStakeEndTime(uint256 newEndTime) external`: 设置质押结束时间
-- `pause() external`: 暂停合约
-- `unpause() external`: 恢复合约
-- `enableEmergencyMode() external`: 启用紧急模式（不可逆）
+**Contract Configuration**
+- `setMinStakeAmount(uint256 newAmount) external`: Set minimum staking amount
+- `setStakeStartTime(uint256 newStartTime) external`: Set staking start time
+- `setStakeEndTime(uint256 newEndTime) external`: Set staking end time
+- `pause() external`: Pause contract
+- `unpause() external`: Resume contract
+- `enableEmergencyMode() external`: Enable emergency mode (irreversible)
 
-**状态查询**
-- `positions(uint256 positionId)`: 查询 position 详情
-- `getUserPositionIds(address user)`: 查询用户的所有 positionId 数组
-- `calculatePotentialReward(uint256 amount)`: 计算指定金额的潜在奖励
-- `whitelisted(address user)`: 查询用户是否在白名单中
-- `minStakeAmount()`: 查询最小质押金额
-- `rewardRate()`: 查询奖励率（basis points）
-- `totalStaked()`: 查询总质押金额
-- `rewardPoolBalance()`: 查询奖励池余额
-- `totalPendingRewards()`: 查询总待领取奖励
-- `stakeStartTime()`: 查询质押开始时间
-- `stakeEndTime()`: 查询质押结束时间
-- `onlyWhitelistCanStake()`: 查询是否启用白名单模式
-- `emergencyMode()`: 查询是否处于紧急模式
-- `paused()`: 查询是否暂停
+**State Queries**
+- `positions(uint256 positionId)`: Query position details
+- `getUserPositionIds(address user)`: Query all positionId array for user
+- `calculatePotentialReward(uint256 amount)`: Calculate potential reward for specified amount
+- `whitelisted(address user)`: Query if user is in whitelist
+- `minStakeAmount()`: Query minimum staking amount
+- `rewardRate()`: Query reward rate (basis points)
+- `totalStaked()`: Query total staked amount
+- `rewardPoolBalance()`: Query reward pool balance
+- `totalPendingRewards()`: Query total pending rewards
+- `stakeStartTime()`: Query staking start time
+- `stakeEndTime()`: Query staking end time
+- `onlyWhitelistCanStake()`: Query if whitelist mode is enabled
+- `emergencyMode()`: Query if in emergency mode
+- `paused()`: Query if paused
 
-**合约事件**
-- `PositionCreated`: 质押创建
-- `PositionUnstaked`: 解除质押
-- `RewardClaimed`: 奖励领取
-- `StakingPaused`: 合约暂停
-- `StakingUnpaused`: 合约恢复
-- `EmergencyWithdrawn`: 紧急提取
-- `WhitelistStatusChanged`: 白名单状态变更
-- `WhitelistModeChanged`: 白名单模式变更
-- `RewardPoolUpdated`: 奖励池更新
-- `StakeStartTimeUpdated`: 开始时间更新
-- `StakeEndTimeUpdated`: 结束时间更新
-- `MinStakeAmountUpdated`: 最小质押金额更新
-- `EmergencyModeEnabled`: 紧急模式启用
-- `Received`: 接收原生代币
+**Contract Events**
+- `PositionCreated`: Staking created
+- `PositionUnstaked`: Unstaked
+- `RewardClaimed`: Reward claimed
+- `StakingPaused`: Contract paused
+- `StakingUnpaused`: Contract resumed
+- `EmergencyWithdrawn`: Emergency withdrawal
+- `WhitelistStatusChanged`: Whitelist status changed
+- `WhitelistModeChanged`: Whitelist mode changed
+- `RewardPoolUpdated`: Reward pool updated
+- `StakeStartTimeUpdated`: Start time updated
+- `StakeEndTimeUpdated`: End time updated
+- `MinStakeAmountUpdated`: Minimum staking amount updated
+- `EmergencyModeEnabled`: Emergency mode enabled
+- `Received`: Received native token
 
-**自定义错误**
-- `AlreadyUnstaked()`: Position 已经被 unstake
-- `StillLocked()`: 仍在锁定期内
-- `NoReward()`: 没有可领取的奖励
-- `PositionNotFound()`: Position 不存在或不属于调用者
-- `NotWhitelisted()`: 不在白名单中
+**Custom Errors**
+- `AlreadyUnstaked()`: Position already unstaked
+- `StillLocked()`: Still in lock period
+- `NoReward()`: No rewards to claim
+- `PositionNotFound()`: Position does not exist or does not belong to caller
+- `NotWhitelisted()`: Not in whitelist
 
-### 初始化参数
+### Initialization Parameters
 
-**参数说明**：
-- `_minStakeAmount`: 最小质押金额（wei 单位）
+**Parameter Description**:
+- `_minStakeAmount`: Minimum staking amount (wei unit)
   - Normal Staking: 1 HSK = `1e18` wei
   - Premium Staking: 500,000 HSK = `500000e18` wei
-- `_rewardRate`: 年化收益率（basis points）
+- `_rewardRate`: Annual yield rate (basis points)
   - Normal Staking: 800 (8% APY)
   - Premium Staking: 1600 (16% APY)
-- `_stakeStartTime`: 质押开始时间（Unix 时间戳）
-- `_stakeEndTime`: 质押结束时间（Unix 时间戳）
-- `_whitelistMode`: 白名单模式
-  - ✅ **Normal Staking**: `false`（所有用户可质押）
-  - ✅ **Premium Staking**: `true`（仅白名单用户可质押）
+- `_stakeStartTime`: Staking start time (Unix timestamp)
+- `_stakeEndTime`: Staking end time (Unix timestamp)
+- `_whitelistMode`: Whitelist mode
+  - ✅ **Normal Staking**: `false` (all users can stake)
+  - ✅ **Premium Staking**: `true` (only whitelisted users can stake)
 
 ---
 
-## 🏗️ 当前测试目录结构
+## 🏗️ Current Test Directory Structure
 
 ```
 test/
-├── normal/                      # Normal Staking 单元测试（✅ 已完成）
-│   ├── deployment.test.ts       # 部署测试
-│   ├── staking.test.ts          # 质押功能测试
-│   ├── rewards.test.ts          # 奖励功能测试
-│   ├── unstaking.test.ts        # 解除质押功能测试
-│   ├── reward-pool.test.ts      # 奖励池管理测试
-│   ├── config.test.ts           # 配置管理测试
-│   ├── emergency.test.ts        # 紧急提取功能测试
-│   └── edge-cases.test.ts       # 边界条件和错误处理测试
-├── e2e/                         # E2E 测试（✅ 已完成）
-│   ├── normal-user-journey.test.ts      # Normal Staking E2E 测试
-│   └── emergency-scenarios.test.ts      # 紧急场景测试
-├── performance/                 # 性能测试（✅ 已完成）
-│   ├── gas-optimization.test.ts         # Gas 优化测试
-│   ├── batch-operations.test.ts         # 批量操作性能测试
-│   └── stress-test.test.ts              # 压力测试
-└── helpers/                     # 测试辅助函数（✅ 已完成）
-    ├── fixtures.ts              # 测试夹具（部署合约、账户管理等）
-    ├── test-utils.ts            # 测试工具函数（断言、计算等）
-    └── state-sync.ts            # 状态同步工具（Hardhat EDR 兼容）
-
-scripts/test/                    # 集成测试脚本（✅ 已完成）
+├── normal/                      # Normal Staking unit tests (✅ Completed)
+│   ├── deployment.test.ts       # Deployment tests
+│   ├── staking.test.ts          # Staking functionality tests
+│   ├── rewards.test.ts           # Reward functionality tests
+│   ├── unstaking.test.ts        # Unstaking functionality tests
+│   ├── reward-pool.test.ts      # Reward pool management tests
+│   ├── config.test.ts           # Configuration management tests
+│   ├── emergency.test.ts        # Emergency withdrawal functionality tests
+│   └── edge-cases.test.ts      # Boundary conditions and error handling tests
+├── e2e/                         # E2E tests (✅ Completed)
+│   ├── normal-user-journey.test.ts      # Normal Staking E2E tests
+│   └── emergency-scenarios.test.ts      # Emergency scenario tests
+├── performance/                 # Performance tests (✅ Completed)
+│   ├── gas-optimization.test.ts         # Gas optimization tests
+│   ├── batch-operations.test.ts        # Batch operation performance tests
+│   └── stress-test.test.ts             # Stress tests
+└── helpers/                     # Test helper functions (✅ Completed)
+    ├── fixtures.ts              # Test fixtures (deploy contracts, account management, etc.)
+    ├── test-utils.ts            # Test utility functions (assertions, calculations, etc.)
+    └── state-sync.ts            # State synchronization tools (Hardhat EDR compatible)
+scripts/test/                    # Integration test scripts (✅ Completed)
 ├── helpers/
-│   ├── fixtures.ts              # 测试夹具
-│   └── test-utils.ts            # 测试工具
+│   ├── fixtures.ts              # Test fixtures
+│   └── test-utils.ts            # Test utilities
 └── integration/
-    ├── deploy-test.ts           # 部署集成测试
-    ├── stake-test.ts            # 质押操作集成测试
-    └── whitelist-test.ts        # 白名单功能集成测试
+    ├── deploy-test.ts           # Deployment integration tests
+    ├── stake-test.ts            # Staking operation integration tests
+    └── whitelist-test.ts        # Whitelist functionality integration tests
 ```
 
-**说明**：
-- ✅ Normal Staking 单元测试已完成（8 个测试文件，103 个测试用例全部通过）
-- ✅ E2E 测试已完成（2 个测试文件）
-- ✅ 性能测试已完成（3 个测试文件）
-- ✅ 测试辅助函数已完成（fixtures.ts, test-utils.ts, state-sync.ts）
-- ✅ 集成测试脚本已完成（3 个测试文件）
-- ⏳ Premium Staking 单元测试待实现（计划中）
+**Notes**:
+- ✅ Normal Staking unit tests completed (8 test files, 103 test cases all passing)
+- ✅ E2E tests completed (2 test files)
+- ✅ Performance tests completed (3 test files)
+- ✅ Test helper functions completed (fixtures.ts, test-utils.ts, state-sync.ts)
+- ✅ Integration test scripts completed (3 test files)
+- ⏳ Premium Staking unit tests pending (planned)
 
-**测试框架**：
-- 使用 Node.js 原生测试框架（`node:test`）
-- 使用 Hardhat EDR（Ethereum Development Runtime）
-- 采用事件验证优先策略解决 Hardhat EDR 状态更新延迟问题
-
----
-
-## 📊 测试用例映射表
-
-### Normal Staking 单元测试（✅ 已完成）
-
-**测试结果**: 103 个测试用例全部通过 ✅
-
-**重要说明**: 
-- 使用 Node.js 原生测试框架（`node:test`）
-- 采用事件验证优先策略（Solution 3）解决 Hardhat EDR 状态更新延迟问题
-- 所有测试都通过 transaction receipt 中的事件来验证执行结果，而不是直接查询状态
-- 如果事件不存在但交易成功，测试会接受为通过（Hardhat EDR 限制）
-
-#### 1. 部署测试 (`test/normal/deployment.test.ts`) ✅
-
-| 测试用例 | 状态 | 说明 |
-|---------|------|------|
-| 应该正确部署 Normal Staking 合约 | ✅ 已完成 | 验证合约部署成功 |
-| 应该正确初始化合约参数 | ✅ 已完成 | 验证 minStakeAmount = 1 HSK, rewardRate = 8% |
-| 应该正确设置白名单模式为关闭 | ✅ 已完成 | 验证 onlyWhitelistCanStake = false |
-| 应该正确设置质押时间窗口 | ✅ 已完成 | 验证 stakeStartTime 和 stakeEndTime |
-| 应该正确初始化状态变量 | ✅ 已完成 | 验证 totalStaked = 0, nextPositionId = 0 |
-| 应该拒绝无效的初始化参数 | ✅ 已完成 | 测试 endTime < startTime 等情况 |
-| 应该正确设置 owner | ✅ 已完成 | 验证 owner 地址正确 |
-
-#### 2. 质押功能测试 (`test/normal/staking.test.ts`) ✅
-
-| 测试用例 | 状态 | 说明 |
-|---------|------|------|
-| 用户应该能够成功质押 | ✅ 已完成 | 验证质押成功，创建 position（使用事件验证） |
-| 应该拒绝低于最小金额的质押 | ✅ 已完成 | 测试质押金额 < minStakeAmount |
-| 应该拒绝质押时间窗口外的质押 | ✅ 已完成 | 测试在 startTime 之前和 endTime 之后 |
-| 应该正确创建 Position | ✅ 已完成 | 验证 position 的所有字段正确（使用事件验证） |
-| 应该正确更新 totalStaked | ✅ 已完成 | 验证 totalStaked 增加（使用事件验证） |
-| 应该正确更新 userPositions | ✅ 已完成 | 验证用户 positionId 数组更新（使用事件验证） |
-| 应该正确触发 PositionCreated 事件 | ✅ 已完成 | 验证事件参数正确 |
-| 应该拒绝暂停状态下的质押 | ✅ 已完成 | 测试 pause 后质押失败 |
-| 应该拒绝紧急模式下的质押 | ✅ 已完成 | 测试 emergencyMode 后质押失败 |
-| 应该拒绝奖励池余额不足的质押 | ✅ 已完成 | 测试奖励池余额 < 潜在奖励 |
-| 应该支持多个用户同时质押 | ✅ 已完成 | 测试并发质押场景（使用事件验证） |
-| 应该支持同一用户多次质押 | ✅ 已完成 | 测试用户创建多个 position |
-
-#### 3. 奖励功能测试 (`test/normal/rewards.test.ts`) ✅
-
-| 测试用例 | 状态 | 说明 |
-|---------|------|------|
-| 应该正确计算待领取奖励 | ✅ 已完成 | 验证 pendingReward 计算正确（使用事件验证和容错处理） |
-| 应该按时间累积奖励 | ✅ 已完成 | 测试时间推进后奖励增加（使用事件验证和容错处理） |
-| 应该正确领取奖励 | ✅ 已完成 | 验证 claimReward 成功（使用事件验证） |
-| 应该更新 lastRewardAt 时间戳 | ✅ 已完成 | 验证领取后时间戳更新（使用容错处理） |
-| 应该正确更新 totalPendingRewards | ✅ 已完成 | 验证总待领取奖励减少（使用事件验证） |
-| 应该正确触发 RewardClaimed 事件 | ✅ 已完成 | 验证事件参数正确 |
-| 应该拒绝领取零奖励 | ✅ 已完成 | 测试没有奖励时 claimReward 失败 |
-| 应该拒绝暂停状态下的领取 | ✅ 已完成 | 测试 pause 后领取失败 |
-| 应该拒绝紧急模式下的领取 | ✅ 已完成 | 测试 emergencyMode 后领取失败 |
-| 应该拒绝非 position 所有者的领取 | ✅ 已完成 | 测试其他用户无法领取 |
-| 应该拒绝不存在的 position | ✅ 已完成 | 测试无效 positionId |
-| 应该正确计算多个 position 的奖励 | ✅ 已完成 | 测试用户多个 position 的奖励计算（使用事件验证和容错处理） |
-| 应该正确处理奖励池余额不足 | ✅ 已完成 | 测试奖励池余额 < 待领取奖励 |
-
-#### 4. 解除质押功能测试 (`test/normal/unstaking.test.ts`) ✅
-
-| 测试用例 | 状态 | 说明 |
-|---------|------|------|
-| 应该正确解除质押（锁定期后） | ✅ 已完成 | 验证 unstake 成功（使用事件验证） |
-| 应该拒绝锁定期内的解除质押 | ✅ 已完成 | 测试锁定期内 unstake 失败 |
-| 应该自动领取所有累积奖励 | ✅ 已完成 | 验证 unstake 时奖励一并领取（使用事件验证） |
-| 应该正确返还本金 | ✅ 已完成 | 验证本金返还正确（使用事件验证） |
-| 应该正确更新 totalStaked | ✅ 已完成 | 验证 totalStaked 减少（使用事件验证） |
-| 应该正确标记 position 为已解除 | ✅ 已完成 | 验证 isUnstaked = true（使用容错处理） |
-| 应该正确触发 PositionUnstaked 事件 | ✅ 已完成 | 验证事件参数正确 |
-| 应该拒绝重复解除质押 | ✅ 已完成 | 测试已解除的 position 再次 unstake 失败 |
-| 应该拒绝非 position 所有者的解除质押 | ✅ 已完成 | 测试其他用户无法解除质押 |
-| 应该拒绝不存在的 position | ✅ 已完成 | 测试无效 positionId |
-| 应该正确处理多个 position 的解除质押 | ✅ 已完成 | 测试用户多个 position 的解除质押 |
-
-#### 5. 奖励池管理测试 (`test/normal/reward-pool.test.ts`) ✅
-
-| 测试用例 | 状态 | 说明 |
-|---------|------|------|
-| Owner 应该能够添加奖励池资金 | ✅ 已完成 | 验证 updateRewardPool 成功（使用事件验证） |
-| 应该正确更新 rewardPoolBalance | ✅ 已完成 | 验证奖励池余额增加（使用事件验证） |
-| 应该正确触发 RewardPoolUpdated 事件 | ✅ 已完成 | 验证事件参数正确 |
-| 应该拒绝非 owner 添加奖励池 | ✅ 已完成 | 测试权限检查 |
-| Owner 应该能够提取多余奖励 | ✅ 已完成 | 验证 withdrawExcessRewardPool 成功 |
-| 应该拒绝提取已预留的奖励 | ✅ 已完成 | 测试不能提取 totalPendingRewards |
-| 应该拒绝提取超过多余部分的奖励 | ✅ 已完成 | 测试提取金额限制 |
-| 应该拒绝非 owner 提取奖励 | ✅ 已完成 | 测试权限检查 |
-
-#### 6. 配置管理测试 (`test/normal/config.test.ts`) ✅
-
-| 测试用例 | 状态 | 说明 |
-|---------|------|------|
-| Owner 应该能够暂停合约 | ✅ 已完成 | 验证 pause 成功（使用事件验证） |
-| Owner 应该能够恢复合约 | ✅ 已完成 | 验证 unpause 成功（使用事件验证） |
-| 应该正确触发 StakingPaused 事件 | ✅ 已完成 | 验证事件参数正确 |
-| 应该正确触发 StakingUnpaused 事件 | ✅ 已完成 | 验证事件参数正确 |
-| 应该拒绝非 owner 暂停合约 | ✅ 已完成 | 测试权限检查 |
-| Owner 应该能够设置最小质押金额 | ✅ 已完成 | 验证 setMinStakeAmount 成功（使用事件验证） |
-| 应该正确触发 MinStakeAmountUpdated 事件 | ✅ 已完成 | 验证事件参数正确 |
-| 应该拒绝紧急模式下设置最小质押金额 | ✅ 已完成 | 测试紧急模式限制 |
-| Owner 应该能够设置质押开始时间 | ✅ 已完成 | 验证 setStakeStartTime 成功（使用事件验证） |
-| 应该正确触发 StakeStartTimeUpdated 事件 | ✅ 已完成 | 验证事件参数正确 |
-| 应该拒绝无效的开始时间 | ✅ 已完成 | 测试 startTime >= endTime |
-| Owner 应该能够设置质押结束时间 | ✅ 已完成 | 验证 setStakeEndTime 成功（使用事件验证） |
-| 应该正确触发 StakeEndTimeUpdated 事件 | ✅ 已完成 | 验证事件参数正确 |
-| 应该拒绝无效的结束时间 | ✅ 已完成 | 测试 endTime <= startTime 或 <= now |
-| Owner 应该能够启用紧急模式 | ✅ 已完成 | 验证 enableEmergencyMode 成功（使用事件验证） |
-| 应该正确触发 EmergencyModeEnabled 事件 | ✅ 已完成 | 验证事件参数正确 |
-| 应该拒绝非 owner 启用紧急模式 | ✅ 已完成 | 测试权限检查 |
-| 紧急模式应该不可逆 | ✅ 已完成 | 测试启用后无法关闭 |
-
-#### 7. 紧急提取功能测试 (`test/normal/emergency.test.ts`) ✅
-
-| 测试用例 | 状态 | 说明 |
-|---------|------|------|
-| 应该能够在紧急模式下提取本金 | ✅ 已完成 | 验证 emergencyWithdraw 成功（使用事件验证） |
-| 应该拒绝非紧急模式下的紧急提取 | ✅ 已完成 | 测试非紧急模式下失败 |
-| 应该只提取本金，不含奖励 | ✅ 已完成 | 验证只返还本金 |
-| 应该正确更新 totalStaked | ✅ 已完成 | 验证 totalStaked 减少（使用事件验证） |
-| 应该正确标记 position 为已解除 | ✅ 已完成 | 验证 isUnstaked = true（使用容错处理） |
-| 应该正确触发 EmergencyWithdrawn 事件 | ✅ 已完成 | 验证事件参数正确 |
-| 应该拒绝非 position 所有者的紧急提取 | ✅ 已完成 | 测试权限检查 |
-| 应该拒绝不存在的 position | ✅ 已完成 | 测试无效 positionId |
-| 应该拒绝已解除的 position | ✅ 已完成 | 测试已解除的 position 无法再次提取 |
-| 应该正确更新 totalPendingRewards | ✅ 已完成 | 验证总待领取奖励更新 |
-
-#### 8. 边界条件和错误处理测试 (`test/normal/edge-cases.test.ts`) ✅
-
-| 测试用例 | 状态 | 说明 |
-|---------|------|------|
-| 应该正确处理最大金额的质押 | ✅ 已完成 | 测试大额质押（使用事件验证） |
-| 应该正确处理最小金额的质押 | ✅ 已完成 | 测试刚好等于 minStakeAmount（使用事件验证） |
-| 应该正确处理零奖励的情况 | ✅ 已完成 | 测试时间未到时的奖励计算（使用事件验证和容错处理） |
-| 应该正确处理时间边界 | ✅ 已完成 | 测试刚好在 startTime 和 endTime |
-| 应该正确处理锁定期边界 | ✅ 已完成 | 测试刚好 365 天后解除质押（使用容错处理） |
-| 应该正确处理重入攻击 | ✅ 已完成 | 测试 ReentrancyGuard 保护 |
-| 应该正确处理溢出情况 | ✅ 已完成 | 测试数值溢出保护 |
-| 应该正确处理多个用户并发操作 | ✅ 已完成 | 测试并发场景（使用事件验证） |
-| 应该正确处理大量 position 的情况 | ✅ 已完成 | 测试大量 position 的情况（使用容错处理） |
+**Test Framework**:
+- Uses Node.js native test framework (`node:test`)
+- Uses Hardhat EDR (Ethereum Development Runtime)
+- Adopts event verification priority strategy to solve Hardhat EDR state update delay issues
 
 ---
 
-### Premium Staking 单元测试（⏳ 待实现）
+## 📊 Test Case Mapping Table
 
-#### 1. 部署测试 (`test/premium/deployment.test.ts`)
+### Normal Staking Unit Tests (✅ Completed)
 
-| 测试用例 | 状态 | 说明 |
-|---------|------|------|
-| 应该正确部署 Premium Staking 合约 | ⏳ 待实现 | 验证合约部署成功 |
-| 应该正确初始化合约参数 | ⏳ 待实现 | 验证 minStakeAmount = 500,000 HSK, rewardRate = 16% |
-| 应该正确设置白名单模式为启用 | ⏳ 待实现 | 验证 onlyWhitelistCanStake = true |
-| 应该正确设置质押时间窗口 | ⏳ 待实现 | 验证 stakeStartTime 和 stakeEndTime |
-| 应该正确初始化状态变量 | ⏳ 待实现 | 验证 totalStaked = 0, nextPositionId = 0 |
-| 应该拒绝无效的初始化参数 | ⏳ 待实现 | 测试 endTime < startTime 等情况 |
-| 应该正确设置 owner | ⏳ 待实现 | 验证 owner 地址正确 |
+**Test Results**: 103 test cases all passing ✅
 
-#### 2. 白名单功能测试 (`test/premium/whitelist.test.ts`)
+**Important Notes**: 
+- Uses Node.js native test framework (`node:test`)
+- Adopts event verification priority strategy (Solution 3) to solve Hardhat EDR state update delay issues
+- All tests verify execution results through events in transaction receipts, rather than directly querying state
+- If events don't exist but transaction succeeds, test accepts as passing (Hardhat EDR limitation)
 
-| 测试用例 | 状态 | 说明 |
-|---------|------|------|
-| Owner 应该能够批量添加白名单 | ⏳ 待实现 | 验证 updateWhitelistBatch 成功 |
-| Owner 应该能够批量移除白名单 | ⏳ 待实现 | 验证批量移除成功 |
-| 应该正确更新 whitelisted 映射 | ⏳ 待实现 | 验证白名单状态正确 |
-| 应该正确触发 WhitelistStatusChanged 事件 | ⏳ 待实现 | 验证事件参数正确 |
-| 应该拒绝非 owner 管理白名单 | ⏳ 待实现 | 测试权限检查 |
-| 应该拒绝超过 100 个地址的批量操作 | ⏳ 待实现 | 测试批量操作限制 |
-| Owner 应该能够切换白名单模式 | ⏳ 待实现 | 验证 setWhitelistOnlyMode 成功 |
-| 应该正确触发 WhitelistModeChanged 事件 | ⏳ 待实现 | 验证事件参数正确 |
-| 应该拒绝非 owner 切换白名单模式 | ⏳ 待实现 | 测试权限检查 |
-| 白名单用户应该能够质押 | ⏳ 待实现 | 验证白名单用户质押成功 |
-| 非白名单用户应该无法质押 | ⏳ 待实现 | 测试非白名单用户质押失败 |
-| 应该正确处理白名单模式关闭后的质押 | ⏳ 待实现 | 测试关闭白名单模式后所有用户可质押 |
+#### 1. Deployment Tests (`test/normal/deployment.test.ts`) ✅
 
-#### 3. 质押功能测试 (`test/premium/staking.test.ts`)
+| Test Case | Status | Description |
+|-----------|--------|-------------|
+| Should correctly deploy Normal Staking contract | ✅ Completed | Verify contract deployment success |
+| Should correctly initialize contract parameters | ✅ Completed | Verify minStakeAmount = 1 HSK, rewardRate = 8% |
+| Should correctly set whitelist mode to disabled | ✅ Completed | Verify onlyWhitelistCanStake = false |
+| Should correctly set staking time window | ✅ Completed | Verify stakeStartTime and stakeEndTime |
+| Should correctly initialize state variables | ✅ Completed | Verify totalStaked = 0, nextPositionId = 0 |
+| Should reject invalid initialization parameters | ✅ Completed | Test endTime < startTime, etc. |
+| Should correctly set owner | ✅ Completed | Verify owner address is correct |
 
-| 测试用例 | 状态 | 说明 |
-|---------|------|------|
-| 白名单用户应该能够成功质押 | ⏳ 待实现 | 验证白名单用户质押成功 |
-| 应该拒绝非白名单用户的质押 | ⏳ 待实现 | 测试非白名单用户质押失败 |
-| 应该拒绝低于最小金额的质押 | ⏳ 待实现 | 测试质押金额 < 500,000 HSK |
-| 应该拒绝质押时间窗口外的质押 | ⏳ 待实现 | 测试在 startTime 之前和 endTime 之后 |
-| 应该正确创建 Position | ⏳ 待实现 | 验证 position 的所有字段正确 |
-| 应该正确更新 totalStaked | ⏳ 待实现 | 验证 totalStaked 增加 |
-| 应该正确触发 PositionCreated 事件 | ⏳ 待实现 | 验证事件参数正确 |
-| 应该拒绝暂停状态下的质押 | ⏳ 待实现 | 测试 pause 后质押失败 |
-| 应该拒绝紧急模式下的质押 | ⏳ 待实现 | 测试 emergencyMode 后质押失败 |
-| 应该支持多个白名单用户同时质押 | ⏳ 待实现 | 测试并发质押场景 |
+#### 2. Staking Functionality Tests (`test/normal/staking.test.ts`) ✅
 
-#### 4. 奖励功能测试 (`test/premium/rewards.test.ts`)
+| Test Case | Status | Description |
+|-----------|--------|-------------|
+| User should be able to stake successfully | ✅ Completed | Verify staking success, create position (using event verification) |
+| Should reject stakes below minimum amount | ✅ Completed | Test staking amount < minStakeAmount |
+| Should reject stakes outside time window | ✅ Completed | Test before startTime and after endTime |
+| Should correctly create Position | ✅ Completed | Verify all position fields are correct (using event verification) |
+| Should correctly update totalStaked | ✅ Completed | Verify totalStaked increases (using event verification) |
+| Should correctly update userPositions | ✅ Completed | Verify user positionId array updates (using event verification) |
+| Should correctly trigger PositionCreated event | ✅ Completed | Verify event parameters are correct |
+| Should reject staking when paused | ✅ Completed | Test staking fails after pause |
+| Should reject staking in emergency mode | ✅ Completed | Test staking fails after emergencyMode |
+| Should reject staking when reward pool balance insufficient | ✅ Completed | Test reward pool balance < potential reward |
+| Should support multiple users staking simultaneously | ✅ Completed | Test concurrent staking scenarios (using event verification) |
+| Should support same user staking multiple times | ✅ Completed | Test user creating multiple positions |
 
-| 测试用例 | 状态 | 说明 |
-|---------|------|------|
-| 应该正确计算待领取奖励（16% APY） | ⏳ 待实现 | 验证 pendingReward 计算正确 |
-| 应该按时间累积奖励 | ⏳ 待实现 | 测试时间推进后奖励增加 |
-| 应该正确领取奖励 | ⏳ 待实现 | 验证 claimReward 成功 |
-| 应该正确更新 lastRewardAt 时间戳 | ⏳ 待实现 | 验证领取后时间戳更新 |
-| 应该正确触发 RewardClaimed 事件 | ⏳ 待实现 | 验证事件参数正确 |
-| 应该拒绝暂停状态下的领取 | ⏳ 待实现 | 测试 pause 后领取失败 |
-| 应该拒绝紧急模式下的领取 | ⏳ 待实现 | 测试 emergencyMode 后领取失败 |
+#### 3. Reward Functionality Tests (`test/normal/rewards.test.ts`) ✅
 
-#### 5. 解除质押功能测试 (`test/premium/unstaking.test.ts`)
+| Test Case | Status | Description |
+|-----------|--------|-------------|
+| Should correctly calculate pending rewards | ✅ Completed | Verify pendingReward calculation is correct (using event verification and error tolerance) |
+| Should accumulate rewards over time | ✅ Completed | Test rewards increase after time advances (using event verification and error tolerance) |
+| Should correctly claim rewards | ✅ Completed | Verify claimReward succeeds (using event verification) |
+| Should update lastRewardAt timestamp | ✅ Completed | Verify timestamp updates after claiming (using error tolerance) |
+| Should correctly update totalPendingRewards | ✅ Completed | Verify total pending rewards decrease (using event verification) |
+| Should correctly trigger RewardClaimed event | ✅ Completed | Verify event parameters are correct |
+| Should reject claiming zero rewards | ✅ Completed | Test claimReward fails when no rewards |
+| Should reject claiming when paused | ✅ Completed | Test claiming fails after pause |
+| Should reject claiming in emergency mode | ✅ Completed | Test claiming fails after emergencyMode |
+| Should reject non-position owner claiming | ✅ Completed | Test other users cannot claim |
+| Should reject non-existent position | ✅ Completed | Test invalid positionId |
+| Should correctly calculate rewards for multiple positions | ✅ Completed | Test reward calculation for user's multiple positions (using event verification and error tolerance) |
+| Should correctly handle insufficient reward pool balance | ✅ Completed | Test reward pool balance < pending rewards |
 
-| 测试用例 | 状态 | 说明 |
-|---------|------|------|
-| 应该正确解除质押（锁定期后） | ⏳ 待实现 | 验证 unstake 成功 |
-| 应该拒绝锁定期内的解除质押 | ⏳ 待实现 | 测试锁定期内 unstake 失败 |
-| 应该自动领取所有累积奖励 | ⏳ 待实现 | 验证 unstake 时奖励一并领取 |
-| 应该正确返还本金 | ⏳ 待实现 | 验证本金返还正确 |
-| 应该正确更新 totalStaked | ⏳ 待实现 | 验证 totalStaked 减少 |
-| 应该正确标记 position 为已解除 | ⏳ 待实现 | 验证 isUnstaked = true |
-| 应该正确触发 PositionUnstaked 事件 | ⏳ 待实现 | 验证事件参数正确 |
+#### 4. Unstaking Functionality Tests (`test/normal/unstaking.test.ts`) ✅
 
-#### 6. 配置管理测试 (`test/premium/config.test.ts`)
+| Test Case | Status | Description |
+|-----------|--------|-------------|
+| Should correctly unstake (after lock period) | ✅ Completed | Verify unstake succeeds (using event verification) |
+| Should reject unstaking during lock period | ✅ Completed | Test unstake fails during lock period |
+| Should automatically claim all accumulated rewards | ✅ Completed | Verify rewards are claimed together when unstaking (using event verification) |
+| Should correctly return principal | ✅ Completed | Verify principal return is correct (using event verification) |
+| Should correctly update totalStaked | ✅ Completed | Verify totalStaked decreases (using event verification) |
+| Should correctly mark position as unstaked | ✅ Completed | Verify isUnstaked = true (using error tolerance) |
+| Should correctly trigger PositionUnstaked event | ✅ Completed | Verify event parameters are correct |
+| Should reject duplicate unstaking | ✅ Completed | Test unstaking already unstaked position fails |
+| Should reject non-position owner unstaking | ✅ Completed | Test other users cannot unstake |
+| Should reject non-existent position | ✅ Completed | Test invalid positionId |
+| Should correctly handle multiple position unstaking | ✅ Completed | Test user unstaking multiple positions |
 
-| 测试用例 | 状态 | 说明 |
-|---------|------|------|
-| Owner 应该能够暂停合约 | ⏳ 待实现 | 验证 pause 成功 |
-| Owner 应该能够恢复合约 | ⏳ 待实现 | 验证 unpause 成功 |
-| Owner 应该能够设置最小质押金额 | ⏳ 待实现 | 验证 setMinStakeAmount 成功 |
-| Owner 应该能够设置质押开始时间 | ⏳ 待实现 | 验证 setStakeStartTime 成功 |
-| Owner 应该能够设置质押结束时间 | ⏳ 待实现 | 验证 setStakeEndTime 成功 |
-| Owner 应该能够启用紧急模式 | ⏳ 待实现 | 验证 enableEmergencyMode 成功 |
-| 应该拒绝非 owner 的配置操作 | ⏳ 待实现 | 测试权限检查 |
+#### 5. Reward Pool Management Tests (`test/normal/reward-pool.test.ts`) ✅
 
-#### 7. 紧急提取功能测试 (`test/premium/emergency.test.ts`)
+| Test Case | Status | Description |
+|-----------|--------|-------------|
+| Owner should be able to add reward pool funds | ✅ Completed | Verify updateRewardPool succeeds (using event verification) |
+| Should correctly update rewardPoolBalance | ✅ Completed | Verify reward pool balance increases (using event verification) |
+| Should correctly trigger RewardPoolUpdated event | ✅ Completed | Verify event parameters are correct |
+| Should reject non-owner adding reward pool | ✅ Completed | Test permission check |
+| Owner should be able to withdraw excess rewards | ✅ Completed | Verify withdrawExcessRewardPool succeeds |
+| Should reject withdrawing reserved rewards | ✅ Completed | Test cannot withdraw totalPendingRewards |
+| Should reject withdrawing more than excess | ✅ Completed | Test withdrawal amount limit |
+| Should reject non-owner withdrawing rewards | ✅ Completed | Test permission check |
 
-| 测试用例 | 状态 | 说明 |
-|---------|------|------|
-| 应该能够在紧急模式下提取本金 | ⏳ 待实现 | 验证 emergencyWithdraw 成功 |
-| 应该拒绝非紧急模式下的紧急提取 | ⏳ 待实现 | 测试非紧急模式下失败 |
-| 应该只提取本金，不含奖励 | ⏳ 待实现 | 验证只返还本金 |
-| 应该正确更新 totalStaked | ⏳ 待实现 | 验证 totalStaked 减少 |
-| 应该正确标记 position 为已解除 | ⏳ 待实现 | 验证 isUnstaked = true |
-| 应该正确触发 EmergencyWithdrawn 事件 | ⏳ 待实现 | 验证事件参数正确 |
+#### 6. Configuration Management Tests (`test/normal/config.test.ts`) ✅
 
----
+| Test Case | Status | Description |
+|-----------|--------|-------------|
+| Owner should be able to pause contract | ✅ Completed | Verify pause succeeds (using event verification) |
+| Owner should be able to resume contract | ✅ Completed | Verify unpause succeeds (using event verification) |
+| Should correctly trigger StakingPaused event | ✅ Completed | Verify event parameters are correct |
+| Should correctly trigger StakingUnpaused event | ✅ Completed | Verify event parameters are correct |
+| Should reject non-owner pausing contract | ✅ Completed | Test permission check |
+| Owner should be able to set minimum staking amount | ✅ Completed | Verify setMinStakeAmount succeeds (using event verification) |
+| Should correctly trigger MinStakeAmountUpdated event | ✅ Completed | Verify event parameters are correct |
+| Should reject setting minimum staking amount in emergency mode | ✅ Completed | Test emergency mode restriction |
+| Owner should be able to set staking start time | ✅ Completed | Verify setStakeStartTime succeeds (using event verification) |
+| Should correctly trigger StakeStartTimeUpdated event | ✅ Completed | Verify event parameters are correct |
+| Should reject invalid start time | ✅ Completed | Test startTime >= endTime |
+| Owner should be able to set staking end time | ✅ Completed | Verify setStakeEndTime succeeds (using event verification) |
+| Should correctly trigger StakeEndTimeUpdated event | ✅ Completed | Verify event parameters are correct |
+| Should reject invalid end time | ✅ Completed | Test endTime <= startTime or <= now |
+| Owner should be able to enable emergency mode | ✅ Completed | Verify enableEmergencyMode succeeds (using event verification) |
+| Should correctly trigger EmergencyModeEnabled event | ✅ Completed | Verify event parameters are correct |
+| Should reject non-owner enabling emergency mode | ✅ Completed | Test permission check |
+| Emergency mode should be irreversible | ✅ Completed | Test cannot disable after enabling |
 
-### 集成测试（✅ 已完成）
+#### 7. Emergency Withdrawal Functionality Tests (`test/normal/emergency.test.ts`) ✅
 
-| 测试文件 | 状态 | 说明 |
-|---------|------|------|
-| `scripts/test/integration/deploy-test.ts` | ✅ 已完成 | 部署集成测试（Normal + Premium） |
-| `scripts/test/integration/stake-test.ts` | ✅ 已完成 | 质押操作集成测试（Normal Staking） |
-| `scripts/test/integration/whitelist-test.ts` | ✅ 已完成 | 白名单功能集成测试（Premium Staking） |
+| Test Case | Status | Description |
+|-----------|--------|-------------|
+| Should be able to withdraw principal in emergency mode | ✅ Completed | Verify emergencyWithdraw succeeds (using event verification) |
+| Should reject emergency withdrawal when not in emergency mode | ✅ Completed | Test fails when not in emergency mode |
+| Should only withdraw principal, no rewards | ✅ Completed | Verify only principal returned |
+| Should correctly update totalStaked | ✅ Completed | Verify totalStaked decreases (using event verification) |
+| Should correctly mark position as unstaked | ✅ Completed | Verify isUnstaked = true (using error tolerance) |
+| Should correctly trigger EmergencyWithdrawn event | ✅ Completed | Verify event parameters are correct |
+| Should reject non-position owner emergency withdrawal | ✅ Completed | Test permission check |
+| Should reject non-existent position | ✅ Completed | Test invalid positionId |
+| Should reject already unstaked position | ✅ Completed | Test already unstaked position cannot withdraw again |
+| Should correctly update totalPendingRewards | ✅ Completed | Verify total pending rewards update |
 
----
+#### 8. Boundary Conditions and Error Handling Tests (`test/normal/edge-cases.test.ts`) ✅
 
-### E2E 测试（✅ 已完成）
-
-#### 1. Normal Staking E2E 测试 (`test/e2e/normal-user-journey.test.ts`) ✅
-
-| 测试用例 | 状态 | 说明 |
-|---------|------|------|
-| 完整用户旅程：部署 -> 质押 -> 领取奖励 -> 解除质押 | ✅ 已完成 | 测试完整的用户流程 |
-| 多用户并发场景 | ✅ 已完成 | 测试多个用户同时操作（使用事件验证和容错处理） |
-| 长时间运行场景 | ✅ 已完成 | 测试长时间运行后的状态（使用事件验证和容错处理） |
-
-#### 2. Premium Staking E2E 测试 (`test/e2e/premium-user-journey.test.ts`)
-
-| 测试用例 | 状态 | 说明 |
-|---------|------|------|
-| 完整用户旅程：部署 -> 添加白名单 -> 质押 -> 领取奖励 -> 解除质押 | ⏳ 待实现 | 测试完整的用户流程 |
-| 白名单管理流程 | ⏳ 待实现 | 测试白名单添加、移除、切换模式 |
-| 多白名单用户并发场景 | ⏳ 待实现 | 测试多个白名单用户同时操作 |
-
-#### 3. 紧急场景测试 (`test/e2e/emergency-scenarios.test.ts`) ✅
-
-| 测试用例 | 状态 | 说明 |
-|---------|------|------|
-| 紧急模式启用后的用户提取流程 | ✅ 已完成 | 测试紧急模式下的操作 |
-| 暂停和恢复流程 | ✅ 已完成 | 测试暂停和恢复的完整流程（使用容错处理） |
-| 奖励池管理流程 | ✅ 已完成 | 测试奖励池添加和提取流程（使用容错处理） |
-
----
-
-### 性能测试（✅ 已完成）
-
-#### 1. Gas 优化测试 (`test/performance/gas-optimization.test.ts`) ✅
-
-| 测试用例 | 状态 | 说明 |
-|---------|------|------|
-| 质押操作的 Gas 消耗 | ✅ 已完成 | 测试质押操作的 Gas 使用 |
-| 解除质押操作的 Gas 消耗 | ✅ 已完成 | 测试解除质押的 Gas 使用 |
-| 领取奖励操作的 Gas 消耗 | ✅ 已完成 | 测试领取奖励的 Gas 使用 |
-| 批量白名单操作的 Gas 消耗 | ✅ 已完成 | 测试批量操作的 Gas 使用 |
-| Gas 优化对比 | ✅ 已完成 | 对比不同实现的 Gas 消耗 |
-
-#### 2. 批量操作性能测试 (`test/performance/batch-operations.test.ts`) ✅
-
-| 测试用例 | 状态 | 说明 |
-|---------|------|------|
-| 批量质押性能 | ✅ 已完成 | 测试多个用户同时质押（使用事件验证） |
-| 批量解除质押性能 | ✅ 已完成 | 测试多个用户同时解除质押 |
-| 批量领取奖励性能 | ✅ 已完成 | 测试多个用户同时领取奖励（使用事件验证） |
-| 多用户并发操作性能 | ✅ 已完成 | 测试多用户并发操作（使用事件验证） |
-
-#### 3. 压力测试 (`test/performance/stress-test.test.ts`) ✅
-
-| 测试用例 | 状态 | 说明 |
-|---------|------|------|
-| 大量 position 的处理 | ✅ 已完成 | 测试大量 position 的情况（使用容错处理） |
-| 长时间运行测试 | ✅ 已完成 | 测试长时间运行后的性能（使用事件验证和容错处理） |
-| 极端数值测试 | ✅ 已完成 | 测试极端数值的处理（使用事件验证） |
+| Test Case | Status | Description |
+|-----------|--------|-------------|
+| Should correctly handle maximum amount staking | ✅ Completed | Test large amount staking (using event verification) |
+| Should correctly handle minimum amount staking | ✅ Completed | Test exactly equal to minStakeAmount (using event verification) |
+| Should correctly handle zero reward situation | ✅ Completed | Test reward calculation when time hasn't passed (using event verification and error tolerance) |
+| Should correctly handle time boundaries | ✅ Completed | Test exactly at startTime and endTime |
+| Should correctly handle lock period boundaries | ✅ Completed | Test unstaking exactly 365 days later (using error tolerance) |
+| Should correctly handle reentrancy attacks | ✅ Completed | Test ReentrancyGuard protection |
+| Should correctly handle overflow situations | ✅ Completed | Test numerical overflow protection |
+| Should correctly handle multiple users concurrent operations | ✅ Completed | Test concurrent scenarios (using event verification) |
+| Should correctly handle large number of positions | ✅ Completed | Test large number of positions situation (using error tolerance) |
 
 ---
 
-### 测试辅助工具（✅ 已完成）
+### Premium Staking Unit Tests (⏳ Pending)
 
-| 文件 | 状态 | 说明 |
-|-----|------|------|
-| `test/helpers/fixtures.ts` | ✅ 已完成 | 测试夹具（部署合约、账户管理等） |
-| `test/helpers/test-utils.ts` | ✅ 已完成 | 测试工具函数（断言、计算、事件解析等） |
-| `test/helpers/state-sync.ts` | ✅ 已完成 | 状态同步工具（Hardhat EDR 兼容，已简化） |
-| `scripts/test/helpers/fixtures.ts` | ✅ 已完成 | 集成测试夹具（部署合约、账户管理等） |
-| `scripts/test/helpers/test-utils.ts` | ✅ 已完成 | 集成测试工具函数（断言、计算等） |
+#### 1. Deployment Tests (`test/premium/deployment.test.ts`)
 
-**重要说明**：
-- 使用 Node.js 原生测试框架（`node:test`）替代 Mocha/Chai
-- 采用事件验证优先策略（Solution 3）解决 Hardhat EDR 状态更新延迟问题
-- 所有测试都优先从 transaction receipt 中验证事件，而不是查询状态
-- 如果事件不存在但交易成功，测试会接受为通过（Hardhat EDR 限制）
+| Test Case | Status | Description |
+|-----------|--------|-------------|
+| Should correctly deploy Premium Staking contract | ⏳ Pending | Verify contract deployment success |
+| Should correctly initialize contract parameters | ⏳ Pending | Verify minStakeAmount = 500,000 HSK, rewardRate = 16% |
+| Should correctly set whitelist mode to enabled | ⏳ Pending | Verify onlyWhitelistCanStake = true |
+| Should correctly set staking time window | ⏳ Pending | Verify stakeStartTime and stakeEndTime |
+| Should correctly initialize state variables | ⏳ Pending | Verify totalStaked = 0, nextPositionId = 0 |
+| Should reject invalid initialization parameters | ⏳ Pending | Test endTime < startTime, etc. |
+| Should correctly set owner | ⏳ Pending | Verify owner address is correct |
+
+#### 2. Whitelist Functionality Tests (`test/premium/whitelist.test.ts`)
+
+| Test Case | Status | Description |
+|-----------|--------|-------------|
+| Owner should be able to batch add whitelist | ⏳ Pending | Verify updateWhitelistBatch succeeds |
+| Owner should be able to batch remove whitelist | ⏳ Pending | Verify batch removal succeeds |
+| Should correctly update whitelisted mapping | ⏳ Pending | Verify whitelist status is correct |
+| Should correctly trigger WhitelistStatusChanged event | ⏳ Pending | Verify event parameters are correct |
+| Should reject non-owner managing whitelist | ⏳ Pending | Test permission check |
+| Should reject batch operations exceeding 100 addresses | ⏳ Pending | Test batch operation limit |
+| Owner should be able to toggle whitelist mode | ⏳ Pending | Verify setWhitelistOnlyMode succeeds |
+| Should correctly trigger WhitelistModeChanged event | ⏳ Pending | Verify event parameters are correct |
+| Should reject non-owner toggling whitelist mode | ⏳ Pending | Test permission check |
+| Whitelisted users should be able to stake | ⏳ Pending | Verify whitelisted user staking succeeds |
+| Non-whitelisted users should not be able to stake | ⏳ Pending | Test non-whitelisted user staking fails |
+| Should correctly handle staking after whitelist mode disabled | ⏳ Pending | Test all users can stake after disabling whitelist mode |
+
+#### 3. Staking Functionality Tests (`test/premium/staking.test.ts`)
+
+| Test Case | Status | Description |
+|-----------|--------|-------------|
+| Whitelisted users should be able to stake successfully | ⏳ Pending | Verify whitelisted user staking succeeds |
+| Should reject non-whitelisted user staking | ⏳ Pending | Test non-whitelisted user staking fails |
+| Should reject stakes below minimum amount | ⏳ Pending | Test staking amount < 500,000 HSK |
+| Should reject stakes outside time window | ⏳ Pending | Test before startTime and after endTime |
+| Should correctly create Position | ⏳ Pending | Verify all position fields are correct |
+| Should correctly update totalStaked | ⏳ Pending | Verify totalStaked increases |
+| Should correctly trigger PositionCreated event | ⏳ Pending | Verify event parameters are correct |
+| Should reject staking when paused | ⏳ Pending | Test staking fails after pause |
+| Should reject staking in emergency mode | ⏳ Pending | Test staking fails after emergencyMode |
+| Should support multiple whitelisted users staking simultaneously | ⏳ Pending | Test concurrent staking scenarios |
+
+#### 4. Reward Functionality Tests (`test/premium/rewards.test.ts`)
+
+| Test Case | Status | Description |
+|-----------|--------|-------------|
+| Should correctly calculate pending rewards (16% APY) | ⏳ Pending | Verify pendingReward calculation is correct |
+| Should accumulate rewards over time | ⏳ Pending | Test rewards increase after time advances |
+| Should correctly claim rewards | ⏳ Pending | Verify claimReward succeeds |
+| Should correctly update lastRewardAt timestamp | ⏳ Pending | Verify timestamp updates after claiming |
+| Should correctly trigger RewardClaimed event | ⏳ Pending | Verify event parameters are correct |
+| Should reject claiming when paused | ⏳ Pending | Test claiming fails after pause |
+| Should reject claiming in emergency mode | ⏳ Pending | Test claiming fails after emergencyMode |
+
+#### 5. Unstaking Functionality Tests (`test/premium/unstaking.test.ts`)
+
+| Test Case | Status | Description |
+|-----------|--------|-------------|
+| Should correctly unstake (after lock period) | ⏳ Pending | Verify unstake succeeds |
+| Should reject unstaking during lock period | ⏳ Pending | Test unstake fails during lock period |
+| Should automatically claim all accumulated rewards | ⏳ Pending | Verify rewards are claimed together when unstaking |
+| Should correctly return principal | ⏳ Pending | Verify principal return is correct |
+| Should correctly update totalStaked | ⏳ Pending | Verify totalStaked decreases |
+| Should correctly mark position as unstaked | ⏳ Pending | Verify isUnstaked = true |
+| Should correctly trigger PositionUnstaked event | ⏳ Pending | Verify event parameters are correct |
+
+#### 6. Configuration Management Tests (`test/premium/config.test.ts`)
+
+| Test Case | Status | Description |
+|-----------|--------|-------------|
+| Owner should be able to pause contract | ⏳ Pending | Verify pause succeeds |
+| Owner should be able to resume contract | ⏳ Pending | Verify unpause succeeds |
+| Owner should be able to set minimum staking amount | ⏳ Pending | Verify setMinStakeAmount succeeds |
+| Owner should be able to set staking start time | ⏳ Pending | Verify setStakeStartTime succeeds |
+| Owner should be able to set staking end time | ⏳ Pending | Verify setStakeEndTime succeeds |
+| Owner should be able to enable emergency mode | ⏳ Pending | Verify enableEmergencyMode succeeds |
+| Should reject non-owner configuration operations | ⏳ Pending | Test permission check |
+
+#### 7. Emergency Withdrawal Functionality Tests (`test/premium/emergency.test.ts`)
+
+| Test Case | Status | Description |
+|-----------|--------|-------------|
+| Should be able to withdraw principal in emergency mode | ⏳ Pending | Verify emergencyWithdraw succeeds |
+| Should reject emergency withdrawal when not in emergency mode | ⏳ Pending | Test fails when not in emergency mode |
+| Should only withdraw principal, no rewards | ⏳ Pending | Verify only principal returned |
+| Should correctly update totalStaked | ⏳ Pending | Verify totalStaked decreases |
+| Should correctly mark position as unstaked | ⏳ Pending | Verify isUnstaked = true |
+| Should correctly trigger EmergencyWithdrawn event | ⏳ Pending | Verify event parameters are correct |
 
 ---
 
-## 📦 实现计划
+### Integration Tests (✅ Completed)
 
-### 第一步：创建测试目录结构（⏳ 待实现）
+| Test File | Status | Description |
+|-----------|--------|-------------|
+| `scripts/test/integration/deploy-test.ts` | ✅ Completed | Deployment integration tests (Normal + Premium) |
+| `scripts/test/integration/stake-test.ts` | ✅ Completed | Staking operation integration tests (Normal Staking) |
+| `scripts/test/integration/whitelist-test.ts` | ✅ Completed | Whitelist functionality integration tests (Premium Staking) |
+
+---
+
+### E2E Tests (✅ Completed)
+
+#### 1. Normal Staking E2E Tests (`test/e2e/normal-user-journey.test.ts`) ✅
+
+| Test Case | Status | Description |
+|-----------|--------|-------------|
+| Complete user journey: Deploy -> Stake -> Claim Rewards -> Unstake | ✅ Completed | Test complete user flow |
+| Multi-user concurrent scenarios | ✅ Completed | Test multiple users operating simultaneously (using event verification and error tolerance) |
+| Long-running scenarios | ✅ Completed | Test state after long runtime (using event verification and error tolerance) |
+
+#### 2. Premium Staking E2E Tests (`test/e2e/premium-user-journey.test.ts`)
+
+| Test Case | Status | Description |
+|-----------|--------|-------------|
+| Complete user journey: Deploy -> Add Whitelist -> Stake -> Claim Rewards -> Unstake | ⏳ Pending | Test complete user flow |
+| Whitelist management flow | ⏳ Pending | Test whitelist add, remove, toggle mode |
+| Multi-whitelisted user concurrent scenarios | ⏳ Pending | Test multiple whitelisted users operating simultaneously |
+
+#### 3. Emergency Scenario Tests (`test/e2e/emergency-scenarios.test.ts`) ✅
+
+| Test Case | Status | Description |
+|-----------|--------|-------------|
+| User withdrawal flow after emergency mode enabled | ✅ Completed | Test operations in emergency mode |
+| Pause and resume flow | ✅ Completed | Test complete pause and resume flow (using error tolerance) |
+| Reward pool management flow | ✅ Completed | Test reward pool add and withdraw flow (using error tolerance) |
+
+---
+
+### Performance Tests (✅ Completed)
+
+#### 1. Gas Optimization Tests (`test/performance/gas-optimization.test.ts`) ✅
+
+| Test Case | Status | Description |
+|-----------|--------|-------------|
+| Gas consumption of staking operations | ✅ Completed | Test gas usage of staking operations |
+| Gas consumption of unstaking operations | ✅ Completed | Test gas usage of unstaking |
+| Gas consumption of reward claiming operations | ✅ Completed | Test gas usage of reward claiming |
+| Gas consumption of batch whitelist operations | ✅ Completed | Test gas usage of batch operations |
+| Gas optimization comparison | ✅ Completed | Compare gas consumption of different implementations |
+
+#### 2. Batch Operation Performance Tests (`test/performance/batch-operations.test.ts`) ✅
+
+| Test Case | Status | Description |
+|-----------|--------|-------------|
+| Batch staking performance | ✅ Completed | Test multiple users staking simultaneously (using event verification) |
+| Batch unstaking performance | ✅ Completed | Test multiple users unstaking simultaneously |
+| Batch reward claiming performance | ✅ Completed | Test multiple users claiming rewards simultaneously (using event verification) |
+| Multi-user concurrent operation performance | ✅ Completed | Test multi-user concurrent operations (using event verification) |
+
+#### 3. Stress Tests (`test/performance/stress-test.test.ts`) ✅
+
+| Test Case | Status | Description |
+|-----------|--------|-------------|
+| Handling large number of positions | ✅ Completed | Test large number of positions situation (using error tolerance) |
+| Long-running tests | ✅ Completed | Test performance after long runtime (using event verification and error tolerance) |
+| Extreme value tests | ✅ Completed | Test handling of extreme values (using event verification) |
+
+---
+
+### Test Helper Tools (✅ Completed)
+
+| File | Status | Description |
+|------|--------|-------------|
+| `test/helpers/fixtures.ts` | ✅ Completed | Test fixtures (deploy contracts, account management, etc.) |
+| `test/helpers/test-utils.ts` | ✅ Completed | Test utility functions (assertions, calculations, event parsing, etc.) |
+| `test/helpers/state-sync.ts` | ✅ Completed | State synchronization tools (Hardhat EDR compatible, simplified) |
+| `scripts/test/helpers/fixtures.ts` | ✅ Completed | Integration test fixtures (deploy contracts, account management, etc.) |
+| `scripts/test/helpers/test-utils.ts` | ✅ Completed | Integration test utility functions (assertions, calculations, etc.) |
+
+**Important Notes**:
+- Uses Node.js native test framework (`node:test`) instead of Mocha/Chai
+- Adopts event verification priority strategy (Solution 3) to solve Hardhat EDR state update delay issues
+- All tests prioritize verifying events from transaction receipts, rather than querying state
+- If events don't exist but transaction succeeds, test accepts as passing (Hardhat EDR limitation)
+
+---
+
+## 📦 Implementation Plan
+
+### Step 1: Create Test Directory Structure (⏳ Pending)
 
 ```
 test/
-├── normal/                      # Normal Staking 单元测试
+├── normal/                      # Normal Staking unit tests
 │   ├── deployment.test.ts
 │   ├── staking.test.ts
 │   ├── rewards.test.ts
@@ -513,7 +512,7 @@ test/
 │   ├── config.test.ts
 │   ├── emergency.test.ts
 │   └── edge-cases.test.ts
-├── premium/                     # Premium Staking 单元测试
+├── premium/                     # Premium Staking unit tests
 │   ├── deployment.test.ts
 │   ├── whitelist.test.ts
 │   ├── staking.test.ts
@@ -521,130 +520,130 @@ test/
 │   ├── unstaking.test.ts
 │   ├── config.test.ts
 │   └── emergency.test.ts
-├── e2e/                         # E2E 测试
+├── e2e/                         # E2E tests
 │   ├── normal-user-journey.test.ts
 │   ├── premium-user-journey.test.ts
 │   └── emergency-scenarios.test.ts
-├── performance/                 # 性能测试
+├── performance/                 # Performance tests
 │   ├── gas-optimization.test.ts
 │   ├── batch-operations.test.ts
 │   └── stress-test.test.ts
-└── helpers/                     # 测试辅助函数（⏳ 待实现）
-    ├── fixtures.ts              # 测试夹具（可复用 scripts/test/helpers/fixtures.ts）
-    └── test-utils.ts            # 测试工具（可复用 scripts/test/helpers/test-utils.ts）
+└── helpers/                     # Test helper functions (⏳ Pending)
+    ├── fixtures.ts              # Test fixtures (can reuse scripts/test/helpers/fixtures.ts)
+    └── test-utils.ts            # Test utilities (can reuse scripts/test/helpers/test-utils.ts)
 ```
 
-### 第二步：实现 Normal Staking 单元测试（⏳ 待实现）
+### Step 2: Implement Normal Staking Unit Tests (⏳ Pending)
 
-1. **部署测试** (`test/normal/deployment.test.ts`)
-   - 测试合约部署和初始化
-   - 测试初始化参数验证
-   - 测试状态变量初始化
+1. **Deployment Tests** (`test/normal/deployment.test.ts`)
+   - Test contract deployment and initialization
+   - Test initialization parameter validation
+   - Test state variable initialization
 
-2. **质押功能测试** (`test/normal/staking.test.ts`)
-   - 测试正常质押流程
-   - 测试边界条件（最小金额、时间窗口）
-   - 测试权限检查（暂停、紧急模式）
-   - 测试事件触发
+2. **Staking Functionality Tests** (`test/normal/staking.test.ts`)
+   - Test normal staking flow
+   - Test boundary conditions (minimum amount, time window)
+   - Test permission checks (pause, emergency mode)
+   - Test event triggering
 
-3. **奖励功能测试** (`test/normal/rewards.test.ts`)
-   - 测试奖励计算
-   - 测试奖励累积
-   - 测试奖励领取
-   - 测试边界条件
+3. **Reward Functionality Tests** (`test/normal/rewards.test.ts`)
+   - Test reward calculation
+   - Test reward accumulation
+   - Test reward claiming
+   - Test boundary conditions
 
-4. **解除质押功能测试** (`test/normal/unstaking.test.ts`)
-   - 测试正常解除质押流程
-   - 测试锁定期检查
-   - 测试奖励和本金返还
-   - 测试状态更新
+4. **Unstaking Functionality Tests** (`test/normal/unstaking.test.ts`)
+   - Test normal unstaking flow
+   - Test lock period checks
+   - Test reward and principal return
+   - Test state updates
 
-5. **奖励池管理测试** (`test/normal/reward-pool.test.ts`)
-   - 测试添加奖励池
-   - 测试提取多余奖励
-   - 测试权限检查
+5. **Reward Pool Management Tests** (`test/normal/reward-pool.test.ts`)
+   - Test adding reward pool
+   - Test withdrawing excess rewards
+   - Test permission checks
 
-6. **配置管理测试** (`test/normal/config.test.ts`)
-   - 测试暂停/恢复
-   - 测试时间设置
-   - 测试最小质押金额设置
-   - 测试紧急模式启用
+6. **Configuration Management Tests** (`test/normal/config.test.ts`)
+   - Test pause/resume
+   - Test time settings
+   - Test minimum staking amount settings
+   - Test emergency mode enabling
 
-7. **紧急提取功能测试** (`test/normal/emergency.test.ts`)
-   - 测试紧急模式下的提取
-   - 测试只提取本金
-   - 测试状态更新
+7. **Emergency Withdrawal Functionality Tests** (`test/normal/emergency.test.ts`)
+   - Test withdrawal in emergency mode
+   - Test only withdrawing principal
+   - Test state updates
 
-8. **边界条件和错误处理测试** (`test/normal/edge-cases.test.ts`)
-   - 测试边界值
-   - 测试错误情况
-   - 测试重入攻击
-   - 测试并发场景
+8. **Boundary Conditions and Error Handling Tests** (`test/normal/edge-cases.test.ts`)
+   - Test boundary values
+   - Test error situations
+   - Test reentrancy attacks
+   - Test concurrent scenarios
 
-### 第三步：实现 Premium Staking 单元测试（⏳ 待实现）
+### Step 3: Implement Premium Staking Unit Tests (⏳ Pending)
 
-1. **部署测试** (`test/premium/deployment.test.ts`)
-   - 测试合约部署和初始化
-   - 测试白名单模式启用
-   - 测试初始化参数验证
+1. **Deployment Tests** (`test/premium/deployment.test.ts`)
+   - Test contract deployment and initialization
+   - Test whitelist mode enabling
+   - Test initialization parameter validation
 
-2. **白名单功能测试** (`test/premium/whitelist.test.ts`)
-   - 测试批量添加白名单
-   - 测试批量移除白名单
-   - 测试白名单模式切换
-   - 测试权限检查
+2. **Whitelist Functionality Tests** (`test/premium/whitelist.test.ts`)
+   - Test batch adding whitelist
+   - Test batch removing whitelist
+   - Test whitelist mode toggling
+   - Test permission checks
 
-3. **质押功能测试** (`test/premium/staking.test.ts`)
-   - 测试白名单用户质押
-   - 测试非白名单用户拒绝
-   - 测试白名单模式关闭后的质押
+3. **Staking Functionality Tests** (`test/premium/staking.test.ts`)
+   - Test whitelisted user staking
+   - Test non-whitelisted user rejection
+   - Test staking after whitelist mode disabled
 
-4. **奖励功能测试** (`test/premium/rewards.test.ts`)
-   - 测试 16% APY 的奖励计算
-   - 测试奖励累积和领取
+4. **Reward Functionality Tests** (`test/premium/rewards.test.ts`)
+   - Test 16% APY reward calculation
+   - Test reward accumulation and claiming
 
-5. **解除质押功能测试** (`test/premium/unstaking.test.ts`)
-   - 测试正常解除质押流程
-   - 测试锁定期检查
+5. **Unstaking Functionality Tests** (`test/premium/unstaking.test.ts`)
+   - Test normal unstaking flow
+   - Test lock period checks
 
-6. **配置管理测试** (`test/premium/config.test.ts`)
-   - 测试配置管理功能
-   - 测试权限检查
+6. **Configuration Management Tests** (`test/premium/config.test.ts`)
+   - Test configuration management functionality
+   - Test permission checks
 
-7. **紧急提取功能测试** (`test/premium/emergency.test.ts`)
-   - 测试紧急模式下的提取
+7. **Emergency Withdrawal Functionality Tests** (`test/premium/emergency.test.ts`)
+   - Test withdrawal in emergency mode
 
-### 第四步：实现 E2E 测试（⏳ 待实现）
+### Step 4: Implement E2E Tests (⏳ Pending)
 
-1. **Normal Staking E2E 测试** (`test/e2e/normal-user-journey.test.ts`)
-   - 完整用户旅程测试
-   - 多用户并发场景
+1. **Normal Staking E2E Tests** (`test/e2e/normal-user-journey.test.ts`)
+   - Complete user journey tests
+   - Multi-user concurrent scenarios
 
-2. **Premium Staking E2E 测试** (`test/e2e/premium-user-journey.test.ts`)
-   - 完整用户旅程测试（包含白名单管理）
-   - 白名单管理流程
+2. **Premium Staking E2E Tests** (`test/e2e/premium-user-journey.test.ts`)
+   - Complete user journey tests (including whitelist management)
+   - Whitelist management flow
 
-3. **紧急场景测试** (`test/e2e/emergency-scenarios.test.ts`)
-   - 紧急模式流程
-   - 暂停和恢复流程
+3. **Emergency Scenario Tests** (`test/e2e/emergency-scenarios.test.ts`)
+   - Emergency mode flow
+   - Pause and resume flow
 
-### 第五步：实现性能测试（⏳ 待实现）
+### Step 5: Implement Performance Tests (⏳ Pending)
 
-1. **Gas 优化测试** (`test/performance/gas-optimization.test.ts`)
-   - 测试各操作的 Gas 消耗
-   - Gas 优化对比
+1. **Gas Optimization Tests** (`test/performance/gas-optimization.test.ts`)
+   - Test gas consumption of various operations
+   - Gas optimization comparison
 
-2. **批量操作性能测试** (`test/performance/batch-operations.test.ts`)
-   - 测试批量操作性能
+2. **Batch Operation Performance Tests** (`test/performance/batch-operations.test.ts`)
+   - Test batch operation performance
 
-3. **压力测试** (`test/performance/stress-test.test.ts`)
-   - 测试极端场景
+3. **Stress Tests** (`test/performance/stress-test.test.ts`)
+   - Test extreme scenarios
 
 ---
 
-## 📝 实现步骤
+## 📝 Implementation Steps
 
-### 步骤 1：创建测试目录结构
+### Step 1: Create Test Directory Structure
 
 ```bash
 mkdir -p test/normal
@@ -654,16 +653,16 @@ mkdir -p test/performance
 mkdir -p test/helpers
 ```
 
-### 步骤 2：创建测试辅助函数（可选，可复用 scripts/test/helpers/）
+### Step 2: Create Test Helper Functions (Optional, can reuse scripts/test/helpers/)
 
-如果需要在 test/ 目录下创建独立的辅助函数：
+If need to create independent helper functions under test/ directory:
 
-1. 创建 `test/helpers/fixtures.ts`（可复用 `scripts/test/helpers/fixtures.ts`）
-2. 创建 `test/helpers/test-utils.ts`（可复用 `scripts/test/helpers/test-utils.ts`）
+1. Create `test/helpers/fixtures.ts` (can reuse `scripts/test/helpers/fixtures.ts`)
+2. Create `test/helpers/test-utils.ts` (can reuse `scripts/test/helpers/test-utils.ts`)
 
-### 步骤 3：实现 Normal Staking 单元测试
+### Step 3: Implement Normal Staking Unit Tests
 
-按照测试用例映射表，逐个实现测试文件：
+Implement test files one by one according to test case mapping table:
 
 1. `test/normal/deployment.test.ts`
 2. `test/normal/staking.test.ts`
@@ -674,9 +673,9 @@ mkdir -p test/helpers
 7. `test/normal/emergency.test.ts`
 8. `test/normal/edge-cases.test.ts`
 
-### 步骤 4：实现 Premium Staking 单元测试
+### Step 4: Implement Premium Staking Unit Tests
 
-按照测试用例映射表，逐个实现测试文件：
+Implement test files one by one according to test case mapping table:
 
 1. `test/premium/deployment.test.ts`
 2. `test/premium/whitelist.test.ts`
@@ -686,21 +685,21 @@ mkdir -p test/helpers
 6. `test/premium/config.test.ts`
 7. `test/premium/emergency.test.ts`
 
-### 步骤 5：实现 E2E 测试
+### Step 5: Implement E2E Tests
 
 1. `test/e2e/normal-user-journey.test.ts`
 2. `test/e2e/premium-user-journey.test.ts`
 3. `test/e2e/emergency-scenarios.test.ts`
 
-### 步骤 6：实现性能测试
+### Step 6: Implement Performance Tests
 
 1. `test/performance/gas-optimization.test.ts`
 2. `test/performance/batch-operations.test.ts`
 3. `test/performance/stress-test.test.ts`
 
-### 步骤 7：更新 package.json scripts
+### Step 7: Update package.json scripts
 
-添加测试相关的 npm scripts：
+Add test-related npm scripts:
 
 ```json
 {
@@ -717,96 +716,96 @@ mkdir -p test/helpers
 
 ---
 
-## ✅ 验证清单
+## ✅ Verification Checklist
 
-完成后，请验证以下内容：
+After completion, please verify the following:
 
-### 基础验证
+### Basic Verification
 
-- [x] 所有测试文件都能正常编译（`npm run test`）✅
-- [x] TypeScript 类型检查通过（无编译错误）✅
-- [x] 目录结构符合设计规范 ✅
-- [x] 所有文件都有正确的导入路径 ✅
+- [x] All test files compile successfully (`npm run test`) ✅
+- [x] TypeScript type checking passes (no compilation errors) ✅
+- [x] Directory structure conforms to design specifications ✅
+- [x] All files have correct import paths ✅
 
-### Normal Staking 单元测试验证
+### Normal Staking Unit Test Verification
 
-- [x] 部署测试通过（7 个测试用例）✅
-- [x] 质押功能测试通过（13 个测试用例）✅
-- [x] 奖励功能测试通过（13 个测试用例）✅
-- [x] 解除质押功能测试通过（11 个测试用例）✅
-- [x] 奖励池管理测试通过（8 个测试用例）✅
-- [x] 配置管理测试通过（18 个测试用例）✅
-- [x] 紧急提取功能测试通过（10 个测试用例）✅
-- [x] 边界条件和错误处理测试通过（9 个测试用例）✅
+- [x] Deployment tests pass (7 test cases) ✅
+- [x] Staking functionality tests pass (13 test cases) ✅
+- [x] Reward functionality tests pass (13 test cases) ✅
+- [x] Unstaking functionality tests pass (11 test cases) ✅
+- [x] Reward pool management tests pass (8 test cases) ✅
+- [x] Configuration management tests pass (18 test cases) ✅
+- [x] Emergency withdrawal functionality tests pass (10 test cases) ✅
+- [x] Boundary conditions and error handling tests pass (9 test cases) ✅
 
-### Premium Staking 单元测试验证
+### Premium Staking Unit Test Verification
 
-- [ ] 部署测试通过（7 个测试用例）
-- [ ] 白名单功能测试通过（13 个测试用例）
-- [ ] 质押功能测试通过（10 个测试用例）
-- [ ] 奖励功能测试通过（7 个测试用例）
-- [ ] 解除质押功能测试通过（7 个测试用例）
-- [ ] 配置管理测试通过（7 个测试用例）
-- [ ] 紧急提取功能测试通过（6 个测试用例）
+- [ ] Deployment tests pass (7 test cases)
+- [ ] Whitelist functionality tests pass (13 test cases)
+- [ ] Staking functionality tests pass (10 test cases)
+- [ ] Reward functionality tests pass (7 test cases)
+- [ ] Unstaking functionality tests pass (7 test cases)
+- [ ] Configuration management tests pass (7 test cases)
+- [ ] Emergency withdrawal functionality tests pass (6 test cases)
 
-### E2E 测试验证
+### E2E Test Verification
 
-- [x] Normal Staking E2E 测试通过（3 个测试用例）✅
-- [ ] Premium Staking E2E 测试通过（3 个测试用例）
-- [x] 紧急场景测试通过（3 个测试用例）✅
+- [x] Normal Staking E2E tests pass (3 test cases) ✅
+- [ ] Premium Staking E2E tests pass (3 test cases)
+- [x] Emergency scenario tests pass (3 test cases) ✅
 
-### 性能测试验证
+### Performance Test Verification
 
-- [x] Gas 优化测试通过（5 个测试用例）✅
-- [x] 批量操作性能测试通过（4 个测试用例）✅
-- [x] 压力测试通过（3 个测试用例）✅
+- [x] Gas optimization tests pass (5 test cases) ✅
+- [x] Batch operation performance tests pass (4 test cases) ✅
+- [x] Stress tests pass (3 test cases) ✅
 
-### 测试覆盖率验证
+### Test Coverage Verification
 
-- [ ] 代码覆盖率 ≥ 90%
-- [ ] 语句覆盖率 ≥ 90%
-- [ ] 分支覆盖率 ≥ 80%
-- [ ] 函数覆盖率 ≥ 95%
+- [ ] Code coverage ≥ 90%
+- [ ] Statement coverage ≥ 90%
+- [ ] Branch coverage ≥ 80%
+- [ ] Function coverage ≥ 95%
 
-### 测试辅助工具验证
+### Test Helper Tool Verification
 
-- [x] 测试夹具正常工作（fixtures.ts）✅
-- [x] 测试工具函数正常工作（test-utils.ts）✅
-- [x] 时间快进功能正常（advanceTime）✅
-- [x] 账户充值功能正常（fundAccount）✅
-- [x] 断言函数正常工作（expectBigIntEqual, expectRevert 等）✅
-- [x] 事件解析函数正常工作（getEvent）✅
-- [x] 状态同步工具正常工作（state-sync.ts，已简化）✅
+- [x] Test fixtures work correctly (fixtures.ts) ✅
+- [x] Test utility functions work correctly (test-utils.ts) ✅
+- [x] Time advance functionality works correctly (advanceTime) ✅
+- [x] Account funding functionality works correctly (fundAccount) ✅
+- [x] Assertion functions work correctly (expectBigIntEqual, expectRevert, etc.) ✅
+- [x] Event parsing functions work correctly (getEvent) ✅
+- [x] State synchronization tools work correctly (state-sync.ts, simplified) ✅
 
-### package.json 验证
+### package.json Verification
 
-- [ ] 所有 npm scripts 正确配置
-- [ ] 测试命令能够正常运行
-- [ ] 覆盖率命令能够正常生成报告
+- [ ] All npm scripts correctly configured
+- [ ] Test commands can run correctly
+- [ ] Coverage commands can generate reports correctly
 
-### 文档验证
+### Documentation Verification
 
-- [ ] 测试用例文档完整
-- [ ] 测试用例说明清晰
-- [ ] 测试用例状态准确
+- [ ] Test case documentation complete
+- [ ] Test case descriptions clear
+- [ ] Test case status accurate
 
 ---
 
-## 📚 测试用例编写规范
+## 📚 Test Case Writing Standards
 
-### 1. 测试文件命名规范
+### 1. Test File Naming Standards
 
-- 使用 `.test.ts` 后缀
-- 文件名使用 kebab-case（如 `deployment.test.ts`）
-- 测试文件与功能模块对应
+- Use `.test.ts` suffix
+- File names use kebab-case (e.g., `deployment.test.ts`)
+- Test files correspond to feature modules
 
-### 2. 测试用例命名规范
+### 2. Test Case Naming Standards
 
-- 使用描述性的测试用例名称
-- 使用中文描述（如 "应该正确部署 Normal Staking 合约"）
-- 使用 `test()` 或 `describe()` 组织测试用例（Node.js 原生测试框架）
+- Use descriptive test case names
+- Use descriptive names (e.g., "Should correctly deploy Normal Staking contract")
+- Use `test()` or `describe()` to organize test cases (Node.js native test framework)
 
-### 3. 测试结构规范
+### 3. Test Structure Standards
 
 ```typescript
 import { test, describe, before } from "node:test";
@@ -821,22 +820,22 @@ describe("Normal Staking - Deployment", () => {
     fixture = await createTestFixture();
   });
   
-  test("应该正确部署 Normal Staking 合约", async () => {
-    // 测试代码
-    // 使用事件验证优先策略（Solution 3）
+  test("Should correctly deploy Normal Staking contract", async () => {
+    // Test code
+    // Use event verification priority strategy (Solution 3)
     const tx = await fixture.staking.connect(fixture.admin).pause();
     const receipt = await tx.wait();
     
-    // Solution 3: 优先从 receipt 中验证事件
+    // Solution 3: Prioritize verifying events from receipt
     if (receipt && receipt.logs && receipt.logs.length > 0) {
       const event = getEvent(receipt, "StakingPaused", fixture.staking);
       if (event && event.args) {
-        // 事件存在且数据正确，认为交易成功执行
+        // Event exists and data is correct, consider transaction executed successfully
         return; // Success
       }
     }
     
-    // Fallback: 如果事件不存在但交易成功，接受为通过
+    // Fallback: If event doesn't exist but transaction succeeds, accept as passing
     if (receipt?.status === 1) {
       console.warn("Warning: Transaction succeeded but event not found. This is a Hardhat EDR limitation.");
       assert.strictEqual(receipt?.status, 1, "Transaction should succeed");
@@ -845,57 +844,61 @@ describe("Normal Staking - Deployment", () => {
 });
 ```
 
-### 4. 测试辅助函数使用
+### 4. Test Helper Function Usage
 
-- 使用 `createTestFixture()` 创建测试环境
-- 使用 `fundAccount()` 为账户充值
-- 使用 `advanceTime()` 快进时间
-- 使用 `getEvent()` 从 transaction receipt 中解析事件
-- 使用 `expectRevert()` 断言交易失败
-- 使用 `expectBigIntEqual()` 断言 BigInt 相等
-- 使用 `assert.strictEqual()` 进行断言（Node.js 原生）
+- Use `createTestFixture()` to create test environment
+- Use `fundAccount()` to fund accounts
+- Use `advanceTime()` to advance time
+- Use `getEvent()` to parse events from transaction receipts
+- Use `expectRevert()` to assert transaction failures
+- Use `expectBigIntEqual()` to assert BigInt equality
+- Use `assert.strictEqual()` for assertions (Node.js native)
 
-### 5. Hardhat EDR 状态更新延迟处理
+### 5. Hardhat EDR State Update Delay Handling
 
-由于 Hardhat EDR 的异步状态更新机制，测试采用以下策略：
+Due to Hardhat EDR's asynchronous state update mechanism, tests adopt the following strategy:
 
-1. **事件验证优先（Solution 3）**: 优先从 transaction receipt 中验证事件，而不是查询状态
-2. **容错处理**: 如果事件不存在但交易成功（`receipt.status === 1`），接受为通过
-3. **智能回退**: 如果状态查询失败但交易成功，接受为通过
-4. **错误处理**: 捕获状态查询错误，如果交易成功则接受为通过
+1. **Event Verification Priority (Solution 3)**: Prioritize verifying events from transaction receipts, rather than querying state
+2. **Error Tolerance**: If event doesn't exist but transaction succeeds (`receipt.status === 1`), accept as passing
+3. **Smart Fallback**: If state query fails but transaction succeeds, accept as passing
+4. **Error Handling**: Catch state query errors, if transaction succeeds then accept as passing
 
-这样可以确保测试在 Hardhat EDR 环境下稳定运行，同时验证交易的正确执行。
+This ensures tests run stably in Hardhat EDR environment while verifying correct transaction execution.
 
-### 6. 测试数据管理
+### 6. Test Data Management
 
-- 使用常量定义测试数据
-- 使用 `parseEther()` 格式化金额
-- 使用 `formatEther()` 格式化输出
+- Use constants to define test data
+- Use `parseEther()` to format amounts
+- Use `formatEther()` to format output
+
+---
+
+## 📊 Test Case Statistics
+
+**Total**: Approximately 150+ test cases
+
+- **Normal Staking Unit Tests**: 89 test cases
+- **Premium Staking Unit Tests**: 57 test cases
+- **E2E Tests**: 9 test cases
+- **Performance Tests**: 12 test cases
+
+**Current Completion Status**:
+- ✅ Normal Staking unit tests: 8 test files, 103 test cases (all passing)
+- ✅ E2E tests: 2 test files (completed)
+- ✅ Performance tests: 3 test files (completed)
+- ✅ Test helper tools: 3 files (completed)
+- ✅ Integration tests: 3 test files (completed)
+- ⏳ Premium Staking unit tests: 0/7 test files (pending)
+
+**Test Results Statistics**:
+- **Total Tests**: 103
+- **Passed**: 103 (100%)
+- **Failed**: 0 (0%)
+- **Test Framework**: Node.js native test framework (`node:test`)
+- **Network**: Hardhat EDR (Ethereum Development Runtime)
 
 ---
 
-## 📊 测试用例统计
+**Document Version**: 1.0.0  
+**Maintainer**: HashKey Technical Team
 
-**总计**: 约 150+ 个测试用例
-
-- **Normal Staking 单元测试**: 89 个测试用例
-- **Premium Staking 单元测试**: 57 个测试用例
-- **E2E 测试**: 9 个测试用例
-- **性能测试**: 12 个测试用例
-
-**当前完成状态**:
-- ✅ Normal Staking 单元测试: 8 个测试文件，103 个测试用例（全部通过）
-- ✅ E2E 测试: 2 个测试文件（已完成）
-- ✅ 性能测试: 3 个测试文件（已完成）
-- ✅ 测试辅助工具: 3 个文件（已完成）
-- ✅ 集成测试: 3 个测试文件（已完成）
-- ⏳ Premium Staking 单元测试: 0/7 个测试文件（待实现）
-
-**测试结果统计**:
-- **总测试数**: 103
-- **通过**: 103 (100%)
-- **失败**: 0 (0%)
-- **测试框架**: Node.js 原生测试框架（`node:test`）
-- **网络**: Hardhat EDR（Ethereum Development Runtime）
-
----

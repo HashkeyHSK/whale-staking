@@ -40,7 +40,7 @@ describe("Normal Staking - E2E User Journey", () => {
     }
   });
 
-  test("完整用户旅程：部署 -> 质押 -> 领取奖励 -> 解除质押", async () => {
+  test("complete user journey: deploy -> stake -> claim rewards -> unstake", async () => {
     // Step 1: Stake
     const stakeAmount = parseEther("1000");
     const tx1 = await fixture.staking.connect(fixture.user1).stake({
@@ -110,7 +110,7 @@ describe("Normal Staking - E2E User Journey", () => {
     assert.strictEqual(finalPosition.isUnstaked, true);
   });
 
-  test("多用户并发场景", async () => {
+  test("multi-user concurrent scenario", async () => {
     const stakeAmount1 = parseEther("100");
     const stakeAmount2 = parseEther("200");
     const stakeAmount3 = parseEther("300");
@@ -161,7 +161,7 @@ describe("Normal Staking - E2E User Journey", () => {
     assert.ok(reward2 > reward1);
   });
 
-  test("长时间运行场景", async () => {
+  test("long-running scenario", async () => {
     const stakeAmount = parseEther("1000");
     const stakeTx = await fixture.staking.connect(fixture.user1).stake({
       value: stakeAmount,

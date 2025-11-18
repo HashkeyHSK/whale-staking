@@ -1,21 +1,21 @@
-# 前端集成指南
+# Frontend Integration Guide
 
-## 查询用户质押ID和待提取奖励
+## Query User Staking IDs and Pending Rewards
 
-### 解决方案
+### Solution
 
-使用 `getUserPositionIds` 函数获取用户的所有质押ID：
+Use `getUserPositionIds` function to get all staking IDs for a user:
 
 ```typescript
 import { ethers } from "ethers";
-import stakingABI from "./abi/HSKStaking.json"; // 合约ABI
+import stakingABI from "./abi/HSKStaking.json"; // Contract ABI
 
 async function getUserPositionIds(
   stakingContract: ethers.Contract,
   userAddress: string
 ): Promise<bigint[]> {
   try {
-    // 直接调用合约函数，一次性获取所有 positionId
+    // Directly call contract function, get all positionIds in one call
     const positionIds = await stakingContract.getUserPositionIds(userAddress);
     return positionIds.map((id: any) => BigInt(id));
   } catch (error) {
@@ -25,12 +25,12 @@ async function getUserPositionIds(
 }
 ```
 
-**优点**：
-- ✅ 一次调用即可获取所有ID
-- ✅ 效率最高，gas消耗最少
-- ✅ 代码简洁，易于维护
+**Advantages**:
+- ✅ Get all IDs in one call
+- ✅ Most efficient, least gas consumption
+- ✅ Clean code, easy to maintain
 
-### 完整示例：查询用户所有位置的待提取奖励
+### Complete Example: Query All Positions' Pending Rewards for User
 
 ```typescript
 import { ethers } from "ethers";
@@ -55,24 +55,24 @@ async function getUserPendingRewards(
     signer || provider
   );
   
-  // 1. 获取用户的所有质押ID
+  // 1. Get all staking IDs for user
   const positionIds = await getUserPositionIds(stakingContract, userAddress);
   
   if (positionIds.length === 0) {
     return [];
   }
   
-  // 2. 查询每个位置的待提取奖励
+  // 2. Query pending rewards for each position
   const results: PositionReward[] = [];
   
   for (const positionId of positionIds) {
     try {
-      // 查询位置信息
+      // Query position information
       const position = await stakingContract.positions(positionId);
       
-      // 查询待提取奖励
-      // 注意：pendingReward 需要 msg.sender 匹配 position.owner
-      // 所以必须使用 signer 来调用
+      // Query pending rewards
+      // Note: pendingReward requires msg.sender to match position.owner
+      // So must use signer to call
       let pendingReward = BigInt(0);
       
       if (signer && !position.isUnstaked) {
@@ -98,13 +98,13 @@ async function getUserPendingRewards(
   return results;
 }
 
-// 使用示例
+// Usage example
 async function example() {
   const provider = new ethers.JsonRpcProvider("YOUR_RPC_URL");
   const signer = new ethers.Wallet("YOUR_PRIVATE_KEY", provider);
   const userAddress = await signer.getAddress();
   
-  const stakingAddress = "0x..."; // 质押合约地址
+  const stakingAddress = "0x..."; // Staking contract address
   
   const rewards = await getUserPendingRewards(
     stakingAddress,
@@ -123,23 +123,23 @@ async function example() {
 }
 ```
 
-### 重要注意事项
+### Important Notes
 
-1. **`pendingReward` 函数要求 `msg.sender` 匹配 `position.owner`**
-   - 即使这是一个 view 函数，它也会检查调用者的地址
-   - 如果地址不匹配，函数会返回 0（不会 revert）
-   - **必须使用 signer 来调用 `pendingReward`**，不能只使用 provider
+1. **`pendingReward` function requires `msg.sender` to match `position.owner`**
+   - Even though this is a view function, it checks the caller's address
+   - If addresses don't match, function returns 0 (does not revert)
+   - **Must use signer to call `pendingReward`**, cannot use provider only
 
-2. **获取用户质押ID**
-   - 使用 `getUserPositionIds(userAddress)` 直接获取所有 positionId
+2. **Get User Staking IDs**
+   - Use `getUserPositionIds(userAddress)` to directly get all positionIds
 
-3. **前端实现建议**
-   - 使用 React Hook 或 Vue Composable 封装查询逻辑
-   - 添加缓存机制，避免频繁查询
-   - 处理加载状态和错误情况
-   - 考虑使用 multicall 批量查询以提高效率
+3. **Frontend Implementation Recommendations**
+   - Use React Hook or Vue Composable to encapsulate query logic
+   - Add caching mechanism to avoid frequent queries
+   - Handle loading states and error cases
+   - Consider using multicall for batch queries to improve efficiency
 
-### React Hook 示例
+### React Hook Example
 
 ```typescript
 import { useState, useEffect } from "react";
@@ -150,7 +150,7 @@ export function useUserStakingPositions(stakingAddress: string) {
   const { address } = useAccount();
   const [positionIds, setPositionIds] = useState<bigint[]>([]);
   
-  // 获取用户的所有质押ID
+  // Get all staking IDs for user
   useEffect(() => {
     if (!address) {
       setPositionIds([]);
@@ -158,7 +158,7 @@ export function useUserStakingPositions(stakingAddress: string) {
     }
     
     async function fetchPositionIds() {
-      // 使用 getUserPositionIds 获取所有 positionId
+      // Use getUserPositionIds to get all positionIds
       const contract = new ethers.Contract(stakingAddress, stakingABI, provider);
       const ids = await contract.getUserPositionIds(address);
       setPositionIds(ids.map((id: any) => BigInt(id)));
@@ -167,7 +167,7 @@ export function useUserStakingPositions(stakingAddress: string) {
     fetchPositionIds();
   }, [address, stakingAddress]);
   
-  // 批量查询所有位置的待提取奖励
+  // Batch query all positions' pending rewards
   const { data: rewards, isLoading } = useContractReads({
     contracts: positionIds.map((positionId) => ({
       address: stakingAddress as `0x${string}`,
@@ -186,54 +186,58 @@ export function useUserStakingPositions(stakingAddress: string) {
 }
 ```
 
-### 合约接口参考
+### Contract Interface Reference
 
 ```solidity
-// 一次性获取用户的所有 positionId
+// Get all positionIds for user in one call
 function getUserPositionIds(address user) external view returns (uint256[] memory);
 
-// 计算指定金额的潜在奖励（用于质押前预览）
+// Calculate potential reward for specified amount (for preview before staking)
 function calculatePotentialReward(uint256 amount) external view returns (uint256);
 
-// 查询位置详情
+// Query position details
 function positions(uint256 positionId) external view returns (Position memory);
 
-// 查询待提取奖励（需要 msg.sender == position.owner）
+// Query pending rewards (requires msg.sender == position.owner)
 function pendingReward(uint256 positionId) external view returns (uint256);
 
-// 获取下一个位置ID
+// Get next position ID
 function nextPositionId() external view returns (uint256);
 ```
 
-### 计算潜在奖励
+### Calculate Potential Rewards
 
-在用户质押前，可以使用 `calculatePotentialReward` 函数预览潜在奖励：
+Before user stakes, can use `calculatePotentialReward` function to preview potential rewards:
 
 ```typescript
 async function previewReward(
   stakingContract: ethers.Contract,
-  stakeAmount: string // 例如 "100" 表示 100 HSK
+  stakeAmount: string // e.g., "100" means 100 HSK
 ): Promise<string> {
   const amountInWei = ethers.parseEther(stakeAmount);
   const potentialReward = await stakingContract.calculatePotentialReward(amountInWei);
   return ethers.formatEther(potentialReward);
 }
 
-// 使用示例
+// Usage example
 const reward = await previewReward(stakingContract, "100");
-console.log(`质押 100 HSK，365天后可获得约 ${reward} HSK 奖励`);
+console.log(`Staking 100 HSK, can get approximately ${reward} HSK rewards after 365 days`);
 ```
 
-### 性能优化建议
+### Performance Optimization Recommendations
 
-1. **使用 Multicall**：批量查询多个位置的奖励
-2. **缓存结果**：避免频繁查询相同的数据
-3. **增量更新**：只查询新增的位置
-4. **后台轮询**：定期更新奖励数据，而不是每次用户操作时查询
+1. **Use Multicall**: Batch query rewards for multiple positions
+2. **Cache Results**: Avoid frequent queries of same data
+3. **Incremental Updates**: Only query new positions
+4. **Background Polling**: Regularly update reward data, rather than querying on every user operation
 
-### 相关脚本
+### Related Scripts
 
-后端脚本中已经实现了类似的功能，可以参考：
-- `scripts/shared/helpers.ts` - `getUserPositionIds` 函数
-- `scripts/normal/query/pending-reward.ts` - 查询待提取奖励的完整实现
+Backend scripts have implemented similar functionality, can refer to:
+- `scripts/shared/helpers.ts` - `getUserPositionIds` function
+- `scripts/normal/query/pending-reward.ts` - Complete implementation for querying pending rewards
 
+---
+
+**Document Version**: 1.0.0  
+**Maintainer**: HashKey Technical Team

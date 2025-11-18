@@ -24,6 +24,7 @@ async function main() {
   const rewardPoolBalance = await staking.rewardPoolBalance();
   const totalPendingRewards = await staking.totalPendingRewards();
   const minStakeAmount = await staking.minStakeAmount();
+  const maxTotalStaked = await staking.maxTotalStaked();
   const rewardRate = await staking.rewardRate();
   const stakeStartTime = await staking.stakeStartTime();
   const stakeEndTime = await staking.stakeEndTime();
@@ -34,6 +35,11 @@ async function main() {
   console.log("  - Emergency mode:", emergencyMode);
   console.log("  - Whitelist mode:", onlyWhitelistCanStake);
   console.log("  - Total staked:", ethers.formatEther(totalStaked), "HSK");
+  console.log("  - Max total staked:", maxTotalStaked === BigInt(0) ? "No limit" : ethers.formatEther(maxTotalStaked) + " HSK");
+  if (maxTotalStaked > BigInt(0)) {
+    const remainingCapacity = maxTotalStaked - totalStaked;
+    console.log("  - Remaining capacity:", ethers.formatEther(remainingCapacity), "HSK");
+  }
   console.log("  - Reward pool balance:", ethers.formatEther(rewardPoolBalance), "HSK");
   console.log("  - Total pending rewards:", ethers.formatEther(totalPendingRewards), "HSK");
   console.log("  - Available reward balance:", ethers.formatEther(rewardPoolBalance - totalPendingRewards), "HSK");

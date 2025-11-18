@@ -40,7 +40,7 @@ describe("Normal Staking - Stress Test", () => {
     }
   });
 
-  test("大量 position 的处理", async () => {
+  test("handling large number of positions", async () => {
     const stakeAmount = parseEther("1");
     const numPositions = 100;
 
@@ -83,7 +83,7 @@ describe("Normal Staking - Stress Test", () => {
     }
   });
 
-  test("长时间运行测试", async () => {
+  test("long-running test", async () => {
     const stakeAmount = parseEther("1000");
     const stakeTx = await fixture.staking.connect(fixture.user1).stake({
       value: stakeAmount,
@@ -157,7 +157,7 @@ describe("Normal Staking - Stress Test", () => {
     }
   });
 
-  test("极端数值测试", async () => {
+  test("extreme value test", async () => {
     // Test with minimum stake
     const minStake = parseEther("1");
     const tx1 = await fixture.staking.connect(fixture.user1).stake({

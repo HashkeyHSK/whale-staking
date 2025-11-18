@@ -1,388 +1,390 @@
-# 常见问题解答（FAQ）
+# Frequently Asked Questions (FAQ)
 
-本文档用于快速回复用户常见问题。
-
----
-
-## 一. 奖励相关
-
-### Q1: 奖励是线性解锁吗？是区块解锁吗？
-
-**A:** 奖励是线性解锁，基于时间计算（不是区块解锁）。
-
-- 奖励按秒连续累积，每秒都在产生收益
-- 与区块出块速度无关，只与时间相关
-- 可以随时提取已累积的奖励，精确到秒
-
-**示例**：质押 10,000 HSK，年化 8%，第 30 天可提取约 65.75 HSK 奖励（2,592,000秒累积的奖励）。
+This document is for quickly answering common user questions.
 
 ---
 
-### Q2: 年化收益率是什么意思？365 天年化 8% 是 365 天后得到 8% 收益吗？
+## I. Reward Related
 
-**A:** 是的。年化收益率是按年计算的收益率。
+### Q1: Are rewards linearly unlocked? Are they unlocked by block?
 
-- **年化 8%** 意思是：如果质押满 365 天，收益是 8%
-- 实际收益 = 本金 × 年化率 × (实际质押秒数 / 365天的秒数)
-- 如果质押时间少于 365 天，收益按比例计算（精确到秒）
+**A:** Rewards are linearly unlocked, calculated based on time (not by block).
 
-**示例1**：质押 10,000 HSK，年化 8%，质押 365 天：
-- 收益 = 10,000 × 8% × (365/365) = 800 HSK
+- Rewards accumulate continuously per second, generating returns every second
+- Unrelated to block production speed, only related to time
+- Can claim accumulated rewards at any time, precise to the second
 
-**示例2**：质押 10,000 HSK，年化 8%，质押 365 天，但在第100天提取奖励：
-- 第100天可提取奖励 = 10,000 × 8% × (100/365) ≈ 219.18 HSK
-- 本金继续锁定，继续产生奖励
-- 注意：V2版本不支持锁定期内解除质押
+**Example**: Staking 10,000 HSK, 8% annual yield, can claim approximately 65.75 HSK rewards on day 30 (rewards accumulated over 2,592,000 seconds).
 
 ---
 
-### Q3: 奖励什么时候可以提取？
+### Q2: What does annual yield rate mean? Does 8% APY for 365 days mean getting 8% returns after 365 days?
 
-**A:** 锁定期内可以随时提取奖励，不需要等到锁定期结束。
+**A:** Yes. Annual yield rate is the yield rate calculated on an annual basis.
 
-- 奖励会持续累积，随时可以提取
-- 提取奖励后，本金继续锁定，继续获得奖励
-- 锁定期结束后，解除质押时会自动提取所有奖励
+- **8% APY** means: If staking for full 365 days, returns are 8%
+- Actual returns = Principal × Annual rate × (Actual staking seconds / Seconds in 365 days)
+- If staking time is less than 365 days, returns are calculated proportionally (precise to the second)
 
----
+**Example 1**: Staking 10,000 HSK, 8% APY, staking for 365 days:
+- Returns = 10,000 × 8% × (365/365) = 800 HSK
 
-### Q4: 如果超过锁定期还没提取，奖励会继续增加吗？
-
-**A:** 不会。奖励只计算到锁定期结束。
-
-- 奖励上限 = 本金 × 年化率 × (锁定期 / 365天)
-- 超过锁定期的时间不会产生额外奖励
-- 建议锁定期结束后及时提取
-
-**示例**：选择 365 天锁定期，年化 8%，实际质押了 400 天：
-- 奖励仍按 365 天计算 = 10,000 × 8% = 800 HSK
-- 多出的 35 天不会产生额外奖励
+**Example 2**: Staking 10,000 HSK, 8% APY, staking for 365 days, but claiming rewards on day 100:
+- Rewards claimable on day 100 = 10,000 × 8% × (100/365) ≈ 219.18 HSK
+- Principal continues to be locked, continues to generate rewards
+- Note: V2 version does not support unstaking during lock period
 
 ---
 
-### Q5: 奖励池余额不足怎么办？
+### Q3: When can rewards be claimed?
 
-**A:** 奖励池由管理员充值维护。
+**A:** Rewards can be claimed at any time during the lock period, no need to wait until lock period ends.
 
-- 如果奖励池余额不足，无法提取奖励
-- 请联系管理员充值奖励池
-- 奖励会累积，等奖励池充值后可以提取
-
----
-
-## 二. 质押相关
-
-### Q6: 什么是质押时间窗口？
-
-**A:** 质押时间窗口是指允许用户进行质押的时间范围。
-
-- 管理员可以设置质押开始时间（`stakeStartTime`）和结束时间（`stakeEndTime`）
-- 用户只能在 `stakeStartTime <= 当前时间 < stakeEndTime` 期间进行质押
-- 部署脚本默认设置开始时间为部署后7天
-- 管理员可以随时调整这个时间窗口
-
-**示例**：
-- 开始时间：2026-11-08 00:00:00
-- 结束时间：2027-11-08 00:00:00
-- 只能在这一年内进行新质押
-- 已有的质押不受影响，仍可正常提取奖励和解除质押
+- Rewards will continuously accumulate, can be claimed at any time
+- After claiming rewards, principal continues to be locked, continues to earn rewards
+- After lock period ends, all rewards are automatically claimed when unstaking
 
 ---
 
-### Q7: 质押后会获得类似 st token 的代币吗？
+### Q4: If I don't claim after lock period ends, will rewards continue to increase?
 
-**A:** 不会。质押后不会产生任何代币。
+**A:** No. Rewards are only calculated up to the end of lock period.
 
-- 质押后只获得一个 `positionId`（质押位置 ID）
-- 没有可交易的代币
-- 质押位置不可转让，绑定您的地址
+- Reward cap = Principal × Annual rate × (Lock period / 365 days)
+- Time beyond lock period does not generate additional rewards
+- Recommend claiming promptly after lock period ends
+
+**Example**: Choose 365-day lock period, 8% APY, actually staked for 400 days:
+- Rewards still calculated based on 365 days = 10,000 × 8% = 800 HSK
+- Extra 35 days do not generate additional rewards
 
 ---
 
-### Q8: 最小质押金额是多少？
+### Q5: What if reward pool balance is insufficient?
+
+**A:** Reward pool is maintained by admin deposits.
+
+- If reward pool balance is insufficient, cannot claim rewards
+- Please contact admin to deposit to reward pool
+- Rewards will accumulate, can claim after reward pool is deposited
+
+---
+
+## II. Staking Related
+
+### Q6: What is staking time window?
+
+**A:** Staking time window is the time range allowing users to stake.
+
+- Admin can set staking start time (`stakeStartTime`) and end time (`stakeEndTime`)
+- Users can only stake during `stakeStartTime <= current time < stakeEndTime`
+- Deployment script defaults start time to 7 days after deployment
+- Admin can adjust this time window at any time
+
+**Example**:
+- Start time: 2026-11-08 00:00:00
+- End time: 2027-11-08 00:00:00
+- Can only stake new positions within this year
+- Existing stakes are not affected, can still claim rewards and unstake normally
+
+---
+
+### Q7: Will I receive st token-like tokens after staking?
+
+**A:** No. Staking does not generate any tokens.
+
+- After staking, only receive a `positionId` (staking position ID)
+- No tradable tokens
+- Staking positions are non-transferable, bound to your address
+
+---
+
+### Q8: What is the minimum staking amount?
 
 **A:** 
-- **普通 Staking**：1 HSK 起
-- **Premium Staking**：500,000 HSK 起
+- **Normal Staking**: Starting from 1 HSK
+- **Premium Staking**: Starting from 500,000 HSK
 
 ---
 
-### Q9: 最大总质押量是什么意思？是单笔限制吗？
+### Q9: What does maximum total staked mean? Is it a per-transaction limit?
 
-**A:** 不是单笔限制，是整个产品池的上限。
+**A:** No, it's not a per-transaction limit, it's the upper limit for the entire product pool.
 
-- 是所有用户质押金额总和的上限
-- 单笔可以质押任意金额（只要不超过池子上限）
-- 达到上限后，新用户无法质押，需要等有用户解除质押
+- It's the upper limit for the sum of all users' staking amounts
+- Can stake any amount per transaction (as long as it doesn't exceed pool limit)
+- After reaching limit, new users cannot stake, need to wait for users to unstake
 
-**示例**：
-- 普通 Staking 最大总质押量：1,000 万 HSK
-- 如果已有 900 万 HSK 被质押，新用户最多只能质押 100 万 HSK
+**Example**:
+- Normal Staking maximum total staked: 10,000,000 HSK
+- If 9,000,000 HSK already staked, new users can stake at most 1,000,000 HSK
+- Premium Staking maximum total staked: 20,000,000 HSK
 
----
-
-### Q10: 可以多次质押吗？
-
-**A:** 可以。每次质押会创建一个新的质押位置。
-
-- 每个质押位置独立计算奖励
-- 可以同时持有多个质押位置
-- 每个位置可以独立提取奖励和解除质押
+**Admin Function**:
+- Admin can adjust maximum total staked via `setMaxTotalStaked()` function
+- Setting to 0 means unlimited
 
 ---
 
-### Q11: Premium Staking 为什么需要白名单？
+### Q10: Can I stake multiple times?
 
-**A:** Premium Staking 面向大户和机构，需要审核。
+**A:** Yes. Each stake creates a new staking position.
 
-- 需要管理员将您的地址添加到白名单
-- 只有白名单用户才能参与 Premium Staking
-- 请联系管理员申请白名单
-
----
-
-## 三. 锁定期和提取
-
-### Q12: 锁定期内可以解除质押吗？
-
-**A:** 锁定期内不能解除质押，只能提取奖励。
-
-- **锁定期内（365天内）**：只能提取奖励，本金继续锁定
-- **锁定期结束后（365天后）**：可以解除质押，提取本金 + 全部奖励
+- Each staking position calculates rewards independently
+- Can hold multiple staking positions simultaneously
+- Each position can claim rewards and unstake independently
 
 ---
 
-### Q13: 锁定期有多长？
+### Q11: Why does Premium Staking require whitelist?
 
-**A:** HSKStaking 采用固定365天锁定期。
+**A:** Premium Staking targets whales and institutions, requires approval.
 
-- 普通 Staking：365 天（固定，约 31,536,000 秒）
-- Premium Staking：365 天（固定，约 31,536,000 秒）
-- V2 版本简化了锁定期选择，所有质押统一为365天
-- 锁定期是合约中的常量 `LOCK_PERIOD`，部署后不可修改
-
----
-
-### Q14: 锁定期结束后必须立即提取吗？
-
-**A:** 不是。锁定期结束后可以随时提取。
-
-- 锁定期结束后，可以随时解除质押
-- 但超过锁定期的时间不会产生额外奖励
-- 建议及时提取，避免资金闲置
+- Need admin to add your address to whitelist
+- Only whitelisted users can participate in Premium Staking
+- Please contact admin to apply for whitelist
 
 ---
 
-### Q15: 解除质押时，奖励会自动提取吗？
+## III. Lock Period and Withdrawal
 
-**A:** 是的。解除质押时会自动提取本金 + 全部累积奖励。
+### Q12: Can I unstake during lock period?
 
-- 不需要先提取奖励再解除质押
-- 一次操作即可提取本金和所有奖励
+**A:** Cannot unstake during lock period, can only claim rewards.
 
----
-
-### Q16: 什么是紧急提取？什么时候可以用？
-
-**A:** 紧急提取是特殊情况下提取本金的功能。
-
-- 仅在管理员启用紧急模式时可用
-- 可以随时提取，不受锁定期限制
-- **只能提取本金，放弃全部奖励**
-- 用于紧急情况，不建议常规使用
+- **During lock period (within 365 days)**: Can only claim rewards, principal continues to be locked
+- **After lock period ends (after 365 days)**: Can unstake, withdraw principal + all rewards
 
 ---
 
-## 四. 收益计算
+### Q13: How long is the lock period?
 
-### Q17: 如何计算我的收益？
+**A:** HSKStaking uses fixed 365-day lock period.
 
-**A:** 收益计算公式：
+- Normal Staking: 365 days (fixed, approximately 31,536,000 seconds)
+- Premium Staking: 365 days (fixed, approximately 31,536,000 seconds)
+- V2 version simplified lock period selection, all staking unified to 365 days
+- Lock period is contract constant `LOCK_PERIOD`, cannot be modified after deployment
+
+---
+
+### Q14: Must I withdraw immediately after lock period ends?
+
+**A:** No. Can withdraw at any time after lock period ends.
+
+- After lock period ends, can unstake at any time
+- But time beyond lock period does not generate additional rewards
+- Recommend withdrawing promptly to avoid idle funds
+
+---
+
+### Q15: Are rewards automatically claimed when unstaking?
+
+**A:** Yes. When unstaking, principal + all accumulated rewards are automatically claimed.
+
+- No need to claim rewards before unstaking
+- One operation extracts principal and all rewards
+
+---
+
+### Q16: What is emergency withdrawal? When can it be used?
+
+**A:** Emergency withdrawal is a function to withdraw principal in special circumstances.
+
+- Only available after admin enables emergency mode
+- Can withdraw at any time, not subject to lock period restrictions
+- **Can only withdraw principal, giving up all rewards**
+- For emergency situations, not recommended for regular use
+
+---
+
+## IV. Return Calculation
+
+### Q17: How do I calculate my returns?
+
+**A:** Return calculation formula:
 
 ```
-收益 = 本金 × 年化率 × (实际质押天数 / 365天)
+Returns = Principal × Annual rate × (Actual staking days / 365 days)
 ```
 
-**限制**：如果实际质押天数 > 锁定期，则按锁定期计算。
+**Limitation**: If actual staking days > lock period, calculate based on lock period.
 
-**示例**：
-- 本金：10,000 HSK
-- 年化率：8%
-- 锁定期：365 天
-- 实际质押：365 天
-- 收益 = 10,000 × 8% × (365/365) = 800 HSK
+**Example**:
+- Principal: 10,000 HSK
+- Annual rate: 8%
+- Lock period: 365 days
+- Actual staking: 365 days
+- Returns = 10,000 × 8% × (365/365) = 800 HSK
 
 ---
 
-### Q18: 普通 Staking 和 Premium Staking 的收益有什么区别？
+### Q18: What's the difference in returns between Normal Staking and Premium Staking?
 
 **A:** 
 
-| 产品 | 年化收益率 | 最小质押 | 参与方式 |
-|------|-----------|---------|---------|
-| 普通 Staking | 8% | 1 HSK | 开放（无需审核） |
-| Premium Staking | 16% | 500,000 HSK | 白名单（需审核） |
+| Product | Annual Yield Rate | Minimum Stake | Participation Method |
+|---------|-------------------|---------------|---------------------|
+| Normal Staking | 8% | 1 HSK | Open (no approval required) |
+| Premium Staking | 16% | 500,000 HSK | Whitelist (requires approval) |
 
 ---
 
-### Q18: 奖励是按天发放还是按月发放？
+### Q18: Are rewards distributed daily or monthly?
 
-**A:** 奖励是线性累积的，按秒计算。
+**A:** Rewards accumulate linearly, calculated per second.
 
-- 不是按天或按月发放，而是每秒都在累积
-- 奖励持续累积，随时可以提取，精确到秒
-- 提取时计算从上次提取到现在的所有奖励（精确到秒）
+- Not distributed daily or monthly, but accumulating every second
+- Rewards continuously accumulate, can be claimed at any time, precise to the second
+- When claiming, calculates all rewards from last claim to now (precise to the second)
 
 ---
 
-## 五. 产品选择
+## V. Product Selection
 
-### Q19: 我应该选择普通 Staking 还是 Premium Staking？
+### Q19: Should I choose Normal Staking or Premium Staking?
 
 **A:** 
 
-**选择普通 Staking，如果：**
-- 质押金额 < 500,000 HSK
-- 希望随时参与，无需审核
-- 接受 8% 年化收益
+**Choose Normal Staking if:**
+- Staking amount < 500,000 HSK
+- Want to participate anytime, no approval needed
+- Accept 8% annual returns
 
-**选择 Premium Staking，如果：**
-- 质押金额 ≥ 500,000 HSK
-- 已获得白名单资格
-- 希望获得 16% 年化收益
-
----
-
-### Q20: 两个产品可以同时参与吗？
-
-**A:** 可以。两个产品完全独立。
-
-- 可以同时在两个产品中质押
-- 每个产品独立计算奖励
-- 互不影响
+**Choose Premium Staking if:**
+- Staking amount ≥ 500,000 HSK
+- Have obtained whitelist qualification
+- Want to earn 16% annual returns
 
 ---
 
-## 六. 技术问题
+### Q20: Can I participate in both products simultaneously?
 
-### Q21: 如何查询我的质押信息？
+**A:** Yes. Both products are completely independent.
 
-**A:** 通过合约函数查询。
-
-- 使用 `userPositions(address, uint256)` 查询用户的第N个质押位置ID（需要遍历索引）
-- 使用 `positions(positionId)` 查询指定位置的详细信息
-- 使用 `pendingReward(positionId)` 查询待提取奖励
-- 可以通过前端界面或调用合约函数查询
-- **注意**: `userPositions` 是 public mapping，返回 positionId，需要再通过 `positions` 查询详情
+- Can stake in both products simultaneously
+- Each product calculates rewards independently
+- Do not affect each other
 
 ---
 
-### Q22: 质押需要支付 Gas 费吗？
+## VI. Technical Questions
 
-**A:** 需要。所有链上操作都需要支付 Gas 费。
+### Q21: How do I query my staking information?
 
-- 质押、提取奖励、解除质押都需要 Gas 费
-- Gas 费由网络决定，不是产品收取
+**A:** Query through contract functions.
 
----
-
-### Q23: 合约可以升级吗？会影响我的质押吗？
-
-**A:** 合约使用可升级代理模式（Transparent Proxy）。
-
-**升级机制**：
-- 合约可以升级，但已存在的质押不受影响
-- 所有质押数据会完整保留（totalStaked, positions, rewards 等）
-- 升级只更新实现逻辑，不改变存储布局
-- 升级由管理员执行，用户无需任何操作
-
-**升级脚本特性**：
-- ✅ 自动检测 ProxyAdmin 类型（合约或 EOA）
-- ✅ 自动从存储槽读取实际的 ProxyAdmin 地址
-- ✅ 智能 Fallback 机制（如果一种方式失败，自动尝试另一种）
-- ✅ 升级前后自动验证状态一致性
-- ✅ 升级成功后自动打印浏览器链接
-
-**查看升级交易**：
-- 升级交易会显示在 ProxyAdmin 合约页面，而不是 Proxy 页面
-- 脚本会在升级成功后打印交易哈希和浏览器链接
+- Use `userPositions(address, uint256)` to query user's Nth staking position ID (need to iterate through indices)
+- Use `positions(positionId)` to query specified position's detailed information
+- Use `pendingReward(positionId)` to query pending rewards
+- Can query through frontend interface or calling contract functions
+- **Note**: `userPositions` is a public mapping, returns positionId, need to query details through `positions`
 
 ---
 
-## 七. 其他问题
+### Q22: Do I need to pay Gas fees for staking?
 
-### Q24: 大户 DID 是什么？
+**A:** Yes. All on-chain operations require Gas fees.
 
-**A:** 大户 DID 是给质押超过 50,000 HSK 用户的特殊身份标识。
-
-- 质押超过 50,000 HSK 的用户可以 mint 大户 DID
-- 这是链下功能，与质押合约无关
-- 具体规则请咨询运营团队
+- Staking, claiming rewards, unstaking all require Gas fees
+- Gas fees are determined by the network, not charged by the product
 
 ---
 
-### Q25: 如果遇到问题，如何联系客服？
+### Q23: Can the contract be upgraded? Will it affect my staking?
 
-**A:** 请联系官方客服或管理员。
+**A:** Contract uses upgradeable proxy pattern (Transparent Proxy).
 
-- 技术问题：联系开发团队
-- 白名单申请：联系管理员
-- 奖励池问题：联系管理员
+**Upgrade Mechanism**:
+- Contract can be upgraded, but existing stakes are not affected
+- All staking data will be completely preserved (totalStaked, positions, rewards, etc.)
+- Upgrade only updates implementation logic, does not change storage layout
+- Upgrade is executed by admin, users need no action
 
----
+**Upgrade Script Features**:
+- ✅ Auto-detect ProxyAdmin type (contract or EOA)
+- ✅ Auto-read actual ProxyAdmin address from storage slot
+- ✅ Smart Fallback mechanism (if one method fails, automatically try another)
+- ✅ Auto-verify state consistency before and after upgrade
+- ✅ Auto-print browser link after successful upgrade
 
-### Q26: 质押有风险吗？
-
-**A:** 质押存在一定风险。
-
-- **智能合约风险**：虽然经过审计，但仍存在技术风险
-- **锁定期风险**：锁定期内无法提取本金
-- **奖励池风险**：如果奖励池余额不足，可能无法提取奖励
-- **紧急模式风险**：紧急模式下只能提取本金，放弃奖励
-
-建议根据自身风险承受能力谨慎参与。
-
----
-
-## 八. 快速参考
-
-### 产品对比表
-
-| 项目 | 普通 Staking | Premium Staking |
-|------|-------------|----------------|
-| **年化收益率** | 8% (800 basis points) | 16% (1600 basis points) |
-| **最小质押** | 1 HSK | 500,000 HSK |
-| **锁定期** | 365 天（固定，LOCK_PERIOD常量） | 365 天（固定，LOCK_PERIOD常量） |
-| **参与方式** | 开放（白名单关闭） | 白名单（启用） |
-| **最大总质押量** | 10,000,000 HSK（池子上限） | 20,000,000 HSK（池子上限） |
-
-### 重要提醒
-
-1. **质押时间窗口**：只能在管理员设置的时间窗口内进行质押，部署脚本默认设置开始时间为部署后7天
-2. **年化收益率**：是按年计算的，不是锁定期结束后的总收益
-3. **奖励上限**：奖励只计算到锁定期结束，超期不增加
-4. **锁定期限制**：锁定期内不能解除质押，只能提取奖励
-5. **奖励池**：奖励由管理员充值，如果余额不足可能无法提取
-6. **紧急模式**：紧急模式下只能提取本金，放弃奖励
+**View Upgrade Transaction**:
+- Upgrade transaction will appear on ProxyAdmin contract page, not Proxy page
+- Script will print transaction hash and browser link after successful upgrade
 
 ---
 
----
+## VII. Other Questions
 
-## 📚 相关文档
+### Q24: What is Whale DID?
 
-- [主 README](../README.md)
-- [合约架构说明](./CONTRACT_ARCHITECTURE.md) - **合约架构详解（开发必读）**
-- [产品方案详细文档](./PRODUCT_PLANS.md) - **运营文档（推荐）**
-- [产品方案执行摘要](./PRODUCT_SUMMARY.md) - 快速了解
-- [双层产品方案文档](./DUAL_TIER_STAKING.md) - 技术部署文档
-- [产品开发文档](./PRODUCT_PLANS_DEV.md) - 开发团队文档
-- [快速开始指南](./QUICK_START_DUAL_TIER.md) - 快速部署指南
-- [术语表](./GLOSSARY.md) - 术语定义
-- [错误处理指南](./ERROR_HANDLING.md) - 常见错误处理
+**A:** Whale DID is a special identity identifier for users staking more than 50,000 HSK.
+
+- Users staking more than 50,000 HSK can mint Whale DID
+- This is an off-chain function, unrelated to staking contract
+- Please consult operations team for specific rules
 
 ---
 
-**文档版本**: 2.0  
-**最后更新**: 2026-11  
-**用途**: 用户问题快速回复参考
+### Q25: How do I contact customer service if I encounter problems?
+
+**A:** Please contact official customer service or admin.
+
+- Technical issues: Contact development team
+- Whitelist application: Contact admin
+- Reward pool issues: Contact admin
+
+---
+
+### Q26: Are there risks in staking?
+
+**A:** Staking involves certain risks.
+
+- **Smart Contract Risk**: Although audited, technical risks still exist
+- **Lock Period Risk**: Cannot withdraw principal during lock period
+- **Reward Pool Risk**: If reward pool balance is insufficient, may not be able to claim rewards
+- **Emergency Mode Risk**: In emergency mode, can only withdraw principal, giving up rewards
+
+Recommend participating cautiously based on your own risk tolerance.
+
+---
+
+## VIII. Quick Reference
+
+### Product Comparison Table
+
+| Item | Normal Staking | Premium Staking |
+|------|---------------|----------------|
+| **Annual Yield Rate** | 8% (800 basis points) | 16% (1600 basis points) |
+| **Minimum Stake** | 1 HSK | 500,000 HSK |
+| **Lock Period** | 365 days (fixed, LOCK_PERIOD constant) | 365 days (fixed, LOCK_PERIOD constant) |
+| **Participation Method** | Open (whitelist disabled) | Whitelist (enabled) |
+| **Maximum Total Staked** | 10,000,000 HSK (pool limit) | 20,000,000 HSK (pool limit) |
+
+### Important Reminders
+
+1. **Staking Time Window**: Can only stake within the time window set by admin, deployment script defaults start time to 7 days after deployment
+2. **Annual Yield Rate**: Calculated on an annual basis, not total returns after lock period ends
+3. **Reward Cap**: Rewards are only calculated up to the end of lock period, extra time does not increase
+4. **Lock Period Restrictions**: Cannot unstake during lock period, can only claim rewards
+5. **Reward Pool**: Rewards are deposited by admin, if balance is insufficient may not be able to claim
+6. **Emergency Mode**: In emergency mode, can only withdraw principal, giving up rewards
+
+---
+
+## 📚 Related Documentation
+
+- [Main README](../README.md)
+- [Contract Architecture](./CONTRACT_ARCHITECTURE.md) - **Detailed contract architecture (required reading for developers)**
+- [Product Plan Documentation](./PRODUCT_PLANS.md) - **Operations documentation (recommended)**
+- [Product Summary](./PRODUCT_SUMMARY.md) - Quick overview
+- [Dual-Tier Product Documentation](./DUAL_TIER_STAKING.md) - Technical deployment documentation
+- [Product Development Documentation](./PRODUCT_PLANS_DEV.md) - Development team documentation
+- [Quick Start Guide](./QUICK_START_DUAL_TIER.md) - Quick deployment guide
+- [Error Handling Guide](./ERROR_HANDLING.md) - Common error handling
+
+---
+
+**Document Version**: 1.0.0  
+**Maintainer**: HashKey Technical Team
+

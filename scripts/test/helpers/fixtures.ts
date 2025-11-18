@@ -64,6 +64,8 @@ export async function deployTestContracts(): Promise<{
   // Prepare initialization data
   const normalMinStake = ethers.parseEther(NORMAL_STAKING_CONFIG.minStakeAmount);
   const premiumMinStake = ethers.parseEther(PREMIUM_STAKING_CONFIG.minStakeAmount);
+  const normalMaxTotalStaked = ethers.parseEther(NORMAL_STAKING_CONFIG.maxTotalStaked);
+  const premiumMaxTotalStaked = ethers.parseEther(PREMIUM_STAKING_CONFIG.maxTotalStaked);
   
   const normalInitData = normalImpl.interface.encodeFunctionData("initialize", [
     normalMinStake,
@@ -71,6 +73,7 @@ export async function deployTestContracts(): Promise<{
     now + 86400, // Start in 1 day
     now + 365 * 86400, // End in 1 year
     false, // Whitelist disabled
+    normalMaxTotalStaked, // Max total staked (10 million HSK)
   ]);
   
   const premiumInitData = premiumImpl.interface.encodeFunctionData("initialize", [
@@ -79,6 +82,7 @@ export async function deployTestContracts(): Promise<{
     now + 86400, // Start in 1 day
     now + 365 * 86400, // End in 1 year
     true, // Whitelist enabled
+    premiumMaxTotalStaked, // Max total staked (20 million HSK)
   ]);
   
   // Deploy proxies

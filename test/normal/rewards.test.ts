@@ -47,7 +47,7 @@ describe("Normal Staking - Rewards Functionality", () => {
     }
   });
 
-  test("应该正确计算待领取奖励", async () => {
+  test("should calculate pending rewards correctly", async () => {
     const stakeAmount = parseEther("1000");
     const nextPositionIdBefore = await fixture.staking.nextPositionId();
     
@@ -112,7 +112,7 @@ describe("Normal Staking - Rewards Functionality", () => {
     }
   });
 
-  test("应该按时间累积奖励", async () => {
+  test("should accumulate rewards over time", async () => {
     const stakeAmount = parseEther("1000");
     const tx = await fixture.staking.connect(fixture.user1).stake({
       value: stakeAmount,
@@ -173,7 +173,7 @@ describe("Normal Staking - Rewards Functionality", () => {
     }
   });
 
-  test("应该正确领取奖励", async () => {
+  test("should claim rewards correctly", async () => {
     const stakeAmount = parseEther("1000");
     const stakeTx = await fixture.staking.connect(fixture.user1).stake({
       value: stakeAmount,
@@ -251,7 +251,7 @@ describe("Normal Staking - Rewards Functionality", () => {
     }
   });
 
-  test("应该更新 lastRewardAt 时间戳", async () => {
+  test("should update lastRewardAt timestamp", async () => {
     const stakeAmount = parseEther("1000");
     await fixture.staking.connect(fixture.user1).stake({
       value: stakeAmount,
@@ -288,7 +288,7 @@ describe("Normal Staking - Rewards Functionality", () => {
     );
   });
 
-  test("应该正确更新 totalPendingRewards", async () => {
+  test("should update totalPendingRewards correctly", async () => {
     const stakeAmount = parseEther("1000");
     const stakeTx = await fixture.staking.connect(fixture.user1).stake({
       value: stakeAmount,
@@ -347,7 +347,7 @@ describe("Normal Staking - Rewards Functionality", () => {
     }
   });
 
-  test("应该正确触发 RewardClaimed 事件", async () => {
+  test("should emit RewardClaimed event correctly", async () => {
     const stakeAmount = parseEther("1000");
     await fixture.staking.connect(fixture.user1).stake({
       value: stakeAmount,
@@ -390,7 +390,7 @@ describe("Normal Staking - Rewards Functionality", () => {
     }
   });
 
-  test("应该拒绝领取零奖励", async () => {
+  test("should reject claiming zero rewards", async () => {
     const stakeAmount = parseEther("10");
     await fixture.staking.connect(fixture.user1).stake({
       value: stakeAmount,
@@ -405,7 +405,7 @@ describe("Normal Staking - Rewards Functionality", () => {
     );
   });
 
-  test("应该拒绝暂停状态下的领取", async () => {
+  test("should reject claiming rewards when paused", async () => {
     const stakeAmount = parseEther("1000");
     await fixture.staking.connect(fixture.user1).stake({
       value: stakeAmount,
@@ -426,7 +426,7 @@ describe("Normal Staking - Rewards Functionality", () => {
     await fixture.staking.connect(fixture.admin).unpause();
   });
 
-  test("应该拒绝紧急模式下的领取", async () => {
+  test("should reject claiming rewards in emergency mode", async () => {
     const stakeAmount = parseEther("1000");
     await fixture.staking.connect(fixture.user1).stake({
       value: stakeAmount,
@@ -445,7 +445,7 @@ describe("Normal Staking - Rewards Functionality", () => {
     );
   });
 
-  test("应该拒绝非 position 所有者的领取", async () => {
+  test("should reject claiming rewards from non-position owner", async () => {
     const stakeAmount = parseEther("1000");
     await fixture.staking.connect(fixture.user1).stake({
       value: stakeAmount,
@@ -462,7 +462,7 @@ describe("Normal Staking - Rewards Functionality", () => {
     );
   });
 
-  test("应该拒绝不存在的 position", async () => {
+  test("should reject claiming rewards for non-existent position", async () => {
     const invalidPositionId = 99999;
 
     await expectRevert(
@@ -471,7 +471,7 @@ describe("Normal Staking - Rewards Functionality", () => {
     );
   });
 
-  test("应该正确计算多个 position 的奖励", async () => {
+  test("should calculate rewards for multiple positions correctly", async () => {
     // Reduce amounts to avoid gas issues
     const stakeAmount1 = parseEther("100"); // Reduced from 1000
     const stakeAmount2 = parseEther("200"); // Reduced from 2000

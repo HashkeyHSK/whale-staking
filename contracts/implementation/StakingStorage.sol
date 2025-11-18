@@ -34,6 +34,8 @@ abstract contract StakingStorage is Initializable, Ownable2StepUpgradeable {
     uint256 public cachedAccruedRewards;
     uint256 public lastAccruedUpdateTime;
     
+    uint256 public maxTotalStaked;
+    
     // Gap for future storage variables (reserves 50 slots for upgrades)
     uint256[50] private __gap;
 
@@ -45,12 +47,14 @@ abstract contract StakingStorage is Initializable, Ownable2StepUpgradeable {
      * @param _minStakeAmount Minimum stake amount (in wei)
      * @param _rewardRate Annual reward rate in basis points (800 for 8%, 1600 for 16%)
      * @param _whitelistMode Enable whitelist mode (true for Premium, false for Normal)
+     * @param _maxTotalStaked Maximum total staked amount (in wei, 0 means no limit)
      */
     function __StakingStorage_init(
         address _owner,
         uint256 _minStakeAmount,
         uint256 _rewardRate,
-        bool _whitelistMode
+        bool _whitelistMode,
+        uint256 _maxTotalStaked
     ) internal onlyInitializing {
         require(_owner != address(0), "StakingStorage: zero owner");
         require(_minStakeAmount > 0, "Invalid min stake amount");
@@ -61,6 +65,7 @@ abstract contract StakingStorage is Initializable, Ownable2StepUpgradeable {
         minStakeAmount = _minStakeAmount;
         rewardRate = _rewardRate;
         nextPositionId = 1;
+        maxTotalStaked = _maxTotalStaked;
 
         stakeStartTime = type(uint256).max;
         stakeEndTime = type(uint256).max;

@@ -20,9 +20,11 @@ async function main() {
     const normalMinStake = await fixture.normalStaking.minStakeAmount();
     const normalRewardRate = await fixture.normalStaking.rewardRate();
     const normalWhitelistMode = await fixture.normalStaking.onlyWhitelistCanStake();
+    const normalMaxTotalStaked = await fixture.normalStaking.maxTotalStaked();
     
     expectBigIntEqual(normalMinStake, parseEther("1"), "Normal min stake should be 1 HSK");
     expectBigIntEqual(normalRewardRate, BigInt(800), "Normal reward rate should be 8%");
+    expectBigIntEqual(normalMaxTotalStaked, parseEther("10000000"), "Normal max total staked should be 10,000,000 HSK");
     if (normalWhitelistMode) {
       throw new Error("Normal staking should have whitelist disabled");
     }
@@ -32,9 +34,11 @@ async function main() {
     const premiumMinStake = await fixture.premiumStaking.minStakeAmount();
     const premiumRewardRate = await fixture.premiumStaking.rewardRate();
     const premiumWhitelistMode = await fixture.premiumStaking.onlyWhitelistCanStake();
+    const premiumMaxTotalStaked = await fixture.premiumStaking.maxTotalStaked();
     
     expectBigIntEqual(premiumMinStake, parseEther("500000"), "Premium min stake should be 500,000 HSK");
     expectBigIntEqual(premiumRewardRate, BigInt(1600), "Premium reward rate should be 16%");
+    expectBigIntEqual(premiumMaxTotalStaked, parseEther("20000000"), "Premium max total staked should be 20,000,000 HSK");
     if (!premiumWhitelistMode) {
       throw new Error("Premium staking should have whitelist enabled");
     }

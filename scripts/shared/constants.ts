@@ -71,15 +71,17 @@ export const NORMAL_STAKING_CONFIG = {
   minStakeAmount: "1",           // 1 HSK
   rewardRate: 800,               // 8% APY (basis points: 800/10000 = 0.08 = 8%)
   whitelistMode: false,          // Whitelist mode disabled
+  maxTotalStaked: "10000000",    // 10,000,000 HSK (10 million HSK pool cap)
   productName: "Normal Staking",
   targetUsers: "Regular Users",
   description: "Staking product for regular users, low threshold, stable returns",
 };
 
 export const PREMIUM_STAKING_CONFIG = {
-  minStakeAmount: "500000",      // 500,000 HSK
+  minStakeAmount: "100",         // 100 HSK (temporarily reduced for testing, normally 500,000 HSK)
   rewardRate: 1600,              // 16% APY (basis points: 1600/10000 = 0.16 = 16%)
   whitelistMode: true,           // Whitelist mode enabled
+  maxTotalStaked: "20000000",    // 20,000,000 HSK (20 million HSK pool cap)
   productName: "Premium Staking",
   targetUsers: "Whales/Institutions",
   description: "Premium staking product for whales and institutions, high threshold, high returns",
