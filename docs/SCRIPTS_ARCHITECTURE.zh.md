@@ -194,7 +194,9 @@ scripts/
 │   │   ├── set-start-time.ts
 │   │   ├── set-end-time.ts
 │   │   ├── set-min-stake.ts
-│   │   └── enable-emergency.ts
+│   │   ├── enable-emergency.ts
+│   │   ├── transfer-ownership.ts  # 第一步：发起所有权转移
+│   │   └── accept-ownership.ts     # 第二步：接受所有权转移
 │   └── query/                # 状态查询
 │       ├── check-status.ts
 │       ├── check-stakes.ts
@@ -220,7 +222,9 @@ scripts/
 │   │   ├── set-start-time.ts
 │   │   ├── set-end-time.ts
 │   │   ├── set-min-stake.ts
-│   │   └── enable-emergency.ts
+│   │   ├── enable-emergency.ts
+│   │   ├── transfer-ownership.ts  # 第一步：发起所有权转移
+│   │   └── accept-ownership.ts     # 第二步：接受所有权转移
 │   └── query/                # 状态查询
 │       ├── check-status.ts
 │       ├── check-stakes.ts
@@ -282,6 +286,8 @@ scripts/
 | `scripts/normal/config/set-end-time.ts` | ✅ 已完成 | 设置结束时间 |
 | `scripts/normal/config/set-min-stake.ts` | ✅ 已完成 | 设置最小质押金额 |
 | `scripts/normal/config/enable-emergency.ts` | ✅ 已完成 | 启用紧急模式 |
+| `scripts/normal/config/transfer-ownership.ts` | ✅ 已完成 | 第一步：发起所有权转移 |
+| `scripts/normal/config/accept-ownership.ts` | ✅ 已完成 | 第二步：接受所有权转移 |
 | `scripts/normal/query/check-status.ts` | ✅ 已完成 | 查询合约状态 |
 | `scripts/normal/query/check-stakes.ts` | ✅ 已完成 | 查询质押信息 |
 | `scripts/normal/query/pending-reward.ts` | ✅ 已完成 | 查询待领取奖励 |
@@ -327,6 +333,8 @@ scripts/
 | `scripts/premium/config/set-end-time.ts` | ✅ 已完成 | 设置结束时间 |
 | `scripts/premium/config/set-min-stake.ts` | ✅ 已完成 | 设置最小质押金额 |
 | `scripts/premium/config/enable-emergency.ts` | ✅ 已完成 | 启用紧急模式 |
+| `scripts/premium/config/transfer-ownership.ts` | ✅ 已完成 | 第一步：发起所有权转移 |
+| `scripts/premium/config/accept-ownership.ts` | ✅ 已完成 | 第二步：接受所有权转移 |
 | `scripts/premium/query/check-status.ts` | ✅ 已完成 | 查询合约状态 |
 | `scripts/premium/query/check-stakes.ts` | ✅ 已完成 | 查询质押信息 |
 | `scripts/premium/query/pending-reward.ts` | ✅ 已完成 | 查询待领取奖励 |
@@ -649,6 +657,45 @@ PROXY_ADMIN_ADDRESS="0x..." NEW_IMPLEMENTATION_ADDRESS="0x..." npm run upgrade:n
 - 升级交易会显示在 ProxyAdmin 合约页面，而不是 Proxy 页面
 - 确保新实现合约与现有存储布局兼容
 - 升级后需要验证新实现合约（脚本会提示命令）
+
+#### 所有权转移脚本（两步流程）
+
+**`scripts/normal/config/transfer-ownership.ts`** 和 **`scripts/premium/config/transfer-ownership.ts`** 实现了两步所有权转移流程的第一步。
+
+**`scripts/normal/config/accept-ownership.ts`** 和 **`scripts/premium/config/accept-ownership.ts`** 实现了两步所有权转移流程的第二步。
+
+**为什么需要两步转移？**
+合约使用 OpenZeppelin 的 `Ownable2StepUpgradeable` 标准，实现了两步所有权转移流程以增强安全性：
+- **防止地址错误**：如果输入了错误的地址，当前 owner 可以在接受前取消
+- **提供撤销机会**：当前 owner 可以在新 owner 接受前取消转移
+- **增强安全性**：降低意外或恶意所有权转移的风险
+
+**使用示例**：
+
+**第一步：发起转移**（当前 owner 执行）：
+```bash
+# 普通质押
+NEW_OWNER_ADDRESS="0x..." npm run config:transfer-ownership:normal:testnet
+
+# 高级质押
+NEW_OWNER_ADDRESS="0x..." npm run config:transfer-ownership:premium:testnet
+```
+
+**第二步：接受所有权**（新 owner 执行）：
+```bash
+# 普通质押
+npm run config:accept-ownership:normal:testnet
+
+# 高级质押
+npm run config:accept-ownership:premium:testnet
+```
+
+**重要注意事项**：
+- 第一步执行后，所有权不会立即转移
+- 新 owner 必须执行第二步才能完成转移
+- 当前 owner 可以通过向不同地址发起新的转移来取消待处理的转移
+- 新 owner 必须使用在第一步中设置为 `NEW_OWNER_ADDRESS` 的账户
+- 两个脚本在执行前都会验证当前状态以防止错误
 
 ### 工具脚本验证
 

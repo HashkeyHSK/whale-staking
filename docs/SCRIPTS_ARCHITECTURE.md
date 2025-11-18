@@ -194,7 +194,9 @@ scripts/
 │   │   ├── set-start-time.ts
 │   │   ├── set-end-time.ts
 │   │   ├── set-min-stake.ts
-│   │   └── enable-emergency.ts
+│   │   ├── enable-emergency.ts
+│   │   ├── transfer-ownership.ts  # Step 1: Initiate ownership transfer
+│   │   └── accept-ownership.ts     # Step 2: Accept ownership transfer
 │   └── query/                # State queries
 │       ├── check-status.ts
 │       ├── check-stakes.ts
@@ -220,7 +222,9 @@ scripts/
 │   │   ├── set-start-time.ts
 │   │   ├── set-end-time.ts
 │   │   ├── set-min-stake.ts
-│   │   └── enable-emergency.ts
+│   │   ├── enable-emergency.ts
+│   │   ├── transfer-ownership.ts  # Step 1: Initiate ownership transfer
+│   │   └── accept-ownership.ts     # Step 2: Accept ownership transfer
 │   └── query/                # State queries
 │       ├── check-status.ts
 │       ├── check-stakes.ts
@@ -282,6 +286,8 @@ The following table lists script completion status:
 | `scripts/normal/config/set-end-time.ts` | ✅ Completed | Set end time |
 | `scripts/normal/config/set-min-stake.ts` | ✅ Completed | Set minimum staking amount |
 | `scripts/normal/config/enable-emergency.ts` | ✅ Completed | Enable emergency mode |
+| `scripts/normal/config/transfer-ownership.ts` | ✅ Completed | Step 1: Initiate ownership transfer |
+| `scripts/normal/config/accept-ownership.ts` | ✅ Completed | Step 2: Accept ownership transfer |
 | `scripts/normal/query/check-status.ts` | ✅ Completed | Query contract status |
 | `scripts/normal/query/check-stakes.ts` | ✅ Completed | Query staking information |
 | `scripts/normal/query/pending-reward.ts` | ✅ Completed | Query pending rewards |
@@ -327,6 +333,8 @@ The following table lists script completion status:
 | `scripts/premium/config/set-end-time.ts` | ✅ Completed | Set end time |
 | `scripts/premium/config/set-min-stake.ts` | ✅ Completed | Set minimum staking amount |
 | `scripts/premium/config/enable-emergency.ts` | ✅ Completed | Enable emergency mode |
+| `scripts/premium/config/transfer-ownership.ts` | ✅ Completed | Step 1: Initiate ownership transfer |
+| `scripts/premium/config/accept-ownership.ts` | ✅ Completed | Step 2: Accept ownership transfer |
 | `scripts/premium/query/check-status.ts` | ✅ Completed | Query contract status |
 | `scripts/premium/query/check-stakes.ts` | ✅ Completed | Query staking information |
 | `scripts/premium/query/pending-reward.ts` | ✅ Completed | Query pending rewards |

@@ -98,6 +98,8 @@ scripts/
 │   │   ├── set-start-time.ts # Set start time
 │   │   ├── set-end-time.ts   # Set end time
 │   │   ├── set-min-stake.ts  # Set minimum staking amount
+│   │   ├── transfer-ownership.ts  # Step 1: Initiate ownership transfer
+│   │   └── accept-ownership.ts   # Step 2: Accept ownership transfer
 │   │   ├── set-max-total-staked.ts # Set maximum total staked
 │   │   └── enable-emergency.ts # Enable emergency mode
 │   └── query/                # Status queries
@@ -127,7 +129,9 @@ scripts/
 │   │   ├── set-end-time.ts
 │   │   ├── set-min-stake.ts
 │   │   ├── set-max-total-staked.ts
-│   │   └── enable-emergency.ts
+│   │   ├── enable-emergency.ts
+│   │   ├── transfer-ownership.ts  # Step 1: Initiate ownership transfer
+│   │   └── accept-ownership.ts   # Step 2: Accept ownership transfer
 │   └── query/                # Status queries
 │       ├── check-status.ts
 │       ├── check-stakes.ts
@@ -269,6 +273,23 @@ export const TESTNET_ADDRESSES: ContractAddresses = {
 - `npm run config:set-max-total-staked:testnet` - Set maximum total staked
 - `npm run config:set-max-total-staked:premium:testnet` - Set maximum total staked (Premium)
 - `npm run config:enable-emergency:testnet` - Enable emergency mode (⚠️ Irreversible)
+
+### Ownership Transfer (Two-Step Process)
+The contract uses OpenZeppelin's `Ownable2StepUpgradeable` standard for enhanced security.
+
+**Step 1: Initiate Transfer** (Current owner executes):
+- `NEW_OWNER_ADDRESS="0x..." npm run config:transfer-ownership:normal:testnet` - Normal Staking
+- `NEW_OWNER_ADDRESS="0x..." npm run config:transfer-ownership:premium:testnet` - Premium Staking
+
+**Step 2: Accept Ownership** (New owner executes):
+- `npm run config:accept-ownership:normal:testnet` - Normal Staking
+- `npm run config:accept-ownership:premium:testnet` - Premium Staking
+
+**Important Notes**:
+- After Step 1, ownership is NOT transferred immediately
+- The new owner must execute Step 2 to complete the transfer
+- The current owner can cancel the pending transfer by initiating a new transfer to a different address
+- The new owner must use the account that was set as `NEW_OWNER_ADDRESS` in Step 1
 
 ### Status Queries (Normal Staking)
 - `npm run query:status:testnet` - Query contract status

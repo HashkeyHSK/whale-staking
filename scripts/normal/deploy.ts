@@ -145,6 +145,26 @@ async function main() {
   console.log("  2. Use scripts/normal/query/check-status.ts to check contract status");
   console.log("  3. Users can start staking after stake start time (no whitelist required)");
   
+  // Check ownership and provide transfer instructions
+  const contractOwner = await staking.owner();
+  console.log("\n📋 Ownership Information:");
+  console.log(`  Current contract owner: ${contractOwner}`);
+  console.log(`  Proxy admin: ${deployer.address}`);
+  
+  if (contractOwner.toLowerCase() === proxyAddress.toLowerCase()) {
+    printWarning("Note: Contract owner is set to proxy address");
+    console.log("  To transfer ownership to deployer, use two-step process:");
+    console.log("  Step 1: npm run config:transfer-ownership:normal:testnet NEW_OWNER_ADDRESS=...");
+    console.log("  Step 2: npm run config:accept-ownership:normal:testnet");
+  } else if (contractOwner.toLowerCase() !== deployer.address.toLowerCase()) {
+    printWarning("Note: Contract owner differs from deployer");
+    console.log("  To transfer ownership to deployer, use two-step process:");
+    console.log("  Step 1: npm run config:transfer-ownership:normal:testnet NEW_OWNER_ADDRESS=...");
+    console.log("  Step 2: npm run config:accept-ownership:normal:testnet");
+  } else {
+    console.log("  ✅ Contract owner is already set to deployer");
+  }
+  
   // Save deployment information
   console.log("\nPlease save the following address to scripts/shared/constants.ts:");
   console.log(`normalStaking: "${proxyAddress}",`);

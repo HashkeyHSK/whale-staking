@@ -99,7 +99,9 @@ scripts/
 │   │   ├── set-end-time.ts   # 设置结束时间
 │   │   ├── set-min-stake.ts  # 设置最小质押金额
 │   │   ├── set-max-total-staked.ts # 设置最大总质押量
-│   │   └── enable-emergency.ts # 启用紧急模式
+│   │   ├── enable-emergency.ts # 启用紧急模式
+│   │   ├── transfer-ownership.ts  # 第一步：发起所有权转移
+│   │   └── accept-ownership.ts   # 第二步：接受所有权转移
 │   └── query/                # 状态查询
 │       ├── check-status.ts   # 查询合约状态
 │       ├── check-stakes.ts   # 查询质押信息
@@ -127,7 +129,9 @@ scripts/
 │   │   ├── set-end-time.ts
 │   │   ├── set-min-stake.ts
 │   │   ├── set-max-total-staked.ts
-│   │   └── enable-emergency.ts
+│   │   ├── enable-emergency.ts
+│   │   ├── transfer-ownership.ts  # 第一步：发起所有权转移
+│   │   └── accept-ownership.ts   # 第二步：接受所有权转移
 │   └── query/                # 状态查询
 │       ├── check-status.ts
 │       ├── check-stakes.ts
@@ -269,6 +273,23 @@ export const TESTNET_ADDRESSES: ContractAddresses = {
 - `npm run config:set-max-total-staked:testnet` - 设置最大总质押量
 - `npm run config:set-max-total-staked:premium:testnet` - 设置最大总质押量（Premium）
 - `npm run config:enable-emergency:testnet` - 启用紧急模式（⚠️ 不可逆）
+
+### 所有权转移（两步流程）
+合约使用 OpenZeppelin 的 `Ownable2StepUpgradeable` 标准以增强安全性。
+
+**第一步：发起转移**（当前 owner 执行）：
+- `NEW_OWNER_ADDRESS="0x..." npm run config:transfer-ownership:normal:testnet` - 普通质押
+- `NEW_OWNER_ADDRESS="0x..." npm run config:transfer-ownership:premium:testnet` - 高级质押
+
+**第二步：接受所有权**（新 owner 执行）：
+- `npm run config:accept-ownership:normal:testnet` - 普通质押
+- `npm run config:accept-ownership:premium:testnet` - 高级质押
+
+**重要注意事项**：
+- 第一步执行后，所有权不会立即转移
+- 新 owner 必须执行第二步才能完成转移
+- 当前 owner 可以通过向不同地址发起新的转移来取消待处理的转移
+- 新 owner 必须使用在第一步中设置为 `NEW_OWNER_ADDRESS` 的账户
 
 ### 状态查询（Normal Staking）
 - `npm run query:status:testnet` - 查询合约状态
