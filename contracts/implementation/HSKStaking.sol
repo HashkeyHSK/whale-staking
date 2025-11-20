@@ -89,9 +89,6 @@ contract HSKStaking is
         
         stakeStartTime = _stakeStartTime;
         stakeEndTime = _stakeEndTime;
-        
-        cachedAccruedRewards = 0;
-        lastAccruedUpdateTime = block.timestamp;
     }
 
     // ==================== EXTERNAL USER FUNCTIONS ====================
@@ -104,9 +101,6 @@ contract HSKStaking is
         whenNotEmergency
         returns (uint256) 
     {
-        // Fix N2: Update accrued rewards before staking
-        _updateAccruedRewards();
-        
         require(block.timestamp >= stakeStartTime, "Staking has not started yet");
         require(block.timestamp < stakeEndTime, "Staking period has ended");
 
@@ -123,7 +117,6 @@ contract HSKStaking is
             rewardRate
         );
 
-        // Fix N5: Use totalPendingRewards directly instead of _getActualAccruedRewards()
         require(
             rewardPoolBalance >= totalPendingRewards + potentialReward,
             "Stake amount exceed"
@@ -159,9 +152,6 @@ contract HSKStaking is
     function unstake(
         uint256 positionId
     ) external override nonReentrant whenNotPaused whenNotEmergency validPosition(positionId) {
-        // Fix N2: Update accrued rewards before unstaking
-        _updateAccruedRewards();
-        
         Position storage position = positions[positionId];
         
         if (position.isUnstaked) revert AlreadyUnstaked();
@@ -184,9 +174,6 @@ contract HSKStaking is
     function claimReward(
         uint256 positionId
     ) external override nonReentrant whenNotPaused whenNotEmergency validPosition(positionId) returns (uint256) {
-        // Fix N2: Update accrued rewards before claiming
-        _updateAccruedRewards();
-        
         uint256 reward = _updateReward(positionId);
         
         if (reward == 0) revert NoReward();
@@ -218,9 +205,6 @@ contract HSKStaking is
     }
 
     function emergencyWithdraw(uint256 positionId) external nonReentrant {
-        // Fix N2: Update accrued rewards before emergency withdrawal
-        _updateAccruedRewards();
-        
         require(emergencyMode, "Not in emergency mode");
         
         Position storage position = positions[positionId];
@@ -229,17 +213,19 @@ contract HSKStaking is
 
         uint256 amount = position.amount;
         
-        // Fix N3: Use _calculatePendingReward instead of full annual reward to avoid double deduction
-        uint256 reservedReward = _calculatePendingReward(position);
+        // Calculate unclaimed reward from lastRewardAt to stakedAt + LOCK_PERIOD
+        uint256 lockEndTime = position.stakedAt + LOCK_PERIOD;
+        uint256 timeElapsed = lockEndTime > position.lastRewardAt 
+            ? lockEndTime - position.lastRewardAt 
+            : 0;
+        
+        uint256 reservedReward = _calculateReward(
+            position.amount,
+            timeElapsed,
+            rewardRate
+        );
         require(totalPendingRewards >= reservedReward, "Pending rewards accounting error");
         totalPendingRewards -= reservedReward;
-        
-        uint256 accruedForPosition = _calculatePendingReward(position);
-        if (cachedAccruedRewards >= accruedForPosition) {
-            cachedAccruedRewards -= accruedForPosition;
-        } else {
-            cachedAccruedRewards = 0;
-        }
         
         position.isUnstaked = true;
         totalStaked -= amount;
@@ -339,45 +325,6 @@ contract HSKStaking is
 
     // ==================== INTERNAL FUNCTIONS ====================
 
-    /**
-     * @dev Updates the cached accrued rewards and last update time
-     * This function should be called before stake, unstake, claimReward, and emergencyWithdraw
-     * to ensure accurate reward calculations
-     */
-    function _updateAccruedRewards() internal {
-        uint256 timeSinceLastUpdate = block.timestamp > lastAccruedUpdateTime 
-            ? block.timestamp - lastAccruedUpdateTime 
-            : 0;
-        
-        if (timeSinceLastUpdate > 0) {
-            uint256 estimatedNewRewards = _calculateReward(
-                totalStaked,
-                timeSinceLastUpdate,
-                rewardRate
-            );
-            cachedAccruedRewards += estimatedNewRewards;
-            lastAccruedUpdateTime = block.timestamp;
-        }
-    }
-
-    function _getActualAccruedRewards() internal view returns (uint256) {
-        uint256 timeSinceLastUpdate = block.timestamp > lastAccruedUpdateTime 
-            ? block.timestamp - lastAccruedUpdateTime 
-            : 0;
-
-        if (timeSinceLastUpdate == 0) {
-            return cachedAccruedRewards;
-        }
-
-        uint256 estimatedNewRewards = _calculateReward(
-            totalStaked,
-            timeSinceLastUpdate,
-            rewardRate
-        );
-
-        return cachedAccruedRewards + estimatedNewRewards;
-    }
-
     function _calculateTimeElapsed(Position memory position) 
         internal 
         view 
@@ -425,12 +372,6 @@ contract HSKStaking is
             require(rewardPoolBalance >= reward, "Insufficient reward pool");
             rewardPoolBalance -= reward;
             totalPendingRewards -= reward;
-            
-            if (cachedAccruedRewards >= reward) {
-                cachedAccruedRewards -= reward;
-            } else {
-                cachedAccruedRewards = 0;
-            }
             
             emit RewardPoolUpdated(rewardPoolBalance);
         }

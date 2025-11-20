@@ -38,8 +38,6 @@ export interface ContractStatus {
   stakeStartTime: bigint;
   stakeEndTime: bigint;
   nextPositionId: bigint;
-  cachedAccruedRewards: bigint;     // Cached accrued rewards
-  lastAccruedUpdateTime: bigint;    // Last update time
 }
 
 /**
