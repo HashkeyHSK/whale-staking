@@ -217,9 +217,14 @@ contract HSKStaking is
 
         uint256 amount = position.amount;
         
+        uint256 lockEndTime = position.stakedAt + LOCK_PERIOD;
+        uint256 timeElapsed = lockEndTime > position.lastRewardAt 
+            ? lockEndTime - position.lastRewardAt 
+            : 0;
+
         uint256 reservedReward = _calculateReward(
             position.amount,
-            LOCK_PERIOD,
+            timeElapsed,
             rewardRate
         );
         require(totalPendingRewards >= reservedReward, "Pending rewards accounting error");
