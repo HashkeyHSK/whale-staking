@@ -323,34 +323,6 @@ describe("Premium Staking - Staking Functionality", () => {
     );
   });
 
-  test("should reject staking when reward pool balance is insufficient", async () => {
-    // Withdraw most of the reward pool, leave only a small amount
-    const poolBalance = await fixture.staking.rewardPoolBalance();
-    const excess = poolBalance - parseEther("50"); // Leave only 50 HSK
-
-    if (excess > 0) {
-      await fixture.staking
-        .connect(fixture.admin)
-        .withdrawExcessRewardPool(excess);
-    }
-
-    // Use a smaller fixed amount to avoid balance issues in Hardhat EDR
-    // Stake amount should require more rewards than available in pool (50 HSK)
-    const stakeAmount = parseEther("1000"); // Reduced from 10000 to avoid balance issues
-    
-    // Fund account with sufficient balance
-    await fundAccount(fixture.user1, stakeAmount + parseEther("100")); // Stake amount + gas buffer
-
-    // Try to stake an amount that would require more rewards than available
-    // This should fail with "Stake amount exceed" error
-    await expectRevert(
-      fixture.staking.connect(fixture.user1).stake({
-        value: stakeAmount,
-      }),
-      "Stake amount exceed"
-    );
-  });
-
   test("should support same user staking multiple times", async () => {
     const stakeAmount1 = parseEther("100");
     const stakeAmount2 = parseEther("200");

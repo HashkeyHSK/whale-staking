@@ -31,9 +31,6 @@ abstract contract StakingStorage is Initializable, Ownable2StepUpgradeable {
     uint256 public stakeEndTime;
     bool public onlyWhitelistCanStake;
     
-    uint256 public cachedAccruedRewards;
-    uint256 public lastAccruedUpdateTime;
-    
     uint256 public maxTotalStaked;
     
     // Gap for future storage variables (reserves 50 slots for upgrades)

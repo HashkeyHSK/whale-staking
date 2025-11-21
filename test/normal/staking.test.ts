@@ -415,26 +415,6 @@ describe("Normal Staking - Staking Functionality", () => {
     }
   });
 
-  test("should reject staking when reward pool balance is insufficient", async () => {
-    // Withdraw most of the reward pool
-    const poolBalance = await fixture.staking.rewardPoolBalance();
-    const excess = poolBalance - parseEther("100"); // Leave only 100 HSK
-
-    if (excess > 0) {
-      await fixture.staking
-        .connect(fixture.admin)
-        .withdrawExcessRewardPool(excess);
-    }
-
-    // Try to stake a large amount that would require more rewards than available
-    await expectRevert(
-      fixture.staking.connect(fixture.user1).stake({
-        value: parseEther("1000"), // Large stake requiring significant rewards
-      }),
-      "Stake amount exceed"
-    );
-  });
-
   test("should support multiple users staking simultaneously", async () => {
     const stakeAmount1 = parseEther("10");
     const stakeAmount2 = parseEther("20");

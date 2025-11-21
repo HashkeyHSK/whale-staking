@@ -35,11 +35,9 @@ export interface ContractStatus {
   rewardPoolBalance: bigint;
   minStakeAmount: bigint;
   rewardRate: bigint;               // basis points (800 = 8%, 1600 = 16%)
-  stakeStartTime: bigint;
-  stakeEndTime: bigint;
-  nextPositionId: bigint;
-  cachedAccruedRewards: bigint;     // Cached accrued rewards
-  lastAccruedUpdateTime: bigint;    // Last update time
+    stakeStartTime: bigint;
+    stakeEndTime: bigint;
+    nextPositionId: bigint;
 }
 
 /**
