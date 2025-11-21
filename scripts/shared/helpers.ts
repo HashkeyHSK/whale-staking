@@ -59,8 +59,6 @@ export function formatContractStatus(status: any, ethers: any) {
     stakeStartTime: new Date(Number(status.stakeStartTime) * 1000).toLocaleString(),
     stakeEndTime: new Date(Number(status.stakeEndTime) * 1000).toLocaleString(),
     nextPositionId: status.nextPositionId.toString(),
-    cachedAccruedRewards: ethers.formatEther(status.cachedAccruedRewards),
-    lastAccruedUpdateTime: new Date(Number(status.lastAccruedUpdateTime) * 1000).toLocaleString(),
   };
 }
 

@@ -89,9 +89,6 @@ contract HSKStaking is
         
         stakeStartTime = _stakeStartTime;
         stakeEndTime = _stakeEndTime;
-        
-        cachedAccruedRewards = 0;
-        lastAccruedUpdateTime = block.timestamp;
     }
 
     // ==================== EXTERNAL USER FUNCTIONS ====================
@@ -118,12 +115,6 @@ contract HSKStaking is
             amount,
             LOCK_PERIOD,
             rewardRate
-        );
-
-        uint256 actualAccruedRewards = _getActualAccruedRewards();
-        require(
-            rewardPoolBalance >= actualAccruedRewards + potentialReward,
-            "Stake amount exceed"
         );
 
         totalPendingRewards += potentialReward;
@@ -217,20 +208,18 @@ contract HSKStaking is
 
         uint256 amount = position.amount;
         
+        uint256 lockEndTime = position.stakedAt + LOCK_PERIOD;
+        uint256 timeElapsed = lockEndTime > position.lastRewardAt 
+            ? lockEndTime - position.lastRewardAt 
+            : 0;
+
         uint256 reservedReward = _calculateReward(
             position.amount,
-            LOCK_PERIOD,
+            timeElapsed,
             rewardRate
         );
         require(totalPendingRewards >= reservedReward, "Pending rewards accounting error");
         totalPendingRewards -= reservedReward;
-        
-        uint256 accruedForPosition = _calculatePendingReward(position);
-        if (cachedAccruedRewards >= accruedForPosition) {
-            cachedAccruedRewards -= accruedForPosition;
-        } else {
-            cachedAccruedRewards = 0;
-        }
         
         position.isUnstaked = true;
         totalStaked -= amount;
@@ -330,24 +319,6 @@ contract HSKStaking is
 
     // ==================== INTERNAL FUNCTIONS ====================
 
-    function _getActualAccruedRewards() internal view returns (uint256) {
-        uint256 timeSinceLastUpdate = block.timestamp > lastAccruedUpdateTime 
-            ? block.timestamp - lastAccruedUpdateTime 
-            : 0;
-
-        if (timeSinceLastUpdate == 0) {
-            return cachedAccruedRewards;
-        }
-
-        uint256 estimatedNewRewards = _calculateReward(
-            totalStaked,
-            timeSinceLastUpdate,
-            rewardRate
-        );
-
-        return cachedAccruedRewards + estimatedNewRewards;
-    }
-
     function _calculateTimeElapsed(Position memory position) 
         internal 
         view 
@@ -395,12 +366,6 @@ contract HSKStaking is
             require(rewardPoolBalance >= reward, "Insufficient reward pool");
             rewardPoolBalance -= reward;
             totalPendingRewards -= reward;
-            
-            if (cachedAccruedRewards >= reward) {
-                cachedAccruedRewards -= reward;
-            } else {
-                cachedAccruedRewards = 0;
-            }
             
             emit RewardPoolUpdated(rewardPoolBalance);
         }
