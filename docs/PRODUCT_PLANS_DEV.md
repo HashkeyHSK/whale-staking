@@ -1,4 +1,4 @@
-# Dual-Tier Staking Product Plan - Development Version
+# Single-Tier Staking Product Plan - Development Version
 
 > **Document Note**: This document is for the development team, containing technical implementation details, contract interfaces, deployment configurations, and other development-related information.  
 > **Operations Version**: Please refer to [PRODUCT_PLANS.md](./PRODUCT_PLANS.md)
@@ -9,12 +9,12 @@
 
 ### 1.1 Product Plan
 
-This plan is based on the `HSKStaking` contract, implementing two products by deploying two independent proxy contracts (`NormalStakingProxy` and `PremiumStakingProxy`):
+This plan is based on the `HSKStaking` contract, implementing two products by deploying two independent proxy contracts (`StakingProxy` and ``):
 
 | Product | Contract Instance | Target Users | Minimum Stake | Annual Yield | Whitelist |
 |---------|------------------|--------------|---------------|--------------|-----------|
-| Normal Staking | Independent Instance A | General users | 1 HSK | 8% | Disabled |
-| Premium Staking | Independent Instance B | Whales/Institutions | 500,000 HSK | 16% | Enabled |
+| Staking | Independent Instance A | General users | 1 HSK | 5% | Disabled |
+|  | Independent Instance B | Whales/Institutions | 500,000 HSK | 16% | Enabled |
 
 ### 1.2 Technology Stack
 
@@ -41,9 +41,9 @@ HSKStaking (Main Implementation Contract)
 #### Proxy Contract Layer
 ```
 Proxy Contract Architecture
-├── NormalStakingProxy (TransparentUpgradeableProxy)
+├── StakingProxy (TransparentUpgradeableProxy)
 │   └── Points to HSKStaking Implementation
-└── PremiumStakingProxy (TransparentUpgradeableProxy)
+└──  (TransparentUpgradeableProxy)
     └── Points to HSKStaking Implementation
 ```
 
@@ -57,18 +57,18 @@ Proxy Contract Architecture
 
 ## II. Product Configuration Parameters
 
-### 2.1 Normal Staking Configuration
+### 2.1 Staking Configuration
 
 | Parameter | Value | Contract Function |
 |-----------|-------|-------------------|
-| `minStakeAmount` | 1 HSK (1e18) | `setMinStakeAmount(1e18)` |
+| `minStakeAmount` | 1000 HSK (1000e18) | `setMinStakeAmount(1000e18)` |
 | `LOCK_PERIOD` | 365 days (31,536,000 seconds) | Fixed constant, set at deployment |
-| `rewardRate` | 8% (800 basis points) | Set via initialize() at deployment |
+| `rewardRate` | 5% (500 basis points) | Set via initialize() at deployment |
 | `stakeStartTime` | 7 days after deployment | `setStakeStartTime(timestamp)` |
 | `stakeEndTime` | `type(uint256).max` | `setStakeEndTime(timestamp)` |
 | `onlyWhitelistCanStake` | `false` | `setWhitelistOnlyMode(false)` |
 
-### 2.2 Premium Staking Configuration
+### 2.2  Configuration
 
 | Parameter | Value | Contract Function |
 |-----------|-------|-------------------|
@@ -123,25 +123,25 @@ mapping(address => bool) public whitelisted;         // Whitelist mapping
 #### Method 1: Deploy Separately (Recommended for Testing)
 
 ```bash
-# Deploy Normal Staking
-STAKE_START_TIME="<timestamp>" STAKE_END_TIME="<timestamp>" npx hardhat run scripts/normal/deploy.ts --network hashkeyTestnet
+# Deploy Staking
+STAKE_START_TIME="<timestamp>" STAKE_END_TIME="<timestamp>" npx hardhat run scripts/staking/deploy.ts --network hashkeyTestnet
 
-# Deploy Premium Staking
-STAKE_START_TIME="<timestamp>" STAKE_END_TIME="<timestamp>" npx hardhat run scripts/premium/deploy.ts --network hashkeyTestnet
+# Deploy 
+STAKE_START_TIME="<timestamp>" STAKE_END_TIME="<timestamp>" npx hardhat run /deploy.ts --network hashkeyTestnet
 ```
 
 **Note**: Deployment scripts require `STAKE_START_TIME` and `STAKE_END_TIME` environment variables (Unix timestamp in seconds).
 
 ### 3.2 Post-Deployment Configuration Checklist
 
-#### Normal Staking
-- [ ] Verify `minStakeAmount` = 1 HSK
-- [ ] Verify `rewardRate` = 800 (8% APY)
+#### Staking
+- [ ] Verify `minStakeAmount` = 1000 HSK
+- [ ] Verify `rewardRate: 500 (5% APY)
 - [ ] Verify `LOCK_PERIOD` = 365 days (fixed)
 - [ ] Verify `onlyWhitelistCanStake` = false
 - [ ] Deposit to reward pool (via `updateRewardPool()`)
 
-#### Premium Staking
+#### 
 - [ ] Verify `minStakeAmount` = 500,000 HSK
 - [ ] Verify `rewardRate` = 1600 (16% APY)
 - [ ] Verify `LOCK_PERIOD` = 365 days (fixed)
@@ -153,15 +153,15 @@ STAKE_START_TIME="<timestamp>" STAKE_END_TIME="<timestamp>" npx hardhat run scri
 
 ```bash
 # Check configuration parameters and contract status
-npx hardhat run scripts/normal/query/check-status.ts --network hashkeyTestnet \
+npx hardhat run scripts/staking/query/check-status.ts --network hashkeyTestnet \
   -- --contract <CONTRACT_ADDRESS>
 
 # Check user staking status
-npx hardhat run scripts/normal/query/check-stakes.ts --network hashkeyTestnet \
+npx hardhat run scripts/staking/query/check-stakes.ts --network hashkeyTestnet \
   -- --contract <CONTRACT_ADDRESS> --user <USER_ADDRESS>
 
-# Check whitelist status (Premium Staking)
-npx hardhat run scripts/premium/query/check-whitelist.ts --network hashkeyTestnet \
+# Check whitelist status ()
+npx hardhat run /query/check-whitelist.ts --network hashkeyTestnet \
   -- --contract <CONTRACT_ADDRESS> --user <USER_ADDRESS>
 ```
 
@@ -276,7 +276,7 @@ Deposit to reward pool.
 **Event**: Triggers `RewardPoolUpdated` event
 
 **Important**:
-- Reward pools need independent management (Normal Staking and Premium Staking managed separately)
+- Reward pools need independent management (Staking and  managed separately)
 
 #### `withdrawExcessRewardPool(uint256 amount)`
 Withdraw excess reward pool funds.
@@ -338,7 +338,7 @@ Query emergency mode status.
 Get fixed lock period (365 days = 31,536,000 seconds).
 
 #### `rewardRate() view → uint256`
-Get annual yield rate (basis points, e.g., 800 = 8%, 1600 = 16%).
+Get annual yield rate (basis points, e.g., 500 = 5%, ).
 
 #### `stakeStartTime() view → uint256`
 Get staking start timestamp.
@@ -386,13 +386,13 @@ uint256 totalReward = (amount × annualRate × timeRatio) / (PRECISION × PRECIS
 
 ### 5.2 Calculation Examples
 
-**Normal Staking (8% APY, 365-day lock period)**:
+**Staking (5% APY, 365-day lock period)**:
 - Stake: 10,000 HSK
 - Lock period: 365 days
 - Actual staking: 365 days
-- Reward = 10,000 × 0.08 × (365/365) = 800 HSK
+- Reward = 10,000 × 0.08 × (365/365) = 500 HSK
 
-**Premium Staking (16% APY, 365-day lock period)**:
+** (16% APY, 365-day lock period)**:
 - Stake: 1,000,000 HSK
 - Lock period: 365 days
 - Actual staking: 365 days
@@ -567,7 +567,7 @@ Important events:
 ### 10.1 User Operation Flows
 
 #### Staking Flow
-1. Check whitelist status (Premium Staking)
+1. Check whitelist status ()
 2. Check staking time window (`stakeStartTime` and `stakeEndTime`)
 3. Check if reward pool balance is sufficient (contract automatically checks)
 4. Call `stake()` and send HSK (fixed 365-day lock period)
@@ -591,7 +591,7 @@ Important events:
 - **Reward Pool Balance**: `rewardPoolBalance()`
 - **Total Pending Rewards**: `totalPendingRewards()`
 - **Lock Period**: `LOCK_PERIOD()` (fixed 365 days)
-- **Annual Yield Rate**: `rewardRate()` (set at deployment, e.g., 800 = 8%)
+- **Annual Yield Rate**: `rewardRate: 500 = 5%)
 - **User Staking Positions**: `getUserPositionIds(user)` (recommended method, returns all position ID array)
 - **Position Details**: `positions(positionId)`
 - **Pending Rewards**: `pendingReward(positionId)`
@@ -600,7 +600,7 @@ Important events:
 
 Common errors:
 - `"Amount below minimum"` - Insufficient staking amount (less than minStakeAmount)
-- `NotWhitelisted` - Not in whitelist (Premium Staking)
+- `NotWhitelisted` - Not in whitelist ()
 - `StillLocked` - Lock period not ended (365 days)
 - `"Stake amount exceed"` - Insufficient reward pool balance (cannot pay expected rewards)
 - `"Insufficient reward pool"` - Insufficient reward pool balance (when claiming rewards)
@@ -617,12 +617,12 @@ Common errors:
 
 ### 11.1 Key Metrics Monitoring
 
-#### Normal Staking
+#### Staking
 - `totalStaked` - Total staked amount
 - `rewardPoolBalance` - Reward pool balance
 - User count statistics (via events)
 
-#### Premium Staking
+#### 
 - `totalStaked` - Total staked amount
 - `rewardPoolBalance` - Reward pool balance
 - Whitelist user count
@@ -660,7 +660,7 @@ Recommended to log:
 - [ ] Configuration parameters verified
 - [ ] Permissions set correctly (Owner)
 - [ ] Reward pool deposit successful
-- [ ] Whitelist users added successfully (Premium Staking)
+- [ ] Whitelist users added successfully ()
 - [ ] Test staking/claiming flow
 
 ### 12.3 Pre-Launch Preparation
@@ -701,7 +701,7 @@ A: Use `enableEmergencyMode()` to enable. Note: In current contract version, eme
 - [Contract Architecture](./CONTRACT_ARCHITECTURE.md) - **Detailed contract architecture (required reading for developers)**
 - [Product Plan Documentation](./PRODUCT_PLANS.md) - **Operations documentation (recommended)**
 - [Product Summary](./PRODUCT_SUMMARY.md) - Quick overview
-- [Dual-Tier Product Documentation](./DUAL_TIER_STAKING.md) - Technical deployment documentation
+- [Single-Tier Product Documentation](./DUAL_TIER_STAKING.md) - Technical deployment documentation
 - [Quick Start Guide](./QUICK_START_DUAL_TIER.md) - Quick deployment guide
 - [Technical FAQ](./TECHNICAL_FAQ.md) - Technical mechanism explanations
 - [Error Handling Guide](./ERROR_HANDLING.md) - Common error handling

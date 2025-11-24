@@ -1,15 +1,15 @@
-# Dual-Tier Staking Product Plan
+# Single-Tier Staking Product Plan
 
 ## I. Product Overview
 
 This plan is based on the Whale Staking contract architecture, providing two independent product schemes targeting different user groups:
 
-- **Normal Staking (Delegated Staking)**: For general users, low threshold, stable returns
-- **Premium Staking (Premium Staking)**: For whales/institutions, high threshold, high returns
+- **Staking (Delegated Staking)**: For general users, low threshold, stable returns
+- ** ()**: For whales/institutions, high threshold, high returns
 
 ---
 
-## II. Product 1: Normal Staking (Delegated Staking)
+## II. Product 1: Staking (Delegated Staking)
 
 ### Product Positioning
 Delegated staking product for general users, lowering participation threshold, providing stable staking returns.
@@ -23,11 +23,11 @@ Delegated staking product for general users, lowering participation threshold, p
 
 | Parameter | Configuration | Notes |
 |-----------|---------------|-------|
-| **Minimum Stake Threshold** | 1 HSK | Minimum amount per user stake |
-| **Annual Yield Rate** | 8% | Fixed annual yield rate (configured at deployment) |
+| **Minimum Stake Threshold** | 1000 HSK | Minimum amount per user stake |
+| **Annual Yield Rate** | 5% | Fixed annual yield rate (configured at deployment) |
 | **Lock Period** | 365 days | Fixed 365-day lock period |
 | **Whitelist Mode** | Disabled | All users can freely participate in staking |
-| **Maximum Total Staked** | 10,000,000 HSK | Upper limit for entire product pool (upper limit for sum of all users' staking amounts, not per-transaction limit) |
+| **Maximum Total Staked** | 30,000,000 HSK | Upper limit for entire product pool (upper limit for sum of all users' staking amounts, not per-transaction limit) |
 
 ### Product Mechanisms
 
@@ -38,7 +38,7 @@ Delegated staking product for general users, lowering participation threshold, p
 - **Multiple Stakes**: Same user can stake multiple times, creating multiple staking positions
 
 #### 2. Reward Mechanism
-- **Fixed Annual Yield**: All lock period options unified to 8% annual yield rate
+- **Fixed Annual Yield**: All lock period options unified to 5% annual yield rate
 - **Per-Second Interest**: Rewards accumulate continuously per actual staking seconds, precise to the second
 - **Reward Cap**: Rewards only calculated up to end of lock period, extra staking time does not increase rewards
 
@@ -90,7 +90,7 @@ Delegated staking product for general users, lowering participation threshold, p
 
 ---
 
-## III. Product 2: Premium Staking (Premium Staking)
+## III. Product 2:  ()
 
 ### Product Positioning
 Premium staking product for whales and institutions, providing high returns but requiring high capital threshold and approval mechanism.
@@ -108,7 +108,7 @@ Premium staking product for whales and institutions, providing high returns but 
 | **Annual Yield Rate** | 16% | Fixed annual yield rate (configured at deployment, calculated automatically on-chain) |
 | **Lock Period** | 365 days | Fixed 365-day lock period |
 | **Whitelist Mode** | Enabled | Only approved users can participate in staking |
-| **Maximum Total Staked** | 20,000,000 HSK | Upper limit for entire product pool (upper limit for sum of all users' staking amounts, not per-transaction limit) |
+| **Maximum Total Staked** | 30,000,000 HSK | Upper limit for entire product pool (upper limit for sum of all users' staking amounts, not per-transaction limit) |
 
 ### Product Mechanisms
 
@@ -173,20 +173,20 @@ Premium staking product for whales and institutions, providing high returns but 
   - Need sufficient reward pool fund support (16% APY requires more funds)
   - Regularly monitor reward pool balance, ensure sufficient funds to pay rewards
 - **User Communication**: Timely communication with whales, provide exclusive services
-- **Whale DID Reminder**: Premium Staking users all meet Whale DID conditions (minimum threshold 500K HSK), timely remind users to mint Whale DID
+- **Whale DID Reminder**:  users all meet Whale DID conditions (minimum threshold 500K HSK), timely remind users to mint Whale DID
 
 ---
 
 ## IV. Product Comparison
 
-| Feature | Normal Staking | Premium Staking |
+| Feature | Staking |  |
 |---------|---------------|----------------|
 | **Target Users** | General users | Whales/Institutions |
-| **Minimum Stake** | 1 HSK | 500,000 HSK |
-| **Annual Yield** | 8% | 16% |
+| **Minimum Stake** | 1000 HSK | 500,000 HSK |
+| **Annual Yield** | 5% | 16% |
 | **Lock Period** | 365 days | 365 days |
 | **Participation Method** | Open (no approval required) | Whitelist (requires approval) |
-| **Maximum Total Staked** | 10,000,000 HSK (pool limit) | 20,000,000 HSK (pool limit) |
+| **Maximum Total Staked** | 30,000,000 HSK (pool limit) | 30,000,000 HSK (pool limit) |
 | **Return Level** | Stable | High returns |
 
 ---
@@ -200,20 +200,20 @@ Premium staking product for whales and institutions, providing high returns but 
 3. **Risk Control**: High-return products need higher thresholds and stricter approval
 4. **Fund Management**: Better manage funds of different scales through product segmentation
 
-### Why is Normal Staking 8%?
+### Why is Staking 5%?
 
-- **Market Positioning**: 8% is a stable return level, suitable for general users
+- **Market Positioning**: 5% is a stable return level, suitable for general users
 - **Controllable Risk**: Lower returns mean lower risk and fund requirements
 - **User Acceptance**: General users more easily accept stable return levels
 
-### Why is Premium Staking 16%?
+### Why is  16%?
 
 - **High Threshold Compensation**: High threshold needs relatively higher returns to attract users
 - **Long-Term Locking**: Encourages users to lock funds long-term
 - **Risk Premium**: Returns cover higher risks and capital costs
 - **Market Positioning**: 16% is a reasonable return level, suitable for whale and institutional investors
 
-### Why Does Premium Staking Need Whitelist?
+### Why Does  Need Whitelist?
 
 - **Fund Security**: High-return products need to ensure quality of participating users
 - **Risk Control**: Filter qualified investors through approval mechanism
@@ -251,9 +251,9 @@ Premium staking product for whales and institutions, providing high returns but 
 **Core Rule**: Rewards only calculated up to end of lock period
 
 **Example**:
-- User chooses 365-day lock period, 8% annual yield
+- User chooses 365-day lock period, 5% annual yield
 - Actually staked for 400 days before withdrawal
-- Rewards still calculated based on 365 days: `Principal × 8% × (365/365) = Principal × 8%`
+- Rewards still calculated based on 365 days: `Principal × 5% × (365/365) = Principal × 5%`
 - **Important**: Time beyond lock period does not generate additional rewards, rewards only calculated up to end of lock period
 
 **Operational Significance**:
@@ -263,12 +263,12 @@ Premium staking product for whales and institutions, providing high returns but 
 
 ### 3. Whitelist Mechanism
 
-**Normal Staking**:
+**Staking**:
 - Whitelist mode: Disabled
 - All users can freely participate
 - No approval required
 
-**Premium Staking**:
+****:
 - Whitelist mode: Enabled
 - Only whitelisted users can stake
 - Requires admin approval to add
@@ -286,8 +286,8 @@ Premium staking product for whales and institutions, providing high returns but 
 - Cannot be used interchangeably
 
 **Reward Pool Requirements**:
-- **Normal Staking**: Calculate required rewards based on 8% APY
-- **Premium Staking**: Calculate required rewards based on 16% APY (needs more funds)
+- **Staking**: Calculate required rewards based on 5% APY
+- ****: Calculate required rewards based on 16% APY (needs more funds)
 
 **Operational Recommendations**:
 - Regularly check reward pool balance
@@ -339,11 +339,11 @@ Premium staking product for whales and institutions, providing high returns but 
 
 ## VII. Operational Strategy Recommendations
 
-### Normal Staking Operational Strategy
+### Staking Operational Strategy
 
 1. **User Acquisition**
    - Emphasize low threshold (can participate with 1 HSK)
-   - Highlight stable returns (8% annual)
+   - Highlight stable returns (5% annual)
    - Reduce participation difficulty (no approval required)
 
 2. **User Retention**
@@ -356,7 +356,7 @@ Premium staking product for whales and institutions, providing high returns but 
    - Plan deposit schedule in advance
    - Ensure timely reward distribution
 
-### Premium Staking Operational Strategy
+###  Operational Strategy
 
 1. **User Acquisition**
    - Targeted invitations to whales and institutions
@@ -377,7 +377,7 @@ Premium staking product for whales and institutions, providing high returns but 
 
 ## VIII. Key Metrics Monitoring
 
-### Normal Staking Monitoring Metrics
+### Staking Monitoring Metrics
 
 - **Total Staked**: Monitor total staking amount for product
 - **User Count**: Count participating users
@@ -385,7 +385,7 @@ Premium staking product for whales and institutions, providing high returns but 
 - **Reward Pool Balance**: Ensure sufficient funds to pay rewards
 - **Total Pending Rewards**: Monitor totalPendingRewards, ensure reward pool balance is sufficient
 
-### Premium Staking Monitoring Metrics
+###  Monitoring Metrics
 
 - **Total Staked**: Monitor total staking amount for product
 - **Whitelist User Count**: Count authorized users
@@ -437,10 +437,10 @@ Premium staking product for whales and institutions, providing high returns but 
 
 ## XI. Summary
 
-The dual-tier Staking product plan meets needs of different user groups through differentiated product design:
+The single-tier Staking product plan meets needs of different user groups through differentiated product design:
 
-- **Normal Staking**: Low threshold, stable returns, targeting general users
-- **Premium Staking**: High threshold, high returns, targeting whales and institutions
+- **Staking**: Low threshold, stable returns, targeting general users
+- ****: High threshold, high returns, targeting whales and institutions
 
 Through reasonable mechanism design, both ensures product security and provides flexible user experience, providing clear operational strategies and monitoring metrics for operations.
 
@@ -451,7 +451,7 @@ Through reasonable mechanism design, both ensures product security and provides 
 - [Main README](../README.md)
 - [Contract Architecture](./CONTRACT_ARCHITECTURE.md) - **Detailed contract architecture (required reading for developers)**
 - [Product Summary](./PRODUCT_SUMMARY.md) - Quick overview
-- [Dual-Tier Product Documentation](./DUAL_TIER_STAKING.md) - Technical deployment documentation
+- [Single-Tier Product Documentation](./DUAL_TIER_STAKING.md) - Technical deployment documentation
 - [Product Development Documentation](./PRODUCT_PLANS_DEV.md) - Development team documentation
 - [Quick Start Guide](./QUICK_START_DUAL_TIER.md) - Quick deployment guide
 - [Technical FAQ](./TECHNICAL_FAQ.md) - Technical mechanism explanations

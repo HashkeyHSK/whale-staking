@@ -82,7 +82,7 @@ scripts/
 │   ├── helpers.ts            # Helper functions
 │   └── utils.ts              # Utility functions
 │
-├── normal/                    # Normal staking
+├── staking/                   # Staking operations
 │   ├── deploy.ts             # Deploy contract
 │   ├── upgrade.ts            # Upgrade contract
 │   ├── stake.ts              # Staking operations
@@ -106,8 +106,6 @@ scripts/
 │       ├── check-status.ts   # Query contract status
 │       ├── check-stakes.ts   # Query staking information
 │       └── pending-reward.ts # Query pending rewards
-│
-├── premium/                   # Premium staking (✅ Completed)
 │   ├── deploy.ts             # Deploy contract
 │   ├── upgrade.ts            # Upgrade contract
 │   ├── stake.ts              # Staking operations (requires whitelist)
@@ -165,11 +163,10 @@ scripts/
 
 ```bash
 # Contract addresses
-export NORMAL_STAKING_ADDRESS="0x..."
-export PREMIUM_STAKING_ADDRESS="0x..."
+export STAKING_ADDRESS="0x..."
 
 # Operation related
-export STAKE_AMOUNT="1"           # Staking amount
+export STAKE_AMOUNT="1000"         # Staking amount (minimum: 1000 HSK)
 export REWARD_AMOUNT="100"        # Reward amount
 export POSITION_ID="1"            # Position ID
 export USER_ADDRESS="0x..."       # Query specific user
@@ -186,7 +183,7 @@ export STAKE_END_TIME="1767225600"    # Staking end time (Unix timestamp, second
 # Configuration related
 export START_TIME="1735689600"      # Start time (Unix timestamp, seconds, for modifying configuration)
 export END_TIME="1735689600"       # End time (Unix timestamp, seconds, for modifying configuration)
-export NEW_MIN_STAKE="1"           # New minimum staking amount
+export NEW_MIN_STAKE="1000"        # New minimum staking amount
 export NEW_MAX_TOTAL_STAKED="10000000"  # New maximum total staked (HSK, 0 means unlimited)
 
 # Advanced operations
@@ -197,7 +194,7 @@ export CONFIRM_EMERGENCY="YES_I_UNDERSTAND"  # Confirm enabling emergency mode
 export PROXY_ADMIN_ADDRESS="0x..."  # ProxyAdmin address (required for upgrade, usually deployer address)
 export NEW_IMPLEMENTATION_ADDRESS="0x..."  # New implementation contract address (optional, auto-deploy if not provided)
 
-# Whitelist related (Premium Staking)
+# Whitelist related (if whitelist mode is enabled)
 export WHITELIST_ADDRESSES="0x123...,0x456..."  # Whitelist address list (comma-separated, max 100)
 export ENABLE="true"  # Enable/disable whitelist mode ("true" or "false")
 ```
@@ -208,8 +205,7 @@ Edit `scripts/shared/constants.ts`:
 
 ```typescript
 export const TESTNET_ADDRESSES: ContractAddresses = {
-  normalStaking: "0x...",  // Fill in deployed address
-  premiumStaking: "",
+  staking: "0x...",  // Fill in deployed address
 };
 ```
 
@@ -225,8 +221,7 @@ export const TESTNET_ADDRESSES: ContractAddresses = {
 - `npm run verify:forge:testnet` - Verify implementation contract (testnet, using Foundry)
 
 ### Contract Upgrade
-- `npm run upgrade:normal:testnet` - Upgrade Normal Staking contract (testnet)
-- `npm run upgrade:premium:testnet` - Upgrade Premium Staking contract (testnet)
+- `npm run upgrade:testnet` - Upgrade Staking contract (testnet)
 
 ### Development Tools
 - `npm run dev:compile` - Compile contracts (via script)
@@ -244,21 +239,10 @@ export const TESTNET_ADDRESSES: ContractAddresses = {
 - `npm run tools:generate-types` - Generate TypeScript types
 - `npm run tools:compare-contracts` - Compare contract differences
 
-### Staking Operations (Normal Staking)
+### Staking Operations
 - `npm run stake:testnet` - Stake
 - `npm run unstake:testnet` - Unstake
 - `npm run claim:testnet` - Claim rewards
-
-### Staking Operations (Premium Staking)
-- `npm run stake:premium:testnet` - Stake (requires whitelist)
-- `npm run unstake:premium:testnet` - Unstake
-- `npm run claim:premium:testnet` - Claim rewards
-
-### Whitelist Management (Premium Staking)
-- `npm run whitelist:add-batch:premium:testnet` - Batch add whitelist
-- `npm run whitelist:remove-batch:premium:testnet` - Batch remove whitelist
-- `npm run whitelist:check-user:premium:testnet` - Query user whitelist status
-- `npm run whitelist:toggle-mode:premium:testnet` - Toggle whitelist mode
 
 ### Reward Management
 - `npm run rewards:add:testnet` - Add rewards
@@ -271,19 +255,16 @@ export const TESTNET_ADDRESSES: ContractAddresses = {
 - `npm run config:set-end-time:testnet` - Set end time
 - `npm run config:set-min-stake:testnet` - Set minimum staking amount
 - `npm run config:set-max-total-staked:testnet` - Set maximum total staked
-- `npm run config:set-max-total-staked:premium:testnet` - Set maximum total staked (Premium)
 - `npm run config:enable-emergency:testnet` - Enable emergency mode (⚠️ Irreversible)
 
 ### Ownership Transfer (Two-Step Process)
 The contract uses OpenZeppelin's `Ownable2StepUpgradeable` standard for enhanced security.
 
 **Step 1: Initiate Transfer** (Current owner executes):
-- `NEW_OWNER_ADDRESS="0x..." npm run config:transfer-ownership:normal:testnet` - Normal Staking
-- `NEW_OWNER_ADDRESS="0x..." npm run config:transfer-ownership:premium:testnet` - Premium Staking
+- `NEW_OWNER_ADDRESS="0x..." npm run config:transfer-ownership:testnet`
 
 **Step 2: Accept Ownership** (New owner executes):
-- `npm run config:accept-ownership:normal:testnet` - Normal Staking
-- `npm run config:accept-ownership:premium:testnet` - Premium Staking
+- `npm run config:accept-ownership:testnet`
 
 **Important Notes**:
 - After Step 1, ownership is NOT transferred immediately
@@ -291,22 +272,13 @@ The contract uses OpenZeppelin's `Ownable2StepUpgradeable` standard for enhanced
 - The current owner can cancel the pending transfer by initiating a new transfer to a different address
 - The new owner must use the account that was set as `NEW_OWNER_ADDRESS` in Step 1
 
-### Status Queries (Normal Staking)
+### Status Queries
 - `npm run query:status:testnet` - Query contract status
 - `npm run query:stakes:testnet` - Query staking information
 - `npm run query:pending-reward:testnet` - Query pending rewards
   - Without `POSITION_ID`, queries all positions' pending rewards for user
   - With `POSITION_ID`, only queries specified position's pending rewards
   - Can specify user address via `USER_ADDRESS` environment variable
-
-### Status Queries (Premium Staking)
-- `npm run query:status:premium:testnet` - Query contract status
-- `npm run query:stakes:premium:testnet` - Query staking information
-- `npm run query:pending-reward:premium:testnet` - Query pending rewards
-  - Without `POSITION_ID`, queries all positions' pending rewards for user
-  - With `POSITION_ID`, only queries specified position's pending rewards
-  - Can specify user address via `USER_ADDRESS` environment variable
-- `npm run query:check-whitelist:premium:testnet` - Query whitelist configuration
 
 ### Emergency Operations
 - `npm run emergency-withdraw:testnet` - Emergency withdraw principal (emergency mode only)
@@ -315,35 +287,29 @@ The contract uses OpenZeppelin's `Ownable2StepUpgradeable` standard for enhanced
 
 1. **Lock Period**: Fixed 365 days
 2. **Reward Rate**: 
-   - Normal Staking: 8% APY (800 basis points)
-   - Premium Staking: 16% APY (1600 basis points)
+   - Staking: 5% APY (500 basis points)
 3. **Minimum Stake**: 
-   - Normal Staking: 1 HSK (can be modified by owner)
-   - Premium Staking: 500,000 HSK (can be modified by owner)
+   - Staking: 1000 HSK (can be modified by owner)
 4. **Maximum Total Staked**: 
-   - Normal Staking: 10,000,000 HSK (can be modified by owner, 0 means unlimited)
-   - Premium Staking: 20,000,000 HSK (can be modified by owner, 0 means unlimited)
+   - Staking: 30,000,000 HSK (can be modified by owner, 0 means unlimited)
 5. **Whitelist**: 
-   - Normal Staking: Disabled (all users can stake)
-   - Premium Staking: Enabled (only whitelisted users can stake)
+   - Staking: Disabled (all users can stake)
 6. **Test First**: Verify on testnet first
 
 ## 📊 Script Statistics
 
 **Currently Implemented**: 59 script files
-- ✅ Normal Staking: 15 scripts
-- ✅ Premium Staking: 24 scripts (including whitelist management)
+- ✅ Staking: All operations, configuration, and queries
 - ✅ Development scripts: 4 scripts
 - ✅ Test scripts: 5 scripts
 - ✅ Tool scripts: 3 scripts
 - ✅ Shared modules: 4 files
 
-**Normal Staking scripts include**:
+**Staking scripts include**:
 - Basic operation scripts: 9 (deploy, upgrade, stake, unstake, claim-rewards, add-rewards, emergency-withdraw, withdraw-excess, verify-forge)
 - Configuration management scripts: 7 (pause, unpause, set-start-time, set-end-time, set-min-stake, set-max-total-staked, enable-emergency)
 - Query scripts: 4 (check-status, check-stakes, pending-reward, position-info)
 
-**Premium Staking scripts include**:
 - Basic operation scripts: 9 (deploy, upgrade, stake, unstake, claim-rewards, add-rewards, emergency-withdraw, withdraw-excess, verify-forge)
 - Whitelist management scripts: 4 (add-batch, remove-batch, check-user, toggle-mode)
 - Configuration management scripts: 7 (pause, unpause, set-start-time, set-end-time, set-min-stake, set-max-total-staked, enable-emergency)
@@ -405,11 +371,8 @@ npm run withdraw-excess:testnet
 **Q: How to set maximum total staked?**
 Maximum total staked is the upper limit for the entire product pool, total staking amount of all users cannot exceed this limit:
 ```bash
-# Set Normal Staking maximum total staked to 15,000,000 HSK
+# Set Staking maximum total staked to 15,000,000 HSK
 NEW_MAX_TOTAL_STAKED="15000000" npm run config:set-max-total-staked:testnet
-
-# Set Premium Staking maximum total staked to 25,000,000 HSK
-NEW_MAX_TOTAL_STAKED="25000000" npm run config:set-max-total-staked:premium:testnet
 
 # Remove limit (set to 0)
 NEW_MAX_TOTAL_STAKED="0" npm run config:set-max-total-staked:testnet
@@ -423,18 +386,15 @@ NEW_MAX_TOTAL_STAKED="0" npm run config:set-max-total-staked:testnet
 **Q: How to upgrade contract?**
 Upgrade scripts automatically detect ProxyAdmin type and use correct method to execute upgrade:
 ```bash
-# Upgrade Normal Staking contract (auto-deploy new implementation)
+# Upgrade Staking contract (auto-deploy new implementation)
 # Script automatically reads ProxyAdmin address from storage slot, no need to manually specify
-npm run upgrade:normal:testnet
+npm run upgrade:testnet
 
 # If ProxyAdmin address differs from current signer, can manually specify
-PROXY_ADMIN_ADDRESS="0x..." npm run upgrade:normal:testnet
+PROXY_ADMIN_ADDRESS="0x..." npm run upgrade:testnet
 
 # Use already deployed implementation contract for upgrade
-PROXY_ADMIN_ADDRESS="0x..." NEW_IMPLEMENTATION_ADDRESS="0x..." npm run upgrade:normal:testnet
-
-# Upgrade Premium Staking contract
-npm run upgrade:premium:testnet
+PROXY_ADMIN_ADDRESS="0x..." NEW_IMPLEMENTATION_ADDRESS="0x..." npm run upgrade:testnet
 ```
 
 **Upgrade Script Features**:
@@ -491,58 +451,18 @@ npm run tools:generate-types
 npm run tools:compare-contracts HSKStaking
 ```
 
-**Q: How to use Premium Staking whitelist functionality?**
-```bash
-# Add users to whitelist (batch, max 100)
-WHITELIST_ADDRESSES="0x123...,0x456..." npm run whitelist:add-batch:premium:testnet
-
-# Remove users from whitelist
-WHITELIST_ADDRESSES="0x123...,0x456..." npm run whitelist:remove-batch:premium:testnet
-
-# Query user whitelist status
-USER_ADDRESS="0x123..." npm run whitelist:check-user:premium:testnet
-
-# Toggle whitelist mode (enable/disable)
-ENABLE="true" npm run whitelist:toggle-mode:premium:testnet
-
-# Query whitelist configuration and user status
-USER_ADDRESS="0x123...,0x456..." npm run query:check-whitelist:premium:testnet
-```
-
-**Q: Premium Staking staking prompts not in whitelist?**
-```bash
-# 1. Check if user is in whitelist
-USER_ADDRESS="0x..." npm run whitelist:check-user:premium:testnet
-
-# 2. If not, contact admin to add to whitelist
-# Admin executes:
-WHITELIST_ADDRESSES="0x..." npm run whitelist:add-batch:premium:testnet
-
-# 3. Confirm whitelist mode is enabled
-npm run query:status:premium:testnet
-```
 
 ## 🎯 Contract Configuration
 
-### Normal Staking
+### Staking Configuration
 
 | Configuration | Value | Notes |
 |--------------|-------|-------|
-| Minimum Stake | 1 HSK | Can be modified by owner |
-| Maximum Total Staked | 10,000,000 HSK | Can be modified by owner (0 means unlimited) |
-| Annual Yield | 8% | Fixed at initialization |
+| Minimum Stake | 1000 HSK | Can be modified by owner |
+| Maximum Total Staked | 30,000,000 HSK | Can be modified by owner (0 means unlimited) |
+| Annual Yield | 5% | Fixed at initialization |
 | Lock Period | 365 days | Contract constant, cannot be modified |
 | Whitelist | Disabled | All users can stake |
-
-### Premium Staking
-
-| Configuration | Value | Notes |
-|--------------|-------|-------|
-| Minimum Stake | 500,000 HSK | Can be modified by owner |
-| Maximum Total Staked | 20,000,000 HSK | Can be modified by owner (0 means unlimited) |
-| Annual Yield | 16% | Fixed at initialization |
-| Lock Period | 365 days | Contract constant, cannot be modified |
-| Whitelist | Enabled | Only whitelisted users can stake |
 
 ## 🔐 Admin Operations
 
@@ -561,7 +481,7 @@ START_TIME="1735689600" npm run config:set-start-time:testnet
 END_TIME="1735689600" npm run config:set-end-time:testnet
 
 # Set minimum staking amount
-NEW_MIN_STAKE="5" npm run config:set-min-stake:testnet
+NEW_MIN_STAKE="1000" npm run config:set-min-stake:testnet
 
 # Set maximum total staked (0 means unlimited)
 NEW_MAX_TOTAL_STAKED="15000000" npm run config:set-max-total-staked:testnet

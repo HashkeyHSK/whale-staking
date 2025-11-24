@@ -1,9 +1,9 @@
 import hre from "hardhat";
-import { NORMAL_STAKING_CONFIG, PREMIUM_STAKING_CONFIG } from "../../scripts/shared/constants.js";
+import { STAKING_CONFIG } from "../../scripts/shared/constants.js";
 import { parseEther } from "./test-utils.js";
 
 // Get ethers from Hardhat runtime environment
-// Reference: scripts/normal/deploy.ts uses hre.network.connect()
+// Reference: scripts/staking/deploy.ts uses hre.network.connect()
 async function getEthers() {
   const { ethers } = await hre.network.connect();
   return ethers;
@@ -27,9 +27,9 @@ export interface TestFixture {
 }
 
 /**
- * Deploy Normal Staking contract for testing
+ * Deploy Staking contract for testing
  */
-export async function deployNormalStaking(): Promise<{
+export async function deployStaking(): Promise<{
   staking: any;
   implementation: any;
   proxy: any;
@@ -57,15 +57,15 @@ export async function deployNormalStaking(): Promise<{
   // This seems wrong. Let me check the deploy script...
   // Actually, in TransparentUpgradeableProxy, when _data is provided, it's called via delegatecall
   // So msg.sender should be the admin (deployer), not the proxy!
-  const minStake = ethers.parseEther(NORMAL_STAKING_CONFIG.minStakeAmount);
-  const maxTotalStaked = ethers.parseEther(NORMAL_STAKING_CONFIG.maxTotalStaked);
+  const minStake = ethers.parseEther(STAKING_CONFIG.minStakeAmount);
+  const maxTotalStaked = ethers.parseEther(STAKING_CONFIG.maxTotalStaked);
   const initData = implementation.interface.encodeFunctionData("initialize", [
     minStake,
-    NORMAL_STAKING_CONFIG.rewardRate,
+    STAKING_CONFIG.rewardRate,
     now - 3600, // Start 1 hour ago (so tests can run immediately)
     now + 7 * 86400, // End in 7 days
-    false, // Whitelist disabled
-    maxTotalStaked, // Max total staked (10 million HSK)
+    STAKING_CONFIG.whitelistMode, // Whitelist mode from config
+    maxTotalStaked, // Max total staked (30 million HSK)
   ]);
   
   // Deploy proxy
@@ -73,8 +73,8 @@ export async function deployNormalStaking(): Promise<{
   // The contract owner is set in initialize() via msg.sender
   // In TransparentUpgradeableProxy constructor, when _data is provided, initialize is called
   // with msg.sender = admin_ (the deployer)
-  const NormalProxy = await ethers.getContractFactory("NormalStakingProxy");
-  const proxy = await NormalProxy.deploy(
+  const StakingProxy = await ethers.getContractFactory("StakingProxy");
+  const proxy = await StakingProxy.deploy(
     implAddress,
     deployer.address, // This is the proxy admin, and also msg.sender in initialize
     initData
@@ -189,121 +189,6 @@ export async function deployNormalStaking(): Promise<{
   };
 }
 
-/**
- * Deploy Premium Staking contract for testing
- */
-export async function deployPremiumStaking(): Promise<{
-  staking: any;
-  implementation: any;
-  proxy: any;
-  deployer: any;
-  proxyAdmin: string;
-}> {
-  const ethers = await getEthers();
-  const [deployer] = await ethers.getSigners();
-  const now = Math.floor(Date.now() / 1000);
-  
-  // Deploy implementation
-  const HSKStaking = await ethers.getContractFactory("HSKStaking");
-  const implementation = await HSKStaking.deploy();
-  await implementation.waitForDeployment();
-  
-  const implAddress = await implementation.getAddress();
-  
-  // Prepare initialization data
-  const minStake = ethers.parseEther(PREMIUM_STAKING_CONFIG.minStakeAmount);
-  const maxTotalStaked = ethers.parseEther(PREMIUM_STAKING_CONFIG.maxTotalStaked);
-  const initData = implementation.interface.encodeFunctionData("initialize", [
-    minStake,
-    PREMIUM_STAKING_CONFIG.rewardRate,
-    now - 3600, // Start 1 hour ago (so tests can run immediately)
-    now + 7 * 86400, // End in 7 days
-    true, // Whitelist enabled
-    maxTotalStaked, // Max total staked (20 million HSK)
-  ]);
-  
-  // Deploy proxy
-  const PremiumProxy = await ethers.getContractFactory("PremiumStakingProxy");
-  const proxy = await PremiumProxy.deploy(
-    implAddress,
-    deployer.address,
-    initData
-  );
-  
-  await proxy.waitForDeployment();
-  const proxyAddress = await proxy.getAddress();
-  
-  // Verify proxy contract is actually deployed
-  let retries = 10;
-  let proxyCode = await ethers.provider.getCode(proxyAddress);
-  while (retries > 0 && (!proxyCode || proxyCode === "0x" || proxyCode.length < 100)) {
-    await new Promise(resolve => setTimeout(resolve, 50));
-    proxyCode = await ethers.provider.getCode(proxyAddress);
-    retries--;
-  }
-  
-  if (!proxyCode || proxyCode === "0x" || proxyCode.length < 100) {
-    throw new Error(`Proxy contract deployment failed. Code length: ${proxyCode.length} bytes. Address: ${proxyAddress}`);
-  }
-  
-  const staking = await ethers.getContractAt("HSKStaking", proxyAddress);
-  
-  // Verify we can read from the contract
-  try {
-    const minStake = await staking.minStakeAmount();
-    if (minStake === 0n) {
-      throw new Error("Contract not initialized correctly - minStakeAmount is 0");
-    }
-  } catch (error: any) {
-    throw new Error(`Failed to read from contract: ${error.message}`);
-  }
-  
-  // Verify proxy admin
-  const ADMIN_SLOT = "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";
-  const adminValue = await ethers.provider.getStorage(proxyAddress, ADMIN_SLOT);
-  const adminAddress = "0x" + adminValue.slice(-40);
-  const deployerAddress = await deployer.getAddress();
-  
-  if (adminAddress.toLowerCase() !== deployerAddress.toLowerCase()) {
-    if (adminAddress === "0x0000000000000000000000000000000000000000") {
-      console.warn(`⚠️  Proxy admin is zero address. This may cause issues with proxy operations.`);
-    } else {
-      console.log(`ℹ️  Proxy admin is ${adminAddress} (not deployer ${deployerAddress})`);
-      console.log(`   This is Hardhat EDR's default behavior. Admin will be used for upgrade operations.`);
-    }
-  }
-  
-  // Transfer ownership if needed
-  const owner = await staking.owner();
-  
-  if (owner.toLowerCase() === proxyAddress.toLowerCase()) {
-    try {
-      const transferTx = await staking.transferOwnership(deployerAddress);
-      await transferTx.wait();
-      
-      const acceptTx = await staking.connect(deployer).acceptOwnership();
-      await acceptTx.wait();
-      
-      const newOwner = await staking.owner();
-      if (newOwner.toLowerCase() !== deployerAddress.toLowerCase()) {
-        console.warn(`Warning: Failed to transfer ownership. Owner is still ${newOwner}`);
-      }
-    } catch (error) {
-      console.warn(`Warning: Could not transfer ownership from proxy to deployer: ${error}`);
-    }
-  }
-  
-  const finalAdminValue = await ethers.provider.getStorage(proxyAddress, ADMIN_SLOT);
-  const finalAdminAddress = "0x" + finalAdminValue.slice(-40);
-  
-  return {
-    staking,
-    implementation,
-    proxy,
-    deployer,
-    proxyAdmin: finalAdminAddress,
-  };
-}
 
 /**
  * Create a complete test fixture
@@ -311,7 +196,7 @@ export async function deployPremiumStaking(): Promise<{
 export async function createTestFixture(): Promise<TestFixture> {
   const ethers = await getEthers();
   const signers = await ethers.getSigners();
-  const contracts = await deployNormalStaking();
+  const contracts = await deployStaking();
   
   // Ensure deployer has enough balance by setting it directly
   const deployerAddress = await signers[0].getAddress();
@@ -328,42 +213,6 @@ export async function createTestFixture(): Promise<TestFixture> {
     } catch (e) {
       // If setBalance doesn't work, try to fund from another account
       // In Hardhat, the first account should already have funds
-    }
-  }
-  
-  return {
-    deployer: signers[0],
-    user1: signers[1],
-    user2: signers[2],
-    user3: signers[3],
-    admin: signers[0], // Same as deployer
-    staking: contracts.staking,
-    implementation: contracts.implementation,
-    proxy: contracts.proxy,
-  };
-}
-
-/**
- * Create a Premium Staking test fixture
- */
-export async function createPremiumTestFixture(): Promise<TestFixture> {
-  const ethers = await getEthers();
-  const signers = await ethers.getSigners();
-  const contracts = await deployPremiumStaking();
-  
-  // Ensure deployer has enough balance
-  const deployerAddress = await signers[0].getAddress();
-  const currentBalance = await ethers.provider.getBalance(deployerAddress);
-  const minBalance = parseEther("1000000000"); // 1 billion ETH
-  
-  if (currentBalance < minBalance) {
-    try {
-      await ethers.provider.send("hardhat_setBalance", [
-        deployerAddress,
-        "0x" + minBalance.toString(16)
-      ]);
-    } catch (e) {
-      // Fallback handled in fundAccount
     }
   }
   

@@ -235,7 +235,7 @@ console.log(`Staking 100 HSK, can get approximately ${reward} HSK rewards after 
 
 Backend scripts have implemented similar functionality, can refer to:
 - `scripts/shared/helpers.ts` - `getUserPositionIds` function
-- `scripts/normal/query/pending-reward.ts` - Complete implementation for querying pending rewards
+- `scripts/staking/query/pending-reward.ts` - Complete implementation for querying pending rewards
 
 ---
 

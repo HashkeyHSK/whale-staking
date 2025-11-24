@@ -242,7 +242,7 @@ export function expectAddressEqual(
  */
 export function calculateExpectedReward(
   amount: bigint,
-  rewardRate: bigint, // basis points (e.g., 800 = 8%)
+  rewardRate: bigint, // basis points (500 = 5%)
   timeElapsed: bigint // seconds
 ): bigint {
   const BASIS_POINTS = BigInt(10000);

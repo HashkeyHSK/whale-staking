@@ -235,7 +235,7 @@ console.log(`质押 100 HSK，365天后可获得约 ${reward} HSK 奖励`);
 
 后端脚本中已经实现了类似的功能，可以参考：
 - `scripts/shared/helpers.ts` - `getUserPositionIds` 函数
-- `scripts/normal/query/pending-reward.ts` - 查询待提取奖励的完整实现
+- `scripts/staking/query/pending-reward.ts` - 查询待提取奖励的完整实现
 
 ---
 

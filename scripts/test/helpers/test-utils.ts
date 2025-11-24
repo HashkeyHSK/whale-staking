@@ -91,7 +91,7 @@ export async function waitForTransactions(
  */
 export function calculateExpectedReward(
   amount: bigint,
-  rewardRate: bigint, // basis points (e.g., 800 = 8%)
+  rewardRate: 500 = 5%)
   timeElapsed: bigint // seconds
 ): bigint {
   const BASIS_POINTS = BigInt(10000);

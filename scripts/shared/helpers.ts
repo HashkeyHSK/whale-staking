@@ -1,28 +1,22 @@
-import { StakingType } from "./types.js";
 import { getAddresses } from "./constants.js";
 
 /**
  * Get staking contract address
+ * @param network - Network name
  */
-export function getStakingAddress(stakingType: StakingType, network: string): string {
+export function getStakingAddress(network: string): string {
   const addresses = getAddresses(network);
-  const address = stakingType === StakingType.NORMAL 
-    ? addresses.normalStaking 
-    : addresses.premiumStaking;
+  const address = addresses.staking;
   
   if (!address || address === "") {
-    const envVarName = stakingType === StakingType.NORMAL 
-      ? "NORMAL_STAKING_ADDRESS" 
-      : "PREMIUM_STAKING_ADDRESS";
-    
     throw new Error(
-      `${stakingType} staking address not configured for network: ${network}.\n\n` +
+      `Staking address not configured for network: ${network}.\n\n` +
       `Solutions (choose one):\n` +
-      `1. Set environment variable: ${envVarName}=0x... npm run rewards:add:testnet\n` +
-      `2. Add to .env file: ${envVarName}=0x...\n` +
+      `1. Set environment variable: STAKING_ADDRESS=0x... npm run rewards:add:testnet\n` +
+      `2. Add to .env file: STAKING_ADDRESS=0x...\n` +
       `3. Update ${network.toUpperCase()}_ADDRESSES in scripts/shared/constants.ts\n\n` +
       `Example:\n` +
-      `  ${envVarName}="0x123..." npm run rewards:add:testnet`
+      `  STAKING_ADDRESS="0x123..." npm run rewards:add:testnet`
     );
   }
   

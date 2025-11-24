@@ -24,8 +24,7 @@ const DEFAULT_CONTRACTS = [
   "HSKStaking",
   "StakingStorage",
   "StakingConstants",
-  "NormalStakingProxy",
-  "PremiumStakingProxy",
+  "StakingProxy",
 ];
 
 interface Artifact {

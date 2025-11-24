@@ -12,7 +12,7 @@ import {
   expectRevert,
 } from "../helpers/test-utils.js";
 
-describe("Normal Staking - Emergency Scenarios", () => {
+describe("Staking - Emergency Scenarios", () => {
   let fixture: Awaited<ReturnType<typeof createTestFixture>>;
 
   before(async () => {

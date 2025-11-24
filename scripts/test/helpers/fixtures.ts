@@ -1,5 +1,5 @@
 import hre from "hardhat";
-import { NORMAL_STAKING_CONFIG, PREMIUM_STAKING_CONFIG } from "../../shared/constants.js";
+import { STAKING_CONFIG } from "../../shared/constants.js";
 
 const { ethers } = hre;
 
@@ -14,8 +14,7 @@ export interface TestFixture {
   user1: ethers.Signer;
   user2: ethers.Signer;
   admin: ethers.Signer;
-  normalStaking: ethers.Contract;
-  premiumStaking: ethers.Contract;
+  staking: ethers.Contract;
 }
 
 /**
@@ -42,80 +41,52 @@ export async function getTestSigners(): Promise<{
  * Deploy test contracts
  */
 export async function deployTestContracts(): Promise<{
-  normalStaking: ethers.Contract;
-  premiumStaking: ethers.Contract;
-  normalImplementation: ethers.Contract;
-  premiumImplementation: ethers.Contract;
+  staking: ethers.Contract;
+  implementation: ethers.Contract;
 }> {
   const [deployer] = await ethers.getSigners();
   const now = Math.floor(Date.now() / 1000);
   
-  // Deploy implementations
+  // Deploy implementation
   const HSKStaking = await ethers.getContractFactory("HSKStaking");
-  const normalImpl = await HSKStaking.deploy();
-  const premiumImpl = await HSKStaking.deploy();
+  const impl = await HSKStaking.deploy();
   
-  await normalImpl.waitForDeployment();
-  await premiumImpl.waitForDeployment();
+  await impl.waitForDeployment();
   
-  const normalImplAddress = await normalImpl.getAddress();
-  const premiumImplAddress = await premiumImpl.getAddress();
+  const implAddress = await impl.getAddress();
   
   // Prepare initialization data
-  const normalMinStake = ethers.parseEther(NORMAL_STAKING_CONFIG.minStakeAmount);
-  const premiumMinStake = ethers.parseEther(PREMIUM_STAKING_CONFIG.minStakeAmount);
-  const normalMaxTotalStaked = ethers.parseEther(NORMAL_STAKING_CONFIG.maxTotalStaked);
-  const premiumMaxTotalStaked = ethers.parseEther(PREMIUM_STAKING_CONFIG.maxTotalStaked);
+  const minStake = ethers.parseEther(STAKING_CONFIG.minStakeAmount);
+  const maxTotalStaked = ethers.parseEther(STAKING_CONFIG.maxTotalStaked);
   
-  const normalInitData = normalImpl.interface.encodeFunctionData("initialize", [
-    normalMinStake,
-    NORMAL_STAKING_CONFIG.rewardRate,
+  const initData = impl.interface.encodeFunctionData("initialize", [
+    minStake,
+    STAKING_CONFIG.rewardRate,
     now + 86400, // Start in 1 day
     now + 365 * 86400, // End in 1 year
-    false, // Whitelist disabled
-    normalMaxTotalStaked, // Max total staked (10 million HSK)
+    STAKING_CONFIG.whitelistMode, // Whitelist mode from config
+    maxTotalStaked, // Max total staked (30 million HSK)
   ]);
   
-  const premiumInitData = premiumImpl.interface.encodeFunctionData("initialize", [
-    premiumMinStake,
-    PREMIUM_STAKING_CONFIG.rewardRate,
-    now + 86400, // Start in 1 day
-    now + 365 * 86400, // End in 1 year
-    true, // Whitelist enabled
-    premiumMaxTotalStaked, // Max total staked (20 million HSK)
-  ]);
+  // Deploy proxy
+  const StakingProxy = await ethers.getContractFactory("StakingProxy");
   
-  // Deploy proxies
-  const NormalProxy = await ethers.getContractFactory("NormalStakingProxy");
-  const PremiumProxy = await ethers.getContractFactory("PremiumStakingProxy");
-  
-  const normalProxy = await NormalProxy.deploy(
-    normalImplAddress,
+  const proxy = await StakingProxy.deploy(
+    implAddress,
     deployer.address,
-    normalInitData
+    initData
   );
   
-  const premiumProxy = await PremiumProxy.deploy(
-    premiumImplAddress,
-    deployer.address,
-    premiumInitData
-  );
+  await proxy.waitForDeployment();
   
-  await normalProxy.waitForDeployment();
-  await premiumProxy.waitForDeployment();
+  const proxyAddress = await proxy.getAddress();
   
-  const normalProxyAddress = await normalProxy.getAddress();
-  const premiumProxyAddress = await premiumProxy.getAddress();
-  
-  // Connect to contracts through proxy
-  const normalStaking = HSKStaking.attach(normalProxyAddress);
-  const premiumStaking = HSKStaking.attach(premiumProxyAddress);
+  // Connect to contract through proxy
+  const staking = HSKStaking.attach(proxyAddress);
   
   return {
-    normalStaking,
-    premiumStaking,
-    normalImplementation: normalImpl,
-    premiumImplementation: premiumImpl,
+    staking,
+    implementation: impl,
   };
 }
 
@@ -128,8 +99,7 @@ export async function createTestFixture(): Promise<TestFixture> {
   
   return {
     ...signers,
-    normalStaking: contracts.normalStaking,
-    premiumStaking: contracts.premiumStaking,
+    staking: contracts.staking,
   };
 }
 

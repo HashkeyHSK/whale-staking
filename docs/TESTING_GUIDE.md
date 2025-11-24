@@ -2,7 +2,7 @@
 
 ## 📋 Objective
 
-Write complete test cases for the Whale Staking project, covering all functionality of Normal Staking and Premium Staking, ensuring contract security and correctness.
+Write complete test cases for the Whale Staking project, covering all functionality of Staking and , ensuring contract security and correctness.
 
 ## ⚠️ Important Notes - Contract Architecture
 
@@ -13,7 +13,7 @@ Write complete test cases for the Whale Staking project, covering all functional
    - `StakingStorage.sol` - Storage layer (inherits Initializable, Ownable2StepUpgradeable)
    - `StakingConstants.sol` - Constant definitions contract (LOCK_PERIOD = 365 days)
    - `IStake.sol` - Interface definition
-   - `NormalStakingProxy.sol` / `PremiumStakingProxy.sol` - Proxy contracts (Transparent Proxy)
+   - `StakingProxy.sol` / `.sol` - Proxy contracts (Transparent Proxy)
 
 2. **Proxy Pattern**: Transparent Proxy (using OpenZeppelin's `TransparentUpgradeableProxy`)
    - Can independently upgrade Normal and Premium staking pools
@@ -26,8 +26,8 @@ Write complete test cases for the Whale Staking project, covering all functional
 4. **Lock Period**: Fixed 365 days (`LOCK_PERIOD = 365 days`), defined in contract constants, cannot be dynamically modified
 
 5. **Reward Rate**: Configured at contract level (`rewardRate` state variable), all positions share the same reward rate
-   - Normal Staking: 800 basis points (8% APY)
-   - Premium Staking: 1600 basis points (16% APY)
+   - Staking: 500 basis points (5% APY)
+   - : 1600 basis points (16% APY)
    - `BASIS_POINTS = 10000` (100% = 10000)
 
 6. **Position Structure**: 
@@ -40,8 +40,8 @@ Write complete test cases for the Whale Staking project, covering all functional
    - ⚠️ **Note**: Position does not contain `lockPeriod` and `rewardRate`, these are contract-level configurations
 
 7. **Whitelist Mode**:
-   - Normal Staking: Whitelist mode disabled (`onlyWhitelistCanStake = false`)
-   - Premium Staking: Whitelist mode enabled (`onlyWhitelistCanStake = true`)
+   - Staking: Whitelist mode disabled (`onlyWhitelistCanStake = false`)
+   - : Whitelist mode enabled (`onlyWhitelistCanStake = true`)
 
 ### Key Contract Functions
 
@@ -111,16 +111,16 @@ Write complete test cases for the Whale Staking project, covering all functional
 
 **Parameter Description**:
 - `_minStakeAmount`: Minimum staking amount (wei unit)
-  - Normal Staking: 1 HSK = `1e18` wei
-  - Premium Staking: 500,000 HSK = `500000e18` wei
+  - Staking: 1 HSK = `1e18` wei
+  - : 500,000 HSK = `500000e18` wei
 - `_rewardRate`: Annual yield rate (basis points)
-  - Normal Staking: 800 (8% APY)
-  - Premium Staking: 1600 (16% APY)
+  - Staking: 500 (5% APY)
+  - : 1600 (16% APY)
 - `_stakeStartTime`: Staking start time (Unix timestamp)
 - `_stakeEndTime`: Staking end time (Unix timestamp)
 - `_whitelistMode`: Whitelist mode
-  - ✅ **Normal Staking**: `false` (all users can stake)
-  - ✅ **Premium Staking**: `true` (only whitelisted users can stake)
+  - ✅ **Staking**: `false` (all users can stake)
+  - ✅ ****: `true` (only whitelisted users can stake)
 
 ---
 
@@ -128,7 +128,7 @@ Write complete test cases for the Whale Staking project, covering all functional
 
 ```
 test/
-├── normal/                      # Normal Staking unit tests (✅ Completed)
+├── normal/                      # Staking unit tests (✅ Completed)
 │   ├── deployment.test.ts       # Deployment tests
 │   ├── staking.test.ts          # Staking functionality tests
 │   ├── rewards.test.ts           # Reward functionality tests
@@ -138,7 +138,7 @@ test/
 │   ├── emergency.test.ts        # Emergency withdrawal functionality tests
 │   └── edge-cases.test.ts      # Boundary conditions and error handling tests
 ├── e2e/                         # E2E tests (✅ Completed)
-│   ├── normal-user-journey.test.ts      # Normal Staking E2E tests
+│   ├── normal-user-journey.test.ts      # Staking E2E tests
 │   └── emergency-scenarios.test.ts      # Emergency scenario tests
 ├── performance/                 # Performance tests (✅ Completed)
 │   ├── gas-optimization.test.ts         # Gas optimization tests
@@ -159,12 +159,12 @@ scripts/test/                    # Integration test scripts (✅ Completed)
 ```
 
 **Notes**:
-- ✅ Normal Staking unit tests completed (8 test files, 103 test cases all passing)
+- ✅ Staking unit tests completed (8 test files, 103 test cases all passing)
 - ✅ E2E tests completed (2 test files)
 - ✅ Performance tests completed (3 test files)
 - ✅ Test helper functions completed (fixtures.ts, test-utils.ts, state-sync.ts)
 - ✅ Integration test scripts completed (3 test files)
-- ⏳ Premium Staking unit tests pending (planned)
+- ⏳  unit tests pending (planned)
 
 **Test Framework**:
 - Uses Node.js native test framework (`node:test`)
@@ -175,7 +175,7 @@ scripts/test/                    # Integration test scripts (✅ Completed)
 
 ## 📊 Test Case Mapping Table
 
-### Normal Staking Unit Tests (✅ Completed)
+### Staking Unit Tests (✅ Completed)
 
 **Test Results**: 103 test cases all passing ✅
 
@@ -185,19 +185,19 @@ scripts/test/                    # Integration test scripts (✅ Completed)
 - All tests verify execution results through events in transaction receipts, rather than directly querying state
 - If events don't exist but transaction succeeds, test accepts as passing (Hardhat EDR limitation)
 
-#### 1. Deployment Tests (`test/normal/deployment.test.ts`) ✅
+#### 1. Deployment Tests (`test/staking/deployment.test.ts`) ✅
 
 | Test Case | Status | Description |
 |-----------|--------|-------------|
-| Should correctly deploy Normal Staking contract | ✅ Completed | Verify contract deployment success |
-| Should correctly initialize contract parameters | ✅ Completed | Verify minStakeAmount = 1 HSK, rewardRate = 8% |
+| Should correctly deploy Staking contract | ✅ Completed | Verify contract deployment success |
+| Should correctly initialize contract parameters | ✅ Completed | Verify minStakeAmount = 1000 HSK, rewardRate = 5% |
 | Should correctly set whitelist mode to disabled | ✅ Completed | Verify onlyWhitelistCanStake = false |
 | Should correctly set staking time window | ✅ Completed | Verify stakeStartTime and stakeEndTime |
 | Should correctly initialize state variables | ✅ Completed | Verify totalStaked = 0, nextPositionId = 0 |
 | Should reject invalid initialization parameters | ✅ Completed | Test endTime < startTime, etc. |
 | Should correctly set owner | ✅ Completed | Verify owner address is correct |
 
-#### 2. Staking Functionality Tests (`test/normal/staking.test.ts`) ✅
+#### 2. Staking Functionality Tests (`test/staking/staking.test.ts`) ✅
 
 | Test Case | Status | Description |
 |-----------|--------|-------------|
@@ -214,7 +214,7 @@ scripts/test/                    # Integration test scripts (✅ Completed)
 | Should support multiple users staking simultaneously | ✅ Completed | Test concurrent staking scenarios (using event verification) |
 | Should support same user staking multiple times | ✅ Completed | Test user creating multiple positions |
 
-#### 3. Reward Functionality Tests (`test/normal/rewards.test.ts`) ✅
+#### 3. Reward Functionality Tests (`test/staking/rewards.test.ts`) ✅
 
 | Test Case | Status | Description |
 |-----------|--------|-------------|
@@ -232,7 +232,7 @@ scripts/test/                    # Integration test scripts (✅ Completed)
 | Should correctly calculate rewards for multiple positions | ✅ Completed | Test reward calculation for user's multiple positions (using event verification and error tolerance) |
 | Should correctly handle insufficient reward pool balance | ✅ Completed | Test reward pool balance < pending rewards |
 
-#### 4. Unstaking Functionality Tests (`test/normal/unstaking.test.ts`) ✅
+#### 4. Unstaking Functionality Tests (`test/staking/unstaking.test.ts`) ✅
 
 | Test Case | Status | Description |
 |-----------|--------|-------------|
@@ -248,7 +248,7 @@ scripts/test/                    # Integration test scripts (✅ Completed)
 | Should reject non-existent position | ✅ Completed | Test invalid positionId |
 | Should correctly handle multiple position unstaking | ✅ Completed | Test user unstaking multiple positions |
 
-#### 5. Reward Pool Management Tests (`test/normal/reward-pool.test.ts`) ✅
+#### 5. Reward Pool Management Tests (`test/staking/reward-pool.test.ts`) ✅
 
 | Test Case | Status | Description |
 |-----------|--------|-------------|
@@ -261,7 +261,7 @@ scripts/test/                    # Integration test scripts (✅ Completed)
 | Should reject withdrawing more than excess | ✅ Completed | Test withdrawal amount limit |
 | Should reject non-owner withdrawing rewards | ✅ Completed | Test permission check |
 
-#### 6. Configuration Management Tests (`test/normal/config.test.ts`) ✅
+#### 6. Configuration Management Tests (`test/staking/config.test.ts`) ✅
 
 | Test Case | Status | Description |
 |-----------|--------|-------------|
@@ -284,7 +284,7 @@ scripts/test/                    # Integration test scripts (✅ Completed)
 | Should reject non-owner enabling emergency mode | ✅ Completed | Test permission check |
 | Emergency mode should be irreversible | ✅ Completed | Test cannot disable after enabling |
 
-#### 7. Emergency Withdrawal Functionality Tests (`test/normal/emergency.test.ts`) ✅
+#### 7. Emergency Withdrawal Functionality Tests (`test/staking/emergency.test.ts`) ✅
 
 | Test Case | Status | Description |
 |-----------|--------|-------------|
@@ -299,7 +299,7 @@ scripts/test/                    # Integration test scripts (✅ Completed)
 | Should reject already unstaked position | ✅ Completed | Test already unstaked position cannot withdraw again |
 | Should correctly update totalPendingRewards | ✅ Completed | Verify total pending rewards update |
 
-#### 8. Boundary Conditions and Error Handling Tests (`test/normal/edge-cases.test.ts`) ✅
+#### 8. Boundary Conditions and Error Handling Tests (`test/staking/edge-cases.test.ts`) ✅
 
 | Test Case | Status | Description |
 |-----------|--------|-------------|
@@ -315,13 +315,13 @@ scripts/test/                    # Integration test scripts (✅ Completed)
 
 ---
 
-### Premium Staking Unit Tests (⏳ Pending)
+###  Unit Tests (⏳ Pending)
 
-#### 1. Deployment Tests (`test/premium/deployment.test.ts`)
+#### 1. Deployment Tests (`/deployment.test.ts`)
 
 | Test Case | Status | Description |
 |-----------|--------|-------------|
-| Should correctly deploy Premium Staking contract | ⏳ Pending | Verify contract deployment success |
+| Should correctly deploy  contract | ⏳ Pending | Verify contract deployment success |
 | Should correctly initialize contract parameters | ⏳ Pending | Verify minStakeAmount = 500,000 HSK, rewardRate = 16% |
 | Should correctly set whitelist mode to enabled | ⏳ Pending | Verify onlyWhitelistCanStake = true |
 | Should correctly set staking time window | ⏳ Pending | Verify stakeStartTime and stakeEndTime |
@@ -329,7 +329,7 @@ scripts/test/                    # Integration test scripts (✅ Completed)
 | Should reject invalid initialization parameters | ⏳ Pending | Test endTime < startTime, etc. |
 | Should correctly set owner | ⏳ Pending | Verify owner address is correct |
 
-#### 2. Whitelist Functionality Tests (`test/premium/whitelist.test.ts`)
+#### 2. Whitelist Functionality Tests (`/whitelist.test.ts`)
 
 | Test Case | Status | Description |
 |-----------|--------|-------------|
@@ -346,7 +346,7 @@ scripts/test/                    # Integration test scripts (✅ Completed)
 | Non-whitelisted users should not be able to stake | ⏳ Pending | Test non-whitelisted user staking fails |
 | Should correctly handle staking after whitelist mode disabled | ⏳ Pending | Test all users can stake after disabling whitelist mode |
 
-#### 3. Staking Functionality Tests (`test/premium/staking.test.ts`)
+#### 3. Staking Functionality Tests (`/staking.test.ts`)
 
 | Test Case | Status | Description |
 |-----------|--------|-------------|
@@ -361,7 +361,7 @@ scripts/test/                    # Integration test scripts (✅ Completed)
 | Should reject staking in emergency mode | ⏳ Pending | Test staking fails after emergencyMode |
 | Should support multiple whitelisted users staking simultaneously | ⏳ Pending | Test concurrent staking scenarios |
 
-#### 4. Reward Functionality Tests (`test/premium/rewards.test.ts`)
+#### 4. Reward Functionality Tests (`/rewards.test.ts`)
 
 | Test Case | Status | Description |
 |-----------|--------|-------------|
@@ -373,7 +373,7 @@ scripts/test/                    # Integration test scripts (✅ Completed)
 | Should reject claiming when paused | ⏳ Pending | Test claiming fails after pause |
 | Should reject claiming in emergency mode | ⏳ Pending | Test claiming fails after emergencyMode |
 
-#### 5. Unstaking Functionality Tests (`test/premium/unstaking.test.ts`)
+#### 5. Unstaking Functionality Tests (`/unstaking.test.ts`)
 
 | Test Case | Status | Description |
 |-----------|--------|-------------|
@@ -385,7 +385,7 @@ scripts/test/                    # Integration test scripts (✅ Completed)
 | Should correctly mark position as unstaked | ⏳ Pending | Verify isUnstaked = true |
 | Should correctly trigger PositionUnstaked event | ⏳ Pending | Verify event parameters are correct |
 
-#### 6. Configuration Management Tests (`test/premium/config.test.ts`)
+#### 6. Configuration Management Tests (`/config.test.ts`)
 
 | Test Case | Status | Description |
 |-----------|--------|-------------|
@@ -397,7 +397,7 @@ scripts/test/                    # Integration test scripts (✅ Completed)
 | Owner should be able to enable emergency mode | ⏳ Pending | Verify enableEmergencyMode succeeds |
 | Should reject non-owner configuration operations | ⏳ Pending | Test permission check |
 
-#### 7. Emergency Withdrawal Functionality Tests (`test/premium/emergency.test.ts`)
+#### 7. Emergency Withdrawal Functionality Tests (`/emergency.test.ts`)
 
 | Test Case | Status | Description |
 |-----------|--------|-------------|
@@ -415,14 +415,14 @@ scripts/test/                    # Integration test scripts (✅ Completed)
 | Test File | Status | Description |
 |-----------|--------|-------------|
 | `scripts/test/integration/deploy-test.ts` | ✅ Completed | Deployment integration tests (Normal + Premium) |
-| `scripts/test/integration/stake-test.ts` | ✅ Completed | Staking operation integration tests (Normal Staking) |
-| `scripts/test/integration/whitelist-test.ts` | ✅ Completed | Whitelist functionality integration tests (Premium Staking) |
+| `scripts/test/integration/stake-test.ts` | ✅ Completed | Staking operation integration tests (Staking) |
+| `scripts/test/integration/whitelist-test.ts` | ✅ Completed | Whitelist functionality integration tests () |
 
 ---
 
 ### E2E Tests (✅ Completed)
 
-#### 1. Normal Staking E2E Tests (`test/e2e/normal-user-journey.test.ts`) ✅
+#### 1. Staking E2E Tests (`test/e2e/normal-user-journey.test.ts`) ✅
 
 | Test Case | Status | Description |
 |-----------|--------|-------------|
@@ -430,7 +430,7 @@ scripts/test/                    # Integration test scripts (✅ Completed)
 | Multi-user concurrent scenarios | ✅ Completed | Test multiple users operating simultaneously (using event verification and error tolerance) |
 | Long-running scenarios | ✅ Completed | Test state after long runtime (using event verification and error tolerance) |
 
-#### 2. Premium Staking E2E Tests (`test/e2e/premium-user-journey.test.ts`)
+#### 2.  E2E Tests (`test/e2e/premium-user-journey.test.ts`)
 
 | Test Case | Status | Description |
 |-----------|--------|-------------|
@@ -503,7 +503,7 @@ scripts/test/                    # Integration test scripts (✅ Completed)
 
 ```
 test/
-├── normal/                      # Normal Staking unit tests
+├── normal/                      # Staking unit tests
 │   ├── deployment.test.ts
 │   ├── staking.test.ts
 │   ├── rewards.test.ts
@@ -512,7 +512,7 @@ test/
 │   ├── config.test.ts
 │   ├── emergency.test.ts
 │   └── edge-cases.test.ts
-├── premium/                     # Premium Staking unit tests
+├── premium/                     #  unit tests
 │   ├── deployment.test.ts
 │   ├── whitelist.test.ts
 │   ├── staking.test.ts
@@ -533,93 +533,93 @@ test/
     └── test-utils.ts            # Test utilities (can reuse scripts/test/helpers/test-utils.ts)
 ```
 
-### Step 2: Implement Normal Staking Unit Tests (⏳ Pending)
+### Step 2: Implement Staking Unit Tests (⏳ Pending)
 
-1. **Deployment Tests** (`test/normal/deployment.test.ts`)
+1. **Deployment Tests** (`test/staking/deployment.test.ts`)
    - Test contract deployment and initialization
    - Test initialization parameter validation
    - Test state variable initialization
 
-2. **Staking Functionality Tests** (`test/normal/staking.test.ts`)
+2. **Staking Functionality Tests** (`test/staking/staking.test.ts`)
    - Test normal staking flow
    - Test boundary conditions (minimum amount, time window)
    - Test permission checks (pause, emergency mode)
    - Test event triggering
 
-3. **Reward Functionality Tests** (`test/normal/rewards.test.ts`)
+3. **Reward Functionality Tests** (`test/staking/rewards.test.ts`)
    - Test reward calculation
    - Test reward accumulation
    - Test reward claiming
    - Test boundary conditions
 
-4. **Unstaking Functionality Tests** (`test/normal/unstaking.test.ts`)
+4. **Unstaking Functionality Tests** (`test/staking/unstaking.test.ts`)
    - Test normal unstaking flow
    - Test lock period checks
    - Test reward and principal return
    - Test state updates
 
-5. **Reward Pool Management Tests** (`test/normal/reward-pool.test.ts`)
+5. **Reward Pool Management Tests** (`test/staking/reward-pool.test.ts`)
    - Test adding reward pool
    - Test withdrawing excess rewards
    - Test permission checks
 
-6. **Configuration Management Tests** (`test/normal/config.test.ts`)
+6. **Configuration Management Tests** (`test/staking/config.test.ts`)
    - Test pause/resume
    - Test time settings
    - Test minimum staking amount settings
    - Test emergency mode enabling
 
-7. **Emergency Withdrawal Functionality Tests** (`test/normal/emergency.test.ts`)
+7. **Emergency Withdrawal Functionality Tests** (`test/staking/emergency.test.ts`)
    - Test withdrawal in emergency mode
    - Test only withdrawing principal
    - Test state updates
 
-8. **Boundary Conditions and Error Handling Tests** (`test/normal/edge-cases.test.ts`)
+8. **Boundary Conditions and Error Handling Tests** (`test/staking/edge-cases.test.ts`)
    - Test boundary values
    - Test error situations
    - Test reentrancy attacks
    - Test concurrent scenarios
 
-### Step 3: Implement Premium Staking Unit Tests (⏳ Pending)
+### Step 3: Implement  Unit Tests (⏳ Pending)
 
-1. **Deployment Tests** (`test/premium/deployment.test.ts`)
+1. **Deployment Tests** (`/deployment.test.ts`)
    - Test contract deployment and initialization
    - Test whitelist mode enabling
    - Test initialization parameter validation
 
-2. **Whitelist Functionality Tests** (`test/premium/whitelist.test.ts`)
+2. **Whitelist Functionality Tests** (`/whitelist.test.ts`)
    - Test batch adding whitelist
    - Test batch removing whitelist
    - Test whitelist mode toggling
    - Test permission checks
 
-3. **Staking Functionality Tests** (`test/premium/staking.test.ts`)
+3. **Staking Functionality Tests** (`/staking.test.ts`)
    - Test whitelisted user staking
    - Test non-whitelisted user rejection
    - Test staking after whitelist mode disabled
 
-4. **Reward Functionality Tests** (`test/premium/rewards.test.ts`)
+4. **Reward Functionality Tests** (`/rewards.test.ts`)
    - Test 16% APY reward calculation
    - Test reward accumulation and claiming
 
-5. **Unstaking Functionality Tests** (`test/premium/unstaking.test.ts`)
+5. **Unstaking Functionality Tests** (`/unstaking.test.ts`)
    - Test normal unstaking flow
    - Test lock period checks
 
-6. **Configuration Management Tests** (`test/premium/config.test.ts`)
+6. **Configuration Management Tests** (`/config.test.ts`)
    - Test configuration management functionality
    - Test permission checks
 
-7. **Emergency Withdrawal Functionality Tests** (`test/premium/emergency.test.ts`)
+7. **Emergency Withdrawal Functionality Tests** (`/emergency.test.ts`)
    - Test withdrawal in emergency mode
 
 ### Step 4: Implement E2E Tests (⏳ Pending)
 
-1. **Normal Staking E2E Tests** (`test/e2e/normal-user-journey.test.ts`)
+1. **Staking E2E Tests** (`test/e2e/normal-user-journey.test.ts`)
    - Complete user journey tests
    - Multi-user concurrent scenarios
 
-2. **Premium Staking E2E Tests** (`test/e2e/premium-user-journey.test.ts`)
+2. ** E2E Tests** (`test/e2e/premium-user-journey.test.ts`)
    - Complete user journey tests (including whitelist management)
    - Whitelist management flow
 
@@ -646,8 +646,8 @@ test/
 ### Step 1: Create Test Directory Structure
 
 ```bash
-mkdir -p test/normal
-mkdir -p test/premium
+mkdir -p test/staking
+mkdir -p 
 mkdir -p test/e2e
 mkdir -p test/performance
 mkdir -p test/helpers
@@ -660,30 +660,30 @@ If need to create independent helper functions under test/ directory:
 1. Create `test/helpers/fixtures.ts` (can reuse `scripts/test/helpers/fixtures.ts`)
 2. Create `test/helpers/test-utils.ts` (can reuse `scripts/test/helpers/test-utils.ts`)
 
-### Step 3: Implement Normal Staking Unit Tests
+### Step 3: Implement Staking Unit Tests
 
 Implement test files one by one according to test case mapping table:
 
-1. `test/normal/deployment.test.ts`
-2. `test/normal/staking.test.ts`
-3. `test/normal/rewards.test.ts`
-4. `test/normal/unstaking.test.ts`
-5. `test/normal/reward-pool.test.ts`
-6. `test/normal/config.test.ts`
-7. `test/normal/emergency.test.ts`
-8. `test/normal/edge-cases.test.ts`
+1. `test/staking/deployment.test.ts`
+2. `test/staking/staking.test.ts`
+3. `test/staking/rewards.test.ts`
+4. `test/staking/unstaking.test.ts`
+5. `test/staking/reward-pool.test.ts`
+6. `test/staking/config.test.ts`
+7. `test/staking/emergency.test.ts`
+8. `test/staking/edge-cases.test.ts`
 
-### Step 4: Implement Premium Staking Unit Tests
+### Step 4: Implement  Unit Tests
 
 Implement test files one by one according to test case mapping table:
 
-1. `test/premium/deployment.test.ts`
-2. `test/premium/whitelist.test.ts`
-3. `test/premium/staking.test.ts`
-4. `test/premium/rewards.test.ts`
-5. `test/premium/unstaking.test.ts`
-6. `test/premium/config.test.ts`
-7. `test/premium/emergency.test.ts`
+1. `/deployment.test.ts`
+2. `/whitelist.test.ts`
+3. `/staking.test.ts`
+4. `/rewards.test.ts`
+5. `/unstaking.test.ts`
+6. `/config.test.ts`
+7. `/emergency.test.ts`
 
 ### Step 5: Implement E2E Tests
 
@@ -705,8 +705,8 @@ Add test-related npm scripts:
 {
   "scripts": {
     "test": "hardhat test",
-    "test:normal": "hardhat test test/normal",
-    "test:premium": "hardhat test test/premium",
+    "test:normal": "hardhat test test/staking",
+    "test:premium": "hardhat test ",
     "test:e2e": "hardhat test test/e2e",
     "test:performance": "hardhat test test/performance",
     "test:coverage": "hardhat coverage"
@@ -727,7 +727,7 @@ After completion, please verify the following:
 - [x] Directory structure conforms to design specifications ✅
 - [x] All files have correct import paths ✅
 
-### Normal Staking Unit Test Verification
+### Staking Unit Test Verification
 
 - [x] Deployment tests pass (7 test cases) ✅
 - [x] Staking functionality tests pass (13 test cases) ✅
@@ -738,7 +738,7 @@ After completion, please verify the following:
 - [x] Emergency withdrawal functionality tests pass (10 test cases) ✅
 - [x] Boundary conditions and error handling tests pass (9 test cases) ✅
 
-### Premium Staking Unit Test Verification
+###  Unit Test Verification
 
 - [ ] Deployment tests pass (7 test cases)
 - [ ] Whitelist functionality tests pass (13 test cases)
@@ -750,8 +750,8 @@ After completion, please verify the following:
 
 ### E2E Test Verification
 
-- [x] Normal Staking E2E tests pass (3 test cases) ✅
-- [ ] Premium Staking E2E tests pass (3 test cases)
+- [x] Staking E2E tests pass (3 test cases) ✅
+- [ ]  E2E tests pass (3 test cases)
 - [x] Emergency scenario tests pass (3 test cases) ✅
 
 ### Performance Test Verification
@@ -802,7 +802,7 @@ After completion, please verify the following:
 ### 2. Test Case Naming Standards
 
 - Use descriptive test case names
-- Use descriptive names (e.g., "Should correctly deploy Normal Staking contract")
+- Use descriptive names (e.g., "Should correctly deploy Staking contract")
 - Use `test()` or `describe()` to organize test cases (Node.js native test framework)
 
 ### 3. Test Structure Standards
@@ -813,14 +813,14 @@ import { strict as assert } from "node:assert";
 import { createTestFixture, advanceTime, fundAccount } from "../helpers/fixtures.js";
 import { expectBigIntEqual, parseEther, getEvent } from "../helpers/test-utils.js";
 
-describe("Normal Staking - Deployment", () => {
+describe("Staking - Deployment", () => {
   let fixture: Awaited<ReturnType<typeof createTestFixture>>;
   
   before(async () => {
     fixture = await createTestFixture();
   });
   
-  test("Should correctly deploy Normal Staking contract", async () => {
+  test("Should correctly deploy Staking contract", async () => {
     // Test code
     // Use event verification priority strategy (Solution 3)
     const tx = await fixture.staking.connect(fixture.admin).pause();
@@ -877,18 +877,18 @@ This ensures tests run stably in Hardhat EDR environment while verifying correct
 
 **Total**: Approximately 150+ test cases
 
-- **Normal Staking Unit Tests**: 89 test cases
-- **Premium Staking Unit Tests**: 57 test cases
+- **Staking Unit Tests**: 89 test cases
+- ** Unit Tests**: 57 test cases
 - **E2E Tests**: 9 test cases
 - **Performance Tests**: 12 test cases
 
 **Current Completion Status**:
-- ✅ Normal Staking unit tests: 8 test files, 103 test cases (all passing)
+- ✅ Staking unit tests: 8 test files, 103 test cases (all passing)
 - ✅ E2E tests: 2 test files (completed)
 - ✅ Performance tests: 3 test files (completed)
 - ✅ Test helper tools: 3 files (completed)
 - ✅ Integration tests: 3 test files (completed)
-- ⏳ Premium Staking unit tests: 0/7 test files (pending)
+- ⏳  unit tests: 0/7 test files (pending)
 
 **Test Results Statistics**:
 - **Total Tests**: 103

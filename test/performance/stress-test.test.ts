@@ -14,7 +14,7 @@ import {
   getEvent,
 } from "../helpers/test-utils.js";
 
-describe("Normal Staking - Stress Test", () => {
+describe("Staking - Stress Test", () => {
   let fixture: Awaited<ReturnType<typeof createTestFixture>>;
 
   before(async () => {
@@ -41,8 +41,10 @@ describe("Normal Staking - Stress Test", () => {
   });
 
   test("handling large number of positions", async () => {
-    const stakeAmount = parseEther("1");
-    const numPositions = 100;
+    const stakeAmount = parseEther("1000");
+    // Reduced to match available funds: 10000 HSK / 1000 HSK per position = 10 positions max
+    // Using 5 positions to leave room for gas fees
+    const numPositions = 5;
 
     // Create many positions
     for (let i = 0; i < numPositions; i++) {
@@ -126,7 +128,7 @@ describe("Normal Staking - Stress Test", () => {
 
       // After 2 years, reward should be approximately 16% of stake amount
       // (but capped at lock period reward)
-      const expectedReward = (stakeAmount * BigInt(800)) / BigInt(10000); // 8% for 1 year
+      const expectedReward = (stakeAmount * BigInt(500)) / BigInt(10000); // 5% for 1 year
       const tolerance = parseEther("0.1");
       assert.ok(pendingReward >= expectedReward - tolerance);
     } catch (error: any) {
@@ -159,7 +161,7 @@ describe("Normal Staking - Stress Test", () => {
 
   test("extreme value test", async () => {
     // Test with minimum stake
-    const minStake = parseEther("1");
+    const minStake = parseEther("1000");
     const tx1 = await fixture.staking.connect(fixture.user1).stake({
       value: minStake,
     });

@@ -2,7 +2,7 @@
 
 ## 📋 Objective
 
-Separate the `scripts/` directory by Normal Staking and Premium Staking to improve code organization and maintainability.
+Separate the `scripts/` directory by Staking and  to improve code organization and maintainability.
 
 ## ⚠️ Important Notes - Contract Architecture
 
@@ -15,7 +15,7 @@ Before starting, please understand the following key information:
    - `StakingStorage.sol` - Storage layer (inherits Initializable, Ownable2StepUpgradeable)
    - `StakingConstants.sol` - Constant definitions contract
    - `IStake.sol` - Interface definition
-   - `NormalStakingProxy.sol` / `PremiumStakingProxy.sol` - Proxy contracts
+   - `StakingProxy.sol` / `.sol` - Proxy contracts
 
 2. **Proxy Pattern**: Transparent Proxy (using OpenZeppelin's `TransparentUpgradeableProxy`)
    - Can independently upgrade Normal and Premium staking pools
@@ -28,7 +28,7 @@ Before starting, please understand the following key information:
 4. **Lock Period**: Fixed 365 days (`LOCK_PERIOD = 365 days`), defined in contract constants, cannot be dynamically modified
 
 5. **Reward Rate**: Configured at contract level (`rewardRate` state variable), all positions share the same reward rate
-   - Expressed in basis points (800 = 8%, 1600 = 16%)
+   - Expressed in basis points (500 = 5%, )
    - `BASIS_POINTS = 10000` (100% = 10000)
 
 6. **Position Structure**: 
@@ -147,24 +147,24 @@ Before starting, please understand the following key information:
 
 **Parameter Description**:
 - `_minStakeAmount`: Minimum staking amount (wei unit)
-  - Normal Staking: 1 HSK = `1e18` wei
-  - Premium Staking: 500,000 HSK = `500000e18` wei
+  - Staking: 1 HSK = `1e18` wei
+  - : 500,000 HSK = `500000e18` wei
 - `_rewardRate`: Annual yield rate (basis points)
-  - Normal Staking: 800 (8% APY)
-  - Premium Staking: 1600 (16% APY)
+  - Staking: 500 (5% APY)
+  - : 1600 (16% APY)
 - `_stakeStartTime`: Staking start time (Unix timestamp)
 - `_stakeEndTime`: Staking end time (Unix timestamp)
 - `_whitelistMode`: Whitelist mode
-  - ✅ **Normal Staking**: `false` (all users can stake)
-  - ✅ **Premium Staking**: `true` (only whitelisted users can stake)
+  - ✅ **Staking**: `false` (all users can stake)
+  - ✅ ****: `true` (only whitelisted users can stake)
 
 **Whitelist Mode Design**:
 
 Now can directly specify whitelist mode at initialization, no need to manually modify after deployment:
 
 **Subsequent Operations**:
-- **Normal Staking**: No additional operations needed, can start staking after deployment
-- **Premium Staking**: Use `updateWhitelistBatch(addresses, true)` to add authorized users
+- **Staking**: No additional operations needed, can start staking after deployment
+- ****: Use `updateWhitelistBatch(addresses, true)` to add authorized users
 
 ---
 
@@ -250,13 +250,13 @@ scripts/
 ```
 
 **Notes**:
-- ✅ Normal Staking related scripts completed (14 scripts)
-- ✅ Premium Staking related scripts completed (23 scripts, including whitelist management)
-- ✅ Test scripts completed (5 scripts, including Premium Staking test support)
+- ✅ Staking related scripts completed (14 scripts)
+- ✅  related scripts completed (23 scripts, including whitelist management)
+- ✅ Test scripts completed (5 scripts, including  test support)
 - ✅ Development scripts completed (4 scripts)
 - ✅ Tool scripts completed (3 scripts)
 
-**Premium Staking Scripts Include**:
+** Scripts Include**:
 - Basic operation scripts: 9 scripts
 - Whitelist management scripts: 4 scripts
 - Configuration management scripts: 6 scripts
@@ -268,30 +268,30 @@ scripts/
 
 The following table lists script completion status:
 
-### Normal Staking Scripts (✅ Completed)
+### Staking Scripts (✅ Completed)
 
 | Script File | Status | Description |
 |------------|--------|-------------|
-| `scripts/normal/deploy.ts` | ✅ Completed | Deploy normal staking contract |
-| `scripts/normal/stake.ts` | ✅ Completed | Staking operation |
-| `scripts/normal/unstake.ts` | ✅ Completed | Unstake |
-| `scripts/normal/claim-rewards.ts` | ✅ Completed | Claim rewards |
-| `scripts/normal/add-rewards.ts` | ✅ Completed | Add reward pool |
-| `scripts/normal/emergency-withdraw.ts` | ✅ Completed | Emergency withdraw principal |
-| `scripts/normal/withdraw-excess.ts` | ✅ Completed | Withdraw excess rewards |
-| `scripts/normal/verify-forge.ts` | ✅ Completed | Verify contract (using Foundry) |
-| `scripts/normal/config/pause.ts` | ✅ Completed | Pause contract |
-| `scripts/normal/config/unpause.ts` | ✅ Completed | Resume contract |
-| `scripts/normal/config/set-start-time.ts` | ✅ Completed | Set start time |
-| `scripts/normal/config/set-end-time.ts` | ✅ Completed | Set end time |
-| `scripts/normal/config/set-min-stake.ts` | ✅ Completed | Set minimum staking amount |
-| `scripts/normal/config/enable-emergency.ts` | ✅ Completed | Enable emergency mode |
-| `scripts/normal/config/transfer-ownership.ts` | ✅ Completed | Step 1: Initiate ownership transfer |
-| `scripts/normal/config/accept-ownership.ts` | ✅ Completed | Step 2: Accept ownership transfer |
-| `scripts/normal/query/check-status.ts` | ✅ Completed | Query contract status |
-| `scripts/normal/query/check-stakes.ts` | ✅ Completed | Query staking information |
-| `scripts/normal/query/pending-reward.ts` | ✅ Completed | Query pending rewards |
-| `scripts/normal/upgrade.ts` | ✅ Completed | Upgrade contract |
+| `scripts/staking/deploy.ts` | ✅ Completed | Deploy normal staking contract |
+| `scripts/staking/stake.ts` | ✅ Completed | Staking operation |
+| `scripts/staking/unstake.ts` | ✅ Completed | Unstake |
+| `scripts/staking/claim-rewards.ts` | ✅ Completed | Claim rewards |
+| `scripts/staking/add-rewards.ts` | ✅ Completed | Add reward pool |
+| `scripts/staking/emergency-withdraw.ts` | ✅ Completed | Emergency withdraw principal |
+| `scripts/staking/withdraw-excess.ts` | ✅ Completed | Withdraw excess rewards |
+| `scripts/staking/verify-forge.ts` | ✅ Completed | Verify contract (using Foundry) |
+| `scripts/staking/config/pause.ts` | ✅ Completed | Pause contract |
+| `scripts/staking/config/unpause.ts` | ✅ Completed | Resume contract |
+| `scripts/staking/config/set-start-time.ts` | ✅ Completed | Set start time |
+| `scripts/staking/config/set-end-time.ts` | ✅ Completed | Set end time |
+| `scripts/staking/config/set-min-stake.ts` | ✅ Completed | Set minimum staking amount |
+| `scripts/staking/config/enable-emergency.ts` | ✅ Completed | Enable emergency mode |
+| `scripts/staking/config/transfer-ownership.ts` | ✅ Completed | Step 1: Initiate ownership transfer |
+| `scripts/staking/config/accept-ownership.ts` | ✅ Completed | Step 2: Accept ownership transfer |
+| `scripts/staking/query/check-status.ts` | ✅ Completed | Query contract status |
+| `scripts/staking/query/check-stakes.ts` | ✅ Completed | Query staking information |
+| `scripts/staking/query/pending-reward.ts` | ✅ Completed | Query pending rewards |
+| `scripts/staking/upgrade.ts` | ✅ Completed | Upgrade contract |
 
 ### Shared Modules (✅ Completed)
 
@@ -302,43 +302,43 @@ The following table lists script completion status:
 | `scripts/shared/helpers.ts` | ✅ Completed | Helper functions |
 | `scripts/shared/utils.ts` | ✅ Completed | Utility functions |
 
-### Premium Staking Scripts (✅ Completed)
+###  Scripts (✅ Completed)
 
 **Architecture Support Status**: ✅ Completed
-- Shared modules fully support Premium Staking
+- Shared modules fully support 
 - `PREMIUM_STAKING_CONFIG` defined
 - `getStakingAddress(StakingType.PREMIUM, network)` implemented
-- Test scripts include Premium Staking test support
+- Test scripts include  test support
 
 **Script Implementation Status**: ✅ Completed
 
 | Script File | Status | Description |
 |------------|--------|-------------|
-| `scripts/premium/deploy.ts` | ✅ Completed | Deploy premium staking contract |
-| `scripts/premium/stake.ts` | ✅ Completed | Staking operation (requires whitelist check) |
-| `scripts/premium/unstake.ts` | ✅ Completed | Unstake |
-| `scripts/premium/claim-rewards.ts` | ✅ Completed | Claim rewards |
-| `scripts/premium/add-rewards.ts` | ✅ Completed | Add reward pool |
-| `scripts/premium/emergency-withdraw.ts` | ✅ Completed | Emergency withdraw principal |
-| `scripts/premium/withdraw-excess.ts` | ✅ Completed | Withdraw excess rewards |
-| `scripts/premium/verify-forge.ts` | ✅ Completed | Verify contract |
-| `scripts/premium/upgrade.ts` | ✅ Completed | Upgrade contract |
-| `scripts/premium/whitelist/add-batch.ts` | ✅ Completed | Batch add whitelist |
-| `scripts/premium/whitelist/remove-batch.ts` | ✅ Completed | Batch remove whitelist |
-| `scripts/premium/whitelist/check-user.ts` | ✅ Completed | Query user whitelist status |
-| `scripts/premium/whitelist/toggle-mode.ts` | ✅ Completed | Toggle whitelist mode |
-| `scripts/premium/config/pause.ts` | ✅ Completed | Pause contract |
-| `scripts/premium/config/unpause.ts` | ✅ Completed | Resume contract |
-| `scripts/premium/config/set-start-time.ts` | ✅ Completed | Set start time |
-| `scripts/premium/config/set-end-time.ts` | ✅ Completed | Set end time |
-| `scripts/premium/config/set-min-stake.ts` | ✅ Completed | Set minimum staking amount |
-| `scripts/premium/config/enable-emergency.ts` | ✅ Completed | Enable emergency mode |
-| `scripts/premium/config/transfer-ownership.ts` | ✅ Completed | Step 1: Initiate ownership transfer |
-| `scripts/premium/config/accept-ownership.ts` | ✅ Completed | Step 2: Accept ownership transfer |
-| `scripts/premium/query/check-status.ts` | ✅ Completed | Query contract status |
-| `scripts/premium/query/check-stakes.ts` | ✅ Completed | Query staking information |
-| `scripts/premium/query/pending-reward.ts` | ✅ Completed | Query pending rewards |
-| `scripts/premium/query/check-whitelist.ts` | ✅ Completed | Query whitelist configuration |
+| `/deploy.ts` | ✅ Completed | Deploy premium staking contract |
+| `/stake.ts` | ✅ Completed | Staking operation (requires whitelist check) |
+| `/unstake.ts` | ✅ Completed | Unstake |
+| `/claim-rewards.ts` | ✅ Completed | Claim rewards |
+| `/add-rewards.ts` | ✅ Completed | Add reward pool |
+| `/emergency-withdraw.ts` | ✅ Completed | Emergency withdraw principal |
+| `/withdraw-excess.ts` | ✅ Completed | Withdraw excess rewards |
+| `/verify-forge.ts` | ✅ Completed | Verify contract |
+| `/upgrade.ts` | ✅ Completed | Upgrade contract |
+| `/whitelist/add-batch.ts` | ✅ Completed | Batch add whitelist |
+| `/whitelist/remove-batch.ts` | ✅ Completed | Batch remove whitelist |
+| `/whitelist/check-user.ts` | ✅ Completed | Query user whitelist status |
+| `/whitelist/toggle-mode.ts` | ✅ Completed | Toggle whitelist mode |
+| `/config/pause.ts` | ✅ Completed | Pause contract |
+| `/config/unpause.ts` | ✅ Completed | Resume contract |
+| `/config/set-start-time.ts` | ✅ Completed | Set start time |
+| `/config/set-end-time.ts` | ✅ Completed | Set end time |
+| `/config/set-min-stake.ts` | ✅ Completed | Set minimum staking amount |
+| `/config/enable-emergency.ts` | ✅ Completed | Enable emergency mode |
+| `/config/transfer-ownership.ts` | ✅ Completed | Step 1: Initiate ownership transfer |
+| `/config/accept-ownership.ts` | ✅ Completed | Step 2: Accept ownership transfer |
+| `/query/check-status.ts` | ✅ Completed | Query contract status |
+| `/query/check-stakes.ts` | ✅ Completed | Query staking information |
+| `/query/pending-reward.ts` | ✅ Completed | Query pending rewards |
+| `/query/check-whitelist.ts` | ✅ Completed | Query whitelist configuration |
 
 ### Development Scripts (✅ Completed)
 
@@ -371,31 +371,31 @@ The following table lists script completion status:
 
 **Currently Implemented**: 57 script files
 
-- ✅ Normal Staking: 14 scripts (including upgrade.ts)
-- ✅ Premium Staking: 23 scripts (including upgrade.ts and whitelist management)
+- ✅ Staking: 14 scripts (including upgrade.ts)
+- ✅ : 23 scripts (including upgrade.ts and whitelist management)
 - ✅ Development scripts: 4 scripts
-- ✅ Test scripts: 5 scripts (including Premium Staking test support)
+- ✅ Test scripts: 5 scripts (including  test support)
 - ✅ Tool scripts: 3 scripts
-- ✅ Shared modules: 4 files (fully support Premium Staking)
+- ✅ Shared modules: 4 files (fully support )
 
-**Premium Staking Script Categories**:
+** Script Categories**:
 - ✅ Basic operation scripts: 9 scripts (deploy, upgrade, stake, unstake, claim-rewards, add-rewards, emergency-withdraw, withdraw-excess, verify-forge)
 - ✅ Whitelist management scripts: 4 scripts (add-batch, remove-batch, check-user, toggle-mode)
 - ✅ Configuration management scripts: 6 scripts (pause, unpause, set-start-time, set-end-time, set-min-stake, enable-emergency)
 - ✅ Query scripts: 4 scripts (check-status, check-stakes, pending-reward, check-whitelist)
 
 **Architecture Support Status**:
-- ✅ Premium Staking configuration defined (`PREMIUM_STAKING_CONFIG`)
-- ✅ Premium Staking address management implemented (`getStakingAddress`)
-- ✅ Premium Staking type definitions implemented (`StakingType.PREMIUM`)
-- ✅ Premium Staking test support implemented (`fixtures.ts`)
-- ✅ Premium Staking all scripts implemented (23 scripts)
+- ✅  configuration defined (`PREMIUM_STAKING_CONFIG`)
+- ✅  address management implemented (`getStakingAddress`)
+- ✅  type definitions implemented (`StakingType.PREMIUM`)
+- ✅  test support implemented (`fixtures.ts`)
+- ✅  all scripts implemented (23 scripts)
 
 ---
 
 ## 📦 Implementation Plan
 
-The following content can serve as reference for Premium Staking implementation.
+The following content can serve as reference for  implementation.
 
 ### Step 1: Create Shared Modules (✅ Completed)
 
@@ -411,33 +411,33 @@ General utility functions are located in `scripts/shared/utils.ts`.
 
 ---
 
-### Step 2: Implement Normal Staking Scripts (✅ Completed)
+### Step 2: Implement Staking Scripts (✅ Completed)
 
-#### 1. `scripts/normal/deploy.ts` (✅ Completed)
+#### 1. `scripts/staking/deploy.ts` (✅ Completed)
 
-#### 2. `scripts/normal/stake.ts`
+#### 2. `scripts/staking/stake.ts`
 
-#### 3. `scripts/normal/add-rewards.ts`
+#### 3. `scripts/staking/add-rewards.ts`
 
-#### 4. `scripts/normal/query/check-status.ts`
+#### 4. `scripts/staking/query/check-status.ts`
 
 ---
 
-### Step 3: Implement Premium Staking Scripts (✅ Completed)
+### Step 3: Implement  Scripts (✅ Completed)
 
-Premium staking scripts are similar to normal staking but require additional whitelist management functionality. Completed by referencing Normal Staking implementation.
+Premium staking scripts are similar to normal staking but require additional whitelist management functionality. Completed by referencing Staking implementation.
 
-#### 1. `scripts/premium/deploy.ts` (✅ Completed)
+#### 1. `/deploy.ts` (✅ Completed)
 
-Similar to `scripts/normal/deploy.ts`, uses `PREMIUM_STAKING_CONFIG`, and enables whitelist mode.
+Similar to `scripts/staking/deploy.ts`, uses `PREMIUM_STAKING_CONFIG`, and enables whitelist mode.
 
-#### 2. `scripts/premium/whitelist/add-batch.ts` (✅ Completed)
+#### 2. `/whitelist/add-batch.ts` (✅ Completed)
 
-#### 3. `scripts/premium/whitelist/remove-batch.ts` (✅ Completed)
+#### 3. `/whitelist/remove-batch.ts` (✅ Completed)
 
-#### 4. `scripts/premium/whitelist/toggle-mode.ts` (✅ Completed)
+#### 4. `/whitelist/toggle-mode.ts` (✅ Completed)
 
-#### 5. `scripts/premium/whitelist/check-user.ts` (✅ Completed)
+#### 5. `/whitelist/check-user.ts` (✅ Completed)
 
 ---
 
@@ -478,18 +478,18 @@ Similar to `scripts/normal/deploy.ts`, uses `PREMIUM_STAKING_CONFIG`, and enable
 3. Create `scripts/shared/helpers.ts`
 4. Create `scripts/shared/utils.ts`
 
-### Step 3: Implement Normal Staking Scripts
+### Step 3: Implement Staking Scripts
 
-1. Create `scripts/normal/deploy.ts`
-2. Create `scripts/normal/stake.ts`
-3. Create `scripts/normal/add-rewards.ts`
-4. Create `scripts/normal/upgrade.ts`
+1. Create `scripts/staking/deploy.ts`
+2. Create `scripts/staking/stake.ts`
+3. Create `scripts/staking/add-rewards.ts`
+4. Create `scripts/staking/upgrade.ts`
 5. Create query scripts (under config/ and query/ directories)
 
-### Step 4: Implement Premium Staking Scripts (✅ Completed)
+### Step 4: Implement  Scripts (✅ Completed)
 
-1. ✅ Create `scripts/premium/deploy.ts`
-2. ✅ Create `scripts/premium/stake.ts`
+1. ✅ Create `/deploy.ts`
+2. ✅ Create `/stake.ts`
 3. ✅ Create whitelist management scripts (under whitelist/ directory, including batch add, batch remove, query, and toggle mode)
 4. ✅ Create query scripts (under config/ and query/ directories)
 5. ✅ Create all basic operation scripts (upgrade, unstake, claim-rewards, add-rewards, emergency-withdraw, withdraw-excess, verify-forge)
@@ -565,15 +565,15 @@ After completion, please verify the following:
 
 ### Deployment Script Verification
 
-- [ ] Normal Staking deployment script can successfully deploy contract
-- [ ] Premium Staking deployment script can successfully deploy contract
+- [ ] Staking deployment script can successfully deploy contract
+- [ ]  deployment script can successfully deploy contract
 - [ ] Deployment scripts correctly configure contract parameters
 - [ ] Testnet deployment commands work correctly
 
 ### Staking Operation Verification
 
-- [ ] Normal Staking staking script executes correctly
-- [ ] Premium Staking staking script executes correctly
+- [ ] Staking staking script executes correctly
+- [ ]  staking script executes correctly
 - [ ] Unstaking script works correctly
 - [ ] Reward claiming script works correctly
 - [ ] Add rewards script works correctly
@@ -615,7 +615,7 @@ After completion, please verify the following:
 
 #### Upgrade Script Detailed Description
 
-**`scripts/normal/upgrade.ts`** and **`scripts/premium/upgrade.ts`** implement intelligent upgrade functionality:
+**`scripts/staking/upgrade.ts`** and **`/upgrade.ts`** implement intelligent upgrade functionality:
 
 **Core Features**:
 1. **Auto-detect ProxyAdmin**:
@@ -623,7 +623,7 @@ After completion, please verify the following:
    - Supports environment variable override (`PROXY_ADMIN_ADDRESS`)
    - Automatically verify if current signer is ProxyAdmin or ProxyAdmin's owner
 
-2. **Dual Mode Support**:
+2. **Single Mode Support**:
    - **ProxyAdmin Contract Mode**: Use OpenZeppelin ProxyAdmin ABI to call `upgrade()` or `upgradeAndCall()`
    - **EOA Mode**: Directly call proxy's `upgradeTo()` or `upgradeToAndCall()`
 

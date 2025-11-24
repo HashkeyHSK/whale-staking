@@ -15,18 +15,16 @@ Error: Insufficient stake amount
 - Staking amount is less than the minimum staking amount requirement
 
 **Solution**:
-- Check minimum staking amount requirements:
-  - Normal Staking: 1 HSK
-  - Premium Staking: 500,000 HSK
+- Check minimum staking amount requirement: 1000 HSK
 - Ensure sent amount >= minimum staking amount
 
 **Example**:
 ```typescript
 // ❌ Error: Insufficient staking amount
-await staking.stake({ value: ethers.parseEther("0.5") });
+await staking.stake({ value: ethers.parseEther("500") });
 
 // ✅ Correct: Meets minimum staking amount
-await staking.stake({ value: ethers.parseEther("1") });
+await staking.stake({ value: ethers.parseEther("1000") });
 ```
 
 **Note**: V2 version uses fixed 365-day lock period, `stake()` function does not require `lockPeriod` parameter.
@@ -46,7 +44,7 @@ Error: Not whitelisted
 
 **Solution**:
 - Check whitelist mode status: `await staking.onlyWhitelistCanStake()`
-- If it's Premium Staking, contact admin to be added to whitelist
+- If it's , contact admin to be added to whitelist
 - Use script to check whitelist status:
   ```bash
   npx hardhat run scripts/checkWhitelist.ts --network <network> \
@@ -363,7 +361,7 @@ console.log(`Lock period: ${LOCK_PERIOD / 86400} days`); // 365 days
 
 // Query annual yield rate
 const rewardRate = await staking.rewardRate();
-console.log(`Annual yield rate: ${rewardRate / 100}%`); // 800 = 8%, 1600 = 16%
+console.log(`Annual yield rate: ${rewardRate: 500 = 5%, 
 
 // Query staking time window
 const stakeStartTime = await staking.stakeStartTime();

@@ -1,4 +1,4 @@
-# 双层 Staking 快速开始指南
+# 单层 Staking 快速开始指南
 
 ## 🎯 快速部署
 
@@ -10,21 +10,21 @@ npm run compile
 npx hardhat compile
 ```
 
-### 步骤 2: 部署双层产品
+### 步骤 2: 部署单层产品
 
 **分别部署（推荐）**
 
 ```bash
-# 部署普通 Staking（需要提供时间戳）
+# 部署Staking（需要提供时间戳）
 STAKE_START_TIME="1735689600" STAKE_END_TIME="1767225600" npm run deploy:testnet
 
-# 部署 Premium Staking（需要提供时间戳）
+# 部署 （需要提供时间戳）
 STAKE_START_TIME="1735689600" STAKE_END_TIME="1767225600" npm run deploy:premium:testnet
 ```
 
 **注意**：部署时必须提供 `STAKE_START_TIME` 和 `STAKE_END_TIME` 环境变量（Unix 时间戳，秒级）。
 
-部署后会输出两个合约地址，请保存：
+部署后会输出一个合约地址，请保存：
 
 ```bash
 # 示例输出
@@ -32,9 +32,9 @@ export NORMAL_STAKING_ADDRESS=0x...
 export PREMIUM_STAKING_ADDRESS=0x...
 ```
 
-### 步骤 3: 配置 Premium Staking 白名单
+### 步骤 3: 配置  白名单
 
-Premium Staking 产品需要白名单授权：
+ 产品需要白名单授权：
 
 ```bash
 # 批量添加白名单（最多100个地址）
@@ -46,26 +46,26 @@ WHITELIST_ADDRESSES="0x123...,0x456..." npm run whitelist:remove-batch:premium:t
 
 ### 步骤 4: 充值奖励池
 
-两个产品需要独立的奖励池：
+一个产品需要独立的奖励池：
 
 ```bash
-# 为普通 Staking 充值（示例：10000 HSK）
+# 为Staking 充值（示例：10000 HSK）
 REWARD_AMOUNT="10000" npm run rewards:add:testnet
 
-# 为 Premium Staking 充值（示例：20000 HSK）
+# 为  充值（示例：20000 HSK）
 REWARD_AMOUNT="20000" npm run rewards:add:premium:testnet
 ```
 
 ## 💰 用户质押示例
 
-### 普通用户质押（普通 Staking）
+### 普通用户质押（Staking）
 
 ```bash
-# 质押 2000 HSK（锁定期固定365天，8% APY）
+# 质押 2000 HSK（锁定期固定365天，5% APY）
 STAKE_AMOUNT="2000" npm run stake:testnet
 ```
 
-### 大户质押（Premium Staking）
+### 大户质押（）
 
 ```bash
 # 质押 600000 HSK（锁定期固定365天，16% APY）
@@ -91,7 +91,7 @@ USER_ADDRESS="0x..." npm run query:stakes:testnet
 # 查看合约状态和配置
 npm run query:status:testnet
 
-# 查看 Premium Staking 合约状态
+# 查看  合约状态
 npm run query:status:premium:testnet
 ```
 
@@ -99,13 +99,13 @@ npm run query:status:premium:testnet
 
 ## ⚙️ 产品配置对比
 
-| 配置项 | 普通 Staking | Premium Staking |
+| 配置项 | Staking |  |
 |--------|-------------|-----------|
 | 最小质押 | 1 HSK | 500,000 HSK |
-| 年化收益 | 8%（部署时配置） | 16%（部署时配置） |
+| 年化收益 | 5%（部署时配置） | 16%（部署时配置） |
 | 锁定期 | 365天（固定） | 365天（固定） |
 | 白名单 | 关闭 | 启用 |
-| 最大总质押 | 10,000,000 HSK（池子上限） | 20,000,000 HSK（池子上限） |
+| 最大总质押 | 30,000,000 HSK（池子上限） | 30,000,000 HSK（池子上限） |
 
 ## 🔧 管理员操作
 
@@ -136,9 +136,9 @@ NEW_MAX_TOTAL_STAKED="20000000" npm run config:set-max-total-staked:testnet
 ## 📝 注意事项
 
 1. **质押时间窗口**: 部署时必须提供 `STAKE_START_TIME` 和 `STAKE_END_TIME` 环境变量（Unix 时间戳，秒级），可以通过管理员函数调整
-2. **独立部署**: 两个产品是完全独立的合约实例
+2. **独立部署**: 一个产品是完全独立的合约实例
 3. **独立奖励池**: 每个产品需要独立的奖励池管理和充值
-4. **白名单管理**: Premium Staking 必须启用白名单，需要管理员授权
+4. **白名单管理**:  必须启用白名单，需要管理员授权
 5. **参数不可逆**: 已存在的质押位置不受配置更新影响
 6. **奖励计算**: 奖励计算逻辑相同，但收益率不同
 

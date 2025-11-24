@@ -1,0 +1,58 @@
+import hre from "hardhat";
+import { getStakingAddress, printSeparator } from "../../shared/helpers.js";
+
+/**
+ * Query Staking contract status
+ */
+async function main() {
+  const { ethers } = await hre.network.connect();
+  const network = (await ethers.provider.getNetwork()).name;
+  const stakingAddress = process.env.STAKING_ADDRESS || getStakingAddress(network);
+
+  printSeparator("Staking Contract Status Query");
+  console.log("Contract address:", stakingAddress);
+
+  // Connect to contract
+  const staking = await ethers.getContractAt("HSKStaking", stakingAddress);
+
+  // Query contract status
+  const isPaused = await staking.paused();
+  const emergencyMode = await staking.emergencyMode();
+  const onlyWhitelistCanStake = await staking.onlyWhitelistCanStake();
+  const totalStaked = await staking.totalStaked();
+  const rewardPoolBalance = await staking.rewardPoolBalance();
+  const totalPendingRewards = await staking.totalPendingRewards();
+  const minStakeAmount = await staking.minStakeAmount();
+  const maxTotalStaked = await staking.maxTotalStaked();
+  const rewardRate = await staking.rewardRate();
+  const stakeStartTime = await staking.stakeStartTime();
+  const stakeEndTime = await staking.stakeEndTime();
+  const nextPositionId = await staking.nextPositionId();
+
+  console.log("\nContract status:");
+  console.log("  - Paused:", isPaused);
+  console.log("  - Emergency mode:", emergencyMode);
+  console.log("  - Whitelist mode:", onlyWhitelistCanStake);
+  console.log("  - Total staked:", ethers.formatEther(totalStaked), "HSK");
+  console.log("  - Max total staked:", maxTotalStaked === BigInt(0) ? "No limit" : ethers.formatEther(maxTotalStaked) + " HSK");
+  if (maxTotalStaked > BigInt(0)) {
+    const remainingCapacity = maxTotalStaked - totalStaked;
+    console.log("  - Remaining capacity:", ethers.formatEther(remainingCapacity), "HSK");
+  }
+  console.log("  - Reward pool balance:", ethers.formatEther(rewardPoolBalance), "HSK");
+  console.log("  - Total pending rewards:", ethers.formatEther(totalPendingRewards), "HSK");
+  console.log("  - Available reward balance:", ethers.formatEther(rewardPoolBalance - totalPendingRewards), "HSK");
+  console.log("  - Min stake amount:", ethers.formatEther(minStakeAmount), "HSK");
+  console.log("  - APY:", Number(rewardRate) / 100, "%");
+  console.log("  - Lock period: 365 days (fixed)");
+  console.log("  - Stake start time:", new Date(Number(stakeStartTime) * 1000).toISOString());
+  console.log("  - Stake end time:", new Date(Number(stakeEndTime) * 1000).toISOString());
+  console.log("  - Next Position ID:", nextPositionId.toString());
+
+  printSeparator();
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

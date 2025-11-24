@@ -1,4 +1,4 @@
-# Dual-Tier Staking Quick Start Guide
+# Single-Tier Staking Quick Start Guide
 
 ## 🎯 Quick Deployment
 
@@ -10,15 +10,15 @@ npm run compile
 npx hardhat compile
 ```
 
-### Step 2: Deploy Dual-Tier Products
+### Step 2: Deploy Single-Tier Products
 
 **Deploy Separately (Recommended)**
 
 ```bash
-# Deploy Normal Staking (requires timestamps)
+# Deploy Staking (requires timestamps)
 STAKE_START_TIME="1735689600" STAKE_END_TIME="1767225600" npm run deploy:testnet
 
-# Deploy Premium Staking (requires timestamps)
+# Deploy  (requires timestamps)
 STAKE_START_TIME="1735689600" STAKE_END_TIME="1767225600" npm run deploy:premium:testnet
 ```
 
@@ -32,9 +32,9 @@ export NORMAL_STAKING_ADDRESS=0x...
 export PREMIUM_STAKING_ADDRESS=0x...
 ```
 
-### Step 3: Configure Premium Staking Whitelist
+### Step 3: Configure  Whitelist
 
-Premium Staking product requires whitelist authorization:
+ product requires whitelist authorization:
 
 ```bash
 # Batch add whitelist (max 100 addresses)
@@ -49,23 +49,23 @@ WHITELIST_ADDRESSES="0x123...,0x456..." npm run whitelist:remove-batch:premium:t
 Both products need independent reward pools:
 
 ```bash
-# Deposit for Normal Staking (example: 10000 HSK)
+# Deposit for Staking (example: 10000 HSK)
 REWARD_AMOUNT="10000" npm run rewards:add:testnet
 
-# Deposit for Premium Staking (example: 20000 HSK)
+# Deposit for  (example: 20000 HSK)
 REWARD_AMOUNT="20000" npm run rewards:add:premium:testnet
 ```
 
 ## 💰 User Staking Examples
 
-### Normal User Staking (Normal Staking)
+### Normal User Staking (Staking)
 
 ```bash
-# Stake 2000 HSK (fixed 365-day lock period, 8% APY)
+# Stake 2000 HSK (fixed 365-day lock period, 5% APY)
 STAKE_AMOUNT="2000" npm run stake:testnet
 ```
 
-### Whale Staking (Premium Staking)
+### Whale Staking ()
 
 ```bash
 # Stake 600000 HSK (fixed 365-day lock period, 16% APY)
@@ -91,7 +91,7 @@ USER_ADDRESS="0x..." npm run query:stakes:testnet
 # View contract status and configuration
 npm run query:status:testnet
 
-# View Premium Staking contract status
+# View  contract status
 npm run query:status:premium:testnet
 ```
 
@@ -99,13 +99,13 @@ npm run query:status:premium:testnet
 
 ## ⚙️ Product Configuration Comparison
 
-| Configuration | Normal Staking | Premium Staking |
+| Configuration | Staking |  |
 |---------------|---------------|----------------|
-| Minimum Stake | 1 HSK | 500,000 HSK |
-| Annual Yield | 8% (configured at deployment) | 16% (configured at deployment) |
+| Minimum Stake | 1000 HSK | 500,000 HSK |
+| Annual Yield | 5% (configured at deployment) | 16% (configured at deployment) |
 | Lock Period | 365 days (fixed) | 365 days (fixed) |
 | Whitelist | Disabled | Enabled |
-| Maximum Total Staked | 10,000,000 HSK (pool limit) | 20,000,000 HSK (pool limit) |
+| Maximum Total Staked | 30,000,000 HSK (pool limit) | 30,000,000 HSK (pool limit) |
 
 ## 🔧 Admin Operations
 
@@ -138,7 +138,7 @@ NEW_MAX_TOTAL_STAKED="20000000" npm run config:set-max-total-staked:testnet
 1. **Staking Time Window**: Must provide `STAKE_START_TIME` and `STAKE_END_TIME` environment variables at deployment (Unix timestamp, in seconds), can be adjusted via admin functions
 2. **Independent Deployment**: Both products are completely independent contract instances
 3. **Independent Reward Pools**: Each product needs independent reward pool management and deposits
-4. **Whitelist Management**: Premium Staking must have whitelist enabled, requires admin authorization
+4. **Whitelist Management**:  must have whitelist enabled, requires admin authorization
 5. **Parameters are Irreversible**: Existing staking positions are not affected by configuration updates
 6. **Reward Calculation**: Reward calculation logic is the same, but yield rates differ
 

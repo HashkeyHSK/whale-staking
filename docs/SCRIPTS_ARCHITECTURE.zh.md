@@ -2,7 +2,7 @@
 
 ## 📋 目标
 
-将 `scripts/` 目录按照普通质押（Normal Staking）和高级质押（Premium Staking）进行分离，提高代码组织性和可维护性。
+将 `scripts/` 目录按照普通质押（Staking）和高级质押（）进行分离，提高代码组织性和可维护性。
 
 ## ⚠️ 重要说明 - 合约架构
 
@@ -15,7 +15,7 @@
    - `StakingStorage.sol` - 存储层（继承 Initializable、Ownable2StepUpgradeable）
    - `StakingConstants.sol` - 常量定义合约
    - `IStake.sol` - 接口定义
-   - `NormalStakingProxy.sol` / `PremiumStakingProxy.sol` - 代理合约
+   - `StakingProxy.sol` / `.sol` - 代理合约
 
 2. **代理模式**: Transparent Proxy（使用 OpenZeppelin 的 `TransparentUpgradeableProxy`）
    - 可独立升级 Normal 和 Premium 质押池
@@ -28,7 +28,7 @@
 4. **锁定期**: 固定 365 天（`LOCK_PERIOD = 365 days`），在合约常量中定义，不可动态修改
 
 5. **奖励率**: 在合约级别配置（`rewardRate` 状态变量），所有 position 共享同一个奖励率
-   - 使用 basis points 表示（800 = 8%，1600 = 16%）
+   - 使用 basis points 表示（500 = 5%，）
    - `BASIS_POINTS = 10000` (100% = 10000)
 
 6. **Position 结构**: 
@@ -147,24 +147,24 @@
 
 **参数说明**：
 - `_minStakeAmount`: 最小质押金额（wei 单位）
-  - Normal Staking: 1 HSK = `1e18` wei
-  - Premium Staking: 500,000 HSK = `500000e18` wei
+  - Staking: 1 HSK = `1e18` wei
+  - : 500,000 HSK = `500000e18` wei
 - `_rewardRate`: 年化收益率（basis points）
-  - Normal Staking: 800 (8% APY)
-  - Premium Staking: 1600 (16% APY)
+  - Staking: 500 (5% APY)
+  - : 1600 (16% APY)
 - `_stakeStartTime`: 质押开始时间（Unix 时间戳）
 - `_stakeEndTime`: 质押结束时间（Unix 时间戳）
 - `_whitelistMode`: 白名单模式
-  - ✅ **Normal Staking**: `false`（所有用户可质押）
-  - ✅ **Premium Staking**: `true`（仅白名单用户可质押）
+  - ✅ **Staking**: `false`（所有用户可质押）
+  - ✅ ****: `true`（仅白名单用户可质押）
 
 **白名单模式设计**：
 
 现在可以在初始化时直接指定白名单模式，无需部署后再手动修改：
 
 **后续操作**：
-- **Normal Staking**: 无需额外操作，部署后即可开始质押
-- **Premium Staking**: 使用 `updateWhitelistBatch(addresses, true)` 添加授权用户
+- **Staking**: 无需额外操作，部署后即可开始质押
+- ****: 使用 `updateWhitelistBatch(addresses, true)` 添加授权用户
 
 ---
 
@@ -250,13 +250,13 @@ scripts/
 ```
 
 **说明**：
-- ✅ Normal Staking 相关脚本已完成（14 个）
-- ✅ Premium Staking 相关脚本已完成（23 个，包含白名单管理）
-- ✅ 测试脚本已完成（5 个，包含 Premium Staking 测试支持）
+- ✅ Staking 相关脚本已完成（14 个）
+- ✅  相关脚本已完成（23 个，包含白名单管理）
+- ✅ 测试脚本已完成（5 个，包含  测试支持）
 - ✅ 开发脚本已完成（4 个）
 - ✅ 工具脚本已完成（3 个）
 
-**Premium Staking 脚本包含**：
+** 脚本包含**：
 - 基础操作脚本：9 个
 - 白名单管理脚本：4 个
 - 配置管理脚本：6 个
@@ -268,30 +268,30 @@ scripts/
 
 以下表格列出了脚本的完成状态：
 
-### Normal Staking 脚本（✅ 已完成）
+### Staking 脚本（✅ 已完成）
 
 | 脚本文件 | 状态 | 说明 |
 |---------|------|------|
-| `scripts/normal/deploy.ts` | ✅ 已完成 | 部署普通质押合约 |
-| `scripts/normal/stake.ts` | ✅ 已完成 | 质押操作 |
-| `scripts/normal/unstake.ts` | ✅ 已完成 | 解除质押 |
-| `scripts/normal/claim-rewards.ts` | ✅ 已完成 | 领取奖励 |
-| `scripts/normal/add-rewards.ts` | ✅ 已完成 | 添加奖励池 |
-| `scripts/normal/emergency-withdraw.ts` | ✅ 已完成 | 紧急提取本金 |
-| `scripts/normal/withdraw-excess.ts` | ✅ 已完成 | 提取多余奖励 |
-| `scripts/normal/verify-forge.ts` | ✅ 已完成 | 验证合约（使用 Foundry） |
-| `scripts/normal/config/pause.ts` | ✅ 已完成 | 暂停合约 |
-| `scripts/normal/config/unpause.ts` | ✅ 已完成 | 恢复合约 |
-| `scripts/normal/config/set-start-time.ts` | ✅ 已完成 | 设置开始时间 |
-| `scripts/normal/config/set-end-time.ts` | ✅ 已完成 | 设置结束时间 |
-| `scripts/normal/config/set-min-stake.ts` | ✅ 已完成 | 设置最小质押金额 |
-| `scripts/normal/config/enable-emergency.ts` | ✅ 已完成 | 启用紧急模式 |
-| `scripts/normal/config/transfer-ownership.ts` | ✅ 已完成 | 第一步：发起所有权转移 |
-| `scripts/normal/config/accept-ownership.ts` | ✅ 已完成 | 第二步：接受所有权转移 |
-| `scripts/normal/query/check-status.ts` | ✅ 已完成 | 查询合约状态 |
-| `scripts/normal/query/check-stakes.ts` | ✅ 已完成 | 查询质押信息 |
-| `scripts/normal/query/pending-reward.ts` | ✅ 已完成 | 查询待领取奖励 |
-| `scripts/normal/upgrade.ts` | ✅ 已完成 | 升级合约 |
+| `scripts/staking/deploy.ts` | ✅ 已完成 | 部署普通质押合约 |
+| `scripts/staking/stake.ts` | ✅ 已完成 | 质押操作 |
+| `scripts/staking/unstake.ts` | ✅ 已完成 | 解除质押 |
+| `scripts/staking/claim-rewards.ts` | ✅ 已完成 | 领取奖励 |
+| `scripts/staking/add-rewards.ts` | ✅ 已完成 | 添加奖励池 |
+| `scripts/staking/emergency-withdraw.ts` | ✅ 已完成 | 紧急提取本金 |
+| `scripts/staking/withdraw-excess.ts` | ✅ 已完成 | 提取多余奖励 |
+| `scripts/staking/verify-forge.ts` | ✅ 已完成 | 验证合约（使用 Foundry） |
+| `scripts/staking/config/pause.ts` | ✅ 已完成 | 暂停合约 |
+| `scripts/staking/config/unpause.ts` | ✅ 已完成 | 恢复合约 |
+| `scripts/staking/config/set-start-time.ts` | ✅ 已完成 | 设置开始时间 |
+| `scripts/staking/config/set-end-time.ts` | ✅ 已完成 | 设置结束时间 |
+| `scripts/staking/config/set-min-stake.ts` | ✅ 已完成 | 设置最小质押金额 |
+| `scripts/staking/config/enable-emergency.ts` | ✅ 已完成 | 启用紧急模式 |
+| `scripts/staking/config/transfer-ownership.ts` | ✅ 已完成 | 第一步：发起所有权转移 |
+| `scripts/staking/config/accept-ownership.ts` | ✅ 已完成 | 第二步：接受所有权转移 |
+| `scripts/staking/query/check-status.ts` | ✅ 已完成 | 查询合约状态 |
+| `scripts/staking/query/check-stakes.ts` | ✅ 已完成 | 查询质押信息 |
+| `scripts/staking/query/pending-reward.ts` | ✅ 已完成 | 查询待领取奖励 |
+| `scripts/staking/upgrade.ts` | ✅ 已完成 | 升级合约 |
 
 ### 共享模块（✅ 已完成）
 
@@ -302,43 +302,43 @@ scripts/
 | `scripts/shared/helpers.ts` | ✅ 已完成 | 辅助函数 |
 | `scripts/shared/utils.ts` | ✅ 已完成 | 工具函数 |
 
-### Premium Staking 脚本（✅ 已完成）
+###  脚本（✅ 已完成）
 
 **架构支持状态**：✅ 已完成
-- 共享模块已完全支持 Premium Staking
+- 共享模块已完全支持 
 - `PREMIUM_STAKING_CONFIG` 已定义
 - `getStakingAddress(StakingType.PREMIUM, network)` 已实现
-- 测试脚本已包含 Premium Staking 测试支持
+- 测试脚本已包含  测试支持
 
 **脚本实现状态**：✅ 已完成
 
 | 脚本文件 | 状态 | 说明 |
 |---------|------|------|
-| `scripts/premium/deploy.ts` | ✅ 已完成 | 部署高级质押合约 |
-| `scripts/premium/stake.ts` | ✅ 已完成 | 质押操作（需白名单检查） |
-| `scripts/premium/unstake.ts` | ✅ 已完成 | 解除质押 |
-| `scripts/premium/claim-rewards.ts` | ✅ 已完成 | 领取奖励 |
-| `scripts/premium/add-rewards.ts` | ✅ 已完成 | 添加奖励池 |
-| `scripts/premium/emergency-withdraw.ts` | ✅ 已完成 | 紧急提取本金 |
-| `scripts/premium/withdraw-excess.ts` | ✅ 已完成 | 提取多余奖励 |
-| `scripts/premium/verify-forge.ts` | ✅ 已完成 | 验证合约 |
-| `scripts/premium/upgrade.ts` | ✅ 已完成 | 升级合约 |
-| `scripts/premium/whitelist/add-batch.ts` | ✅ 已完成 | 批量添加白名单 |
-| `scripts/premium/whitelist/remove-batch.ts` | ✅ 已完成 | 批量移除白名单 |
-| `scripts/premium/whitelist/check-user.ts` | ✅ 已完成 | 查询用户白名单状态 |
-| `scripts/premium/whitelist/toggle-mode.ts` | ✅ 已完成 | 切换白名单模式 |
-| `scripts/premium/config/pause.ts` | ✅ 已完成 | 暂停合约 |
-| `scripts/premium/config/unpause.ts` | ✅ 已完成 | 恢复合约 |
-| `scripts/premium/config/set-start-time.ts` | ✅ 已完成 | 设置开始时间 |
-| `scripts/premium/config/set-end-time.ts` | ✅ 已完成 | 设置结束时间 |
-| `scripts/premium/config/set-min-stake.ts` | ✅ 已完成 | 设置最小质押金额 |
-| `scripts/premium/config/enable-emergency.ts` | ✅ 已完成 | 启用紧急模式 |
-| `scripts/premium/config/transfer-ownership.ts` | ✅ 已完成 | 第一步：发起所有权转移 |
-| `scripts/premium/config/accept-ownership.ts` | ✅ 已完成 | 第二步：接受所有权转移 |
-| `scripts/premium/query/check-status.ts` | ✅ 已完成 | 查询合约状态 |
-| `scripts/premium/query/check-stakes.ts` | ✅ 已完成 | 查询质押信息 |
-| `scripts/premium/query/pending-reward.ts` | ✅ 已完成 | 查询待领取奖励 |
-| `scripts/premium/query/check-whitelist.ts` | ✅ 已完成 | 查询白名单配置 |
+| `/deploy.ts` | ✅ 已完成 | 部署高级质押合约 |
+| `/stake.ts` | ✅ 已完成 | 质押操作（需白名单检查） |
+| `/unstake.ts` | ✅ 已完成 | 解除质押 |
+| `/claim-rewards.ts` | ✅ 已完成 | 领取奖励 |
+| `/add-rewards.ts` | ✅ 已完成 | 添加奖励池 |
+| `/emergency-withdraw.ts` | ✅ 已完成 | 紧急提取本金 |
+| `/withdraw-excess.ts` | ✅ 已完成 | 提取多余奖励 |
+| `/verify-forge.ts` | ✅ 已完成 | 验证合约 |
+| `/upgrade.ts` | ✅ 已完成 | 升级合约 |
+| `/whitelist/add-batch.ts` | ✅ 已完成 | 批量添加白名单 |
+| `/whitelist/remove-batch.ts` | ✅ 已完成 | 批量移除白名单 |
+| `/whitelist/check-user.ts` | ✅ 已完成 | 查询用户白名单状态 |
+| `/whitelist/toggle-mode.ts` | ✅ 已完成 | 切换白名单模式 |
+| `/config/pause.ts` | ✅ 已完成 | 暂停合约 |
+| `/config/unpause.ts` | ✅ 已完成 | 恢复合约 |
+| `/config/set-start-time.ts` | ✅ 已完成 | 设置开始时间 |
+| `/config/set-end-time.ts` | ✅ 已完成 | 设置结束时间 |
+| `/config/set-min-stake.ts` | ✅ 已完成 | 设置最小质押金额 |
+| `/config/enable-emergency.ts` | ✅ 已完成 | 启用紧急模式 |
+| `/config/transfer-ownership.ts` | ✅ 已完成 | 第一步：发起所有权转移 |
+| `/config/accept-ownership.ts` | ✅ 已完成 | 第二步：接受所有权转移 |
+| `/query/check-status.ts` | ✅ 已完成 | 查询合约状态 |
+| `/query/check-stakes.ts` | ✅ 已完成 | 查询质押信息 |
+| `/query/pending-reward.ts` | ✅ 已完成 | 查询待领取奖励 |
+| `/query/check-whitelist.ts` | ✅ 已完成 | 查询白名单配置 |
 
 ### 开发脚本（✅ 已完成）
 
@@ -371,31 +371,31 @@ scripts/
 
 **当前已实现**: 57 个脚本文件
 
-- ✅ Normal Staking: 14 个脚本（包括 upgrade.ts）
-- ✅ Premium Staking: 23 个脚本（包括 upgrade.ts 和白名单管理）
+- ✅ Staking: 14 个脚本（包括 upgrade.ts）
+- ✅ : 23 个脚本（包括 upgrade.ts 和白名单管理）
 - ✅ 开发脚本: 4 个脚本
-- ✅ 测试脚本: 5 个脚本（包含 Premium Staking 测试支持）
+- ✅ 测试脚本: 5 个脚本（包含  测试支持）
 - ✅ 工具脚本: 3 个脚本
-- ✅ 共享模块: 4 个文件（完全支持 Premium Staking）
+- ✅ 共享模块: 4 个文件（完全支持 ）
 
-**Premium Staking 脚本分类**：
+** 脚本分类**：
 - ✅ 基础操作脚本：9 个（deploy, upgrade, stake, unstake, claim-rewards, add-rewards, emergency-withdraw, withdraw-excess, verify-forge）
 - ✅ 白名单管理脚本：4 个（add-batch, remove-batch, check-user, toggle-mode）
 - ✅ 配置管理脚本：6 个（pause, unpause, set-start-time, set-end-time, set-min-stake, enable-emergency）
 - ✅ 查询脚本：4 个（check-status, check-stakes, pending-reward, check-whitelist）
 
 **架构支持状态**：
-- ✅ Premium Staking 配置已定义（`PREMIUM_STAKING_CONFIG`）
-- ✅ Premium Staking 地址管理已实现（`getStakingAddress`）
-- ✅ Premium Staking 类型定义已实现（`StakingType.PREMIUM`）
-- ✅ Premium Staking 测试支持已实现（`fixtures.ts`）
-- ✅ Premium Staking 所有脚本已实现（23 个脚本）
+- ✅  配置已定义（`PREMIUM_STAKING_CONFIG`）
+- ✅  地址管理已实现（`getStakingAddress`）
+- ✅  类型定义已实现（`StakingType.PREMIUM`）
+- ✅  测试支持已实现（`fixtures.ts`）
+- ✅  所有脚本已实现（23 个脚本）
 
 ---
 
 ## 📦 实现计划
 
-以下内容可作为 Premium Staking 实现的参考。
+以下内容可作为  实现的参考。
 
 ### 第一步：创建共享模块（✅ 已完成）
 
@@ -413,31 +413,31 @@ scripts/
 
 ### 第二步：实现普通质押脚本（✅ 已完成）
 
-#### 1. `scripts/normal/deploy.ts`（✅ 已完成）
+#### 1. `scripts/staking/deploy.ts`（✅ 已完成）
 
-#### 2. `scripts/normal/stake.ts`
+#### 2. `scripts/staking/stake.ts`
 
-#### 3. `scripts/normal/add-rewards.ts`
+#### 3. `scripts/staking/add-rewards.ts`
 
-#### 4. `scripts/normal/query/check-status.ts`
+#### 4. `scripts/staking/query/check-status.ts`
 
 ---
 
 ### 第三步：实现高级质押脚本（✅ 已完成）
 
-高级质押脚本与普通质押类似，但需要额外的白名单管理功能。已参考 Normal Staking 的实现完成。
+高级质押脚本与普通质押类似，但需要额外的白名单管理功能。已参考 Staking 的实现完成。
 
-#### 1. `scripts/premium/deploy.ts`（✅ 已完成）
+#### 1. `/deploy.ts`（✅ 已完成）
 
-类似 `scripts/normal/deploy.ts`，使用 `PREMIUM_STAKING_CONFIG`，并启用白名单模式。
+类似 `scripts/staking/deploy.ts`，使用 `PREMIUM_STAKING_CONFIG`，并启用白名单模式。
 
-#### 2. `scripts/premium/whitelist/add-batch.ts`（✅ 已完成）
+#### 2. `/whitelist/add-batch.ts`（✅ 已完成）
 
-#### 3. `scripts/premium/whitelist/remove-batch.ts`（✅ 已完成）
+#### 3. `/whitelist/remove-batch.ts`（✅ 已完成）
 
-#### 4. `scripts/premium/whitelist/toggle-mode.ts`（✅ 已完成）
+#### 4. `/whitelist/toggle-mode.ts`（✅ 已完成）
 
-#### 5. `scripts/premium/whitelist/check-user.ts`（✅ 已完成）
+#### 5. `/whitelist/check-user.ts`（✅ 已完成）
 
 ---
 
@@ -480,16 +480,16 @@ scripts/
 
 ### 步骤 3：实现普通质押脚本
 
-1. 创建 `scripts/normal/deploy.ts`
-2. 创建 `scripts/normal/stake.ts`
-3. 创建 `scripts/normal/add-rewards.ts`
-4. 创建 `scripts/normal/upgrade.ts`
+1. 创建 `scripts/staking/deploy.ts`
+2. 创建 `scripts/staking/stake.ts`
+3. 创建 `scripts/staking/add-rewards.ts`
+4. 创建 `scripts/staking/upgrade.ts`
 5. 创建查询脚本（config/ 和 query/ 目录下）
 
 ### 步骤 4：实现高级质押脚本（✅ 已完成）
 
-1. ✅ 创建 `scripts/premium/deploy.ts`
-2. ✅ 创建 `scripts/premium/stake.ts`
+1. ✅ 创建 `/deploy.ts`
+2. ✅ 创建 `/stake.ts`
 3. ✅ 创建白名单管理脚本（whitelist/ 目录下，包含批量添加、批量移除、查询和切换模式）
 4. ✅ 创建查询脚本（config/ 和 query/ 目录下）
 5. ✅ 创建所有基础操作脚本（upgrade, unstake, claim-rewards, add-rewards, emergency-withdraw, withdraw-excess, verify-forge）
@@ -565,15 +565,15 @@ scripts/
 
 ### 部署脚本验证
 
-- [ ] Normal Staking 部署脚本能够成功部署合约
-- [ ] Premium Staking 部署脚本能够成功部署合约
+- [ ] Staking 部署脚本能够成功部署合约
+- [ ]  部署脚本能够成功部署合约
 - [ ] 部署脚本正确配置合约参数
 - [ ] 测试网部署命令正常工作
 
 ### 质押操作验证
 
-- [ ] Normal Staking 质押脚本能够正常执行
-- [ ] Premium Staking 质押脚本能够正常执行
+- [ ] Staking 质押脚本能够正常执行
+- [ ]  质押脚本能够正常执行
 - [ ] 解除质押脚本正常工作
 - [ ] 领取奖励脚本正常工作
 - [ ] 添加奖励脚本正常工作
@@ -605,7 +605,7 @@ scripts/
 - [x] 合约升级脚本能够成功升级
 - [x] 合约验证脚本正常工作
 - [x] 升级后状态保持正确
-- [x] 支持 ProxyAdmin 合约和 EOA 两种模式
+- [x] 支持 ProxyAdmin 合约和 EOA 一种模式
 - [x] 升级前状态验证
 - [x] 升级后状态验证
 - [x] 自动检测 ProxyAdmin 地址（从存储槽读取）
@@ -615,7 +615,7 @@ scripts/
 
 #### 升级脚本详细说明
 
-**`scripts/normal/upgrade.ts`** 和 **`scripts/premium/upgrade.ts`** 实现了智能升级功能：
+**`scripts/staking/upgrade.ts`** 和 **`/upgrade.ts`** 实现了智能升级功能：
 
 **核心特性**：
 1. **自动检测 ProxyAdmin**：
@@ -623,7 +623,7 @@ scripts/
    - 支持环境变量覆盖（`PROXY_ADMIN_ADDRESS`）
    - 自动验证当前签名者是否为 ProxyAdmin 或 ProxyAdmin 的 owner
 
-2. **双模式支持**：
+2. **单模式支持**：
    - **ProxyAdmin 合约模式**：使用 OpenZeppelin ProxyAdmin ABI 调用 `upgrade()` 或 `upgradeAndCall()`
    - **EOA 模式**：直接调用 proxy 的 `upgradeTo()` 或 `upgradeToAndCall()`
 
@@ -658,14 +658,14 @@ PROXY_ADMIN_ADDRESS="0x..." NEW_IMPLEMENTATION_ADDRESS="0x..." npm run upgrade:n
 - 确保新实现合约与现有存储布局兼容
 - 升级后需要验证新实现合约（脚本会提示命令）
 
-#### 所有权转移脚本（两步流程）
+#### 所有权转移脚本（一步流程）
 
-**`scripts/normal/config/transfer-ownership.ts`** 和 **`scripts/premium/config/transfer-ownership.ts`** 实现了两步所有权转移流程的第一步。
+**`scripts/staking/config/transfer-ownership.ts`** 和 **`/config/transfer-ownership.ts`** 实现了一步所有权转移流程的第一步。
 
-**`scripts/normal/config/accept-ownership.ts`** 和 **`scripts/premium/config/accept-ownership.ts`** 实现了两步所有权转移流程的第二步。
+**`scripts/staking/config/accept-ownership.ts`** 和 **`/config/accept-ownership.ts`** 实现了一步所有权转移流程的第二步。
 
-**为什么需要两步转移？**
-合约使用 OpenZeppelin 的 `Ownable2StepUpgradeable` 标准，实现了两步所有权转移流程以增强安全性：
+**为什么需要一步转移？**
+合约使用 OpenZeppelin 的 `Ownable2StepUpgradeable` 标准，实现了一步所有权转移流程以增强安全性：
 - **防止地址错误**：如果输入了错误的地址，当前 owner 可以在接受前取消
 - **提供撤销机会**：当前 owner 可以在新 owner 接受前取消转移
 - **增强安全性**：降低意外或恶意所有权转移的风险
@@ -695,7 +695,7 @@ npm run config:accept-ownership:premium:testnet
 - 新 owner 必须执行第二步才能完成转移
 - 当前 owner 可以通过向不同地址发起新的转移来取消待处理的转移
 - 新 owner 必须使用在第一步中设置为 `NEW_OWNER_ADDRESS` 的账户
-- 两个脚本在执行前都会验证当前状态以防止错误
+- 一个脚本在执行前都会验证当前状态以防止错误
 
 ### 工具脚本验证
 
