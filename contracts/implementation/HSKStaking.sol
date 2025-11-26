@@ -128,7 +128,8 @@ contract HSKStaking is
             amount: amount,
             stakedAt: block.timestamp,
             lastRewardAt: block.timestamp,
-            isUnstaked: false
+            isUnstaked: false,
+            isCompletedStake: false
         });
         
         userPositions[msg.sender].push(positionId);
@@ -158,6 +159,7 @@ contract HSKStaking is
         uint256 totalPayout = amount + reward;
 
         position.isUnstaked = true;
+        position.isCompletedStake = true;  // Mark as completed full staking period
         totalStaked -= amount;
 
         emit RewardClaimed(msg.sender, positionId, reward, block.timestamp);
@@ -172,12 +174,6 @@ contract HSKStaking is
     ) external override nonReentrant whenNotPaused whenNotEmergency validPosition(positionId) returns (uint256) {
         Position storage position = positions[positionId];
         
-        // Cannot claim rewards if early unstake has been requested
-        uint256 requestTime = earlyUnstakeRequestTime[positionId];
-        if (requestTime > 0) {
-            revert EarlyUnstakeRequested();
-        }
-        
         uint256 reward = _updateReward(positionId);
         
         if (reward == 0) revert NoReward();
@@ -185,12 +181,7 @@ contract HSKStaking is
         // Record total claimed rewards
         claimedRewards[positionId] += reward;
 
-        // Automatically claim penalty pool share (if not yet claimed)
-        uint256 penaltyShare = _claimPenaltyPoolInternal(positionId);
-
-        // Send normal reward + penalty pool share
-        uint256 totalToSend = reward + penaltyShare;
-        (bool success, ) = msg.sender.call{value: totalToSend}("");
+        (bool success, ) = msg.sender.call{value: reward}("");
         require(success, "Reward transfer failed");
         
         emit RewardClaimed(msg.sender, positionId, reward, block.timestamp);
@@ -209,37 +200,6 @@ contract HSKStaking is
 
     function getUserPositionIds(address user) external view returns (uint256[] memory) {
         return userPositions[user];
-    }
-
-    /**
-     * @dev Get reward statistics for a specific position
-     * This function can be called by anyone to query position reward info
-     * @param user The user address (for verification that position belongs to this user)
-     * @param positionId The position ID to query
-     * @return claimedReward Total claimed rewards for this position
-     * @return pendingRewardAmount Pending rewards for this position
-     * @return totalReward Total rewards (claimed + pending)
-     */
-    function getPositionRewardInfo(address user, uint256 positionId) external view returns (
-        uint256 claimedReward,
-        uint256 pendingRewardAmount,
-        uint256 totalReward
-    ) {
-        Position memory position = positions[positionId];
-        
-        if (position.owner == address(0)) {
-            return (0, 0, 0);
-        }
-        
-        require(position.owner == user, "Position does not belong to this user");
-        
-        claimedReward = claimedRewards[positionId];
-        
-        if (!position.isUnstaked && !emergencyMode) {
-            pendingRewardAmount = _calculatePendingReward(position);
-        }
-        
-        totalReward = claimedReward + pendingRewardAmount;
     }
 
     function calculatePotentialReward(uint256 amount) external view returns (uint256) {
@@ -283,8 +243,9 @@ contract HSKStaking is
         // Calculate total reward (based on actual staking time)
         // Important: Reward is calculated up to the early unstake request time (requestTime), not the completion time
         // From the moment of requesting early unstake, no new rewards are generated
-        // Note: At this point, position's earlyUnstakeRequestTime is already set, _calculateTimeElapsed will automatically use it
-        uint256 timeElapsed = _calculateTimeElapsed(position);
+        uint256 lockEndTime = position.stakedAt + LOCK_PERIOD;
+        uint256 endTime = requestTime < lockEndTime ? requestTime : lockEndTime;
+        uint256 timeElapsed = endTime > position.lastRewardAt ? endTime - position.lastRewardAt : 0;
         uint256 totalReward = _calculateReward(position.amount, timeElapsed, rewardRate);
         
         // Calculate allowed reward (after deducting penalty rate)
@@ -309,10 +270,6 @@ contract HSKStaking is
         // Calculate reward return (allowed reward - claimed reward)
         uint256 rewardReturn = allowedReward > claimed ? allowedReward - claimed : 0;
         
-        // Automatically claim penalty pool share (if not yet claimed)
-        // Ensure users can also receive penaltyPool share when completing early unstake
-        uint256 penaltyShare = _claimPenaltyPoolInternal(positionId);
-        
         // Update reward pool and pending rewards
         if (rewardReturn > 0) {
             require(rewardPoolBalance >= rewardReturn, "Insufficient reward pool");
@@ -322,7 +279,6 @@ contract HSKStaking is
         // Update totalPendingRewards
         // Calculate reward that should be reserved from stake to early unstake request time
         // Reward is only calculated up to request time (requestTime), so need to subtract reward from requestTime to lock period end
-        uint256 lockEndTime = position.stakedAt + LOCK_PERIOD;
         uint256 remainingTime = lockEndTime > requestTime ? lockEndTime - requestTime : 0;
         uint256 remainingReward = _calculateReward(position.amount, remainingTime, rewardRate);
         
@@ -354,11 +310,13 @@ contract HSKStaking is
         }
         
         // Mark position as unstaked
+        // Note: Early unstake does NOT mark as completed stake (isCompletedStake remains false)
         position.isUnstaked = true;
         totalStaked -= position.amount;
         
-        // Total return amount = principal + reward return + penalty pool share
-        uint256 totalReturn = principalReturn + rewardReturn + penaltyShare;
+        // Total return amount = principal + reward return
+        // Note: Early unstake positions do not receive penalty pool distribution
+        uint256 totalReturn = principalReturn + rewardReturn;
         
         emit EarlyUnstakeCompleted(
             msg.sender,
@@ -376,56 +334,66 @@ contract HSKStaking is
 
 
     /**
-     * @dev Internal function to claim penalty pool share
-     * This function is called by both claimReward() and completeEarlyUnstake()
-     * Users can claim multiple times, each time getting the incremental penalty pool share
-     * Uses snapshot mechanism to ensure fairness: all positions use the same totalStaked snapshot
-     * @param positionId The position ID to claim penalty pool for
-     * @return penaltyShare The incremental penalty pool share amount for this claim
+     * @dev Distribute penalty pool to positions that completed full staking period
+     * Only positions that completed full staking period (via unstake) are eligible
+     * Distribution is based on staked amount proportion
+     * @param positionIds Array of position IDs to distribute penalty pool to
      */
-    function _claimPenaltyPoolInternal(uint256 positionId) internal returns (uint256) {
-        if (penaltyPoolBalance == 0 || totalStaked == 0) {
-            return 0;
+    function distributePenaltyPool(uint256[] calldata positionIds) external onlyOwner nonReentrant {
+        require(block.timestamp >= stakeEndTime, "Staking period not ended");
+        require(penaltyPoolBalance > 0, "Penalty pool is empty");
+        require(positionIds.length > 0, "Empty position array");
+        
+        // Save current penalty pool balance (will be used for calculations)
+        uint256 currentPenaltyPoolBalance = penaltyPoolBalance;
+        
+        // Calculate total staked amount of all completed positions
+        uint256 totalCompletedStaked = 0;
+        
+        // First pass: validate all positions and calculate total
+        for (uint256 i = 0; i < positionIds.length;) {
+            Position storage position = positions[positionIds[i]];
+            
+            // Verify position exists and completed full staking period
+            require(position.owner != address(0), "Position does not exist");
+            require(position.isCompletedStake, "Position did not complete full staking period");
+            require(position.isUnstaked, "Position must be unstaked");
+            
+            totalCompletedStaked += position.amount;
+            
+            unchecked { ++i; }
         }
         
-        Position storage position = positions[positionId];
+        require(totalCompletedStaked > 0, "No valid completed positions");
         
-        // Get or set snapshot value (record totalStaked snapshot on first claim)
-        uint256 snapshotTotalStaked = penaltyPoolSnapshotTotalStaked[positionId];
-        if (snapshotTotalStaked == 0) {
-            // First claim, record current totalStaked as snapshot (to ensure fairness)
-            snapshotTotalStaked = totalStaked;
-            penaltyPoolSnapshotTotalStaked[positionId] = snapshotTotalStaked;
+        // Second pass: distribute penalty pool proportionally
+        uint256 totalDistributed = 0;
+        for (uint256 i = 0; i < positionIds.length;) {
+            Position storage position = positions[positionIds[i]];
+            
+            // Calculate share based on staked amount proportion
+            // Use saved currentPenaltyPoolBalance to ensure accurate calculation
+            uint256 share = (currentPenaltyPoolBalance * position.amount) / totalCompletedStaked;
+            
+            if (share > 0) {
+                // Ensure we don't exceed remaining balance
+                uint256 remainingBalance = currentPenaltyPoolBalance - totalDistributed;
+                uint256 actualShare = share < remainingBalance ? share : remainingBalance;
+                
+                if (actualShare > 0) {
+                    totalDistributed += actualShare;
+                    penaltyPoolBalance -= actualShare;
+                    
+                    // Transfer to position owner
+                    (bool success, ) = position.owner.call{value: actualShare}("");
+                    require(success, "Penalty pool transfer failed");
+                    
+                    emit PenaltyPoolDistributed(position.owner, actualShare, block.timestamp);
+                }
+            }
+            
+            unchecked { ++i; }
         }
-        
-        // Use snapshot value to calculate total penalty pool share this position should receive at current moment
-        // Note: Uses snapshot's totalStaked but current penaltyPoolBalance
-        // This ensures fairness (all positions use same totalStaked baseline) while allowing users to claim newly added penalty pool
-        uint256 currentTotalShare = (penaltyPoolBalance * position.amount) / snapshotTotalStaked;
-        
-        // Get cumulative claimed amount
-        uint256 claimedAmount = penaltyPoolClaimed[positionId];
-        
-        // If current share <= claimed amount, no new share available
-        if (currentTotalShare <= claimedAmount) {
-            return 0;
-        }
-        
-        // Calculate incremental share available for this claim
-        uint256 incrementalShare = currentTotalShare - claimedAmount;
-        
-        // Update cumulative claimed amount
-        penaltyPoolClaimed[positionId] = currentTotalShare;
-        
-        // Deduct from penalty pool (note: deducting incremental portion)
-        // But since we use currentTotalShare, need to ensure it doesn't exceed actual balance
-        uint256 actualShare = incrementalShare < penaltyPoolBalance ? incrementalShare : penaltyPoolBalance;
-        penaltyPoolBalance -= actualShare;
-        
-        // Emit event
-        emit PenaltyPoolDistributed(msg.sender, actualShare, block.timestamp);
-        
-        return actualShare;
     }
 
     function emergencyWithdraw(uint256 positionId) external nonReentrant {
@@ -554,17 +522,7 @@ contract HSKStaking is
         returns (uint256) 
     {
         uint256 lockEndTime = position.stakedAt + LOCK_PERIOD;
-        uint256 endTime;
-        
-        // If early unstake has been requested, reward is calculated up to request time
-        uint256 requestTime = earlyUnstakeRequestTime[position.positionId];
-        if (requestTime > 0) {
-            // Reward calculated up to early unstake request time
-            endTime = requestTime < lockEndTime ? requestTime : lockEndTime;
-        } else {
-            // Normal case: calculate up to current time or lock period end time
-            endTime = block.timestamp < lockEndTime ? block.timestamp : lockEndTime;
-        }
+        uint256 endTime = block.timestamp < lockEndTime ? block.timestamp : lockEndTime;
         
         return endTime > position.lastRewardAt ? endTime - position.lastRewardAt : 0;
     }
@@ -611,18 +569,9 @@ contract HSKStaking is
         }
 
         // Update lastRewardAt
-        // If early unstake has been requested, update to request time; otherwise update to current time
-        uint256 requestTime = earlyUnstakeRequestTime[positionId];
         uint256 lockEndTime = position.stakedAt + LOCK_PERIOD;
-        
-        if (requestTime > 0) {
-            // Early unstake requested, update to request time (not exceeding lock period end time)
-            position.lastRewardAt = requestTime < lockEndTime ? requestTime : lockEndTime;
-        } else {
-            // Normal case, update to current time (not exceeding lock period end time)
-            uint256 currentTime = block.timestamp;
-            position.lastRewardAt = currentTime > lockEndTime ? lockEndTime : currentTime;
-        }
+        uint256 currentTime = block.timestamp;
+        position.lastRewardAt = currentTime > lockEndTime ? lockEndTime : currentTime;
     }
 
     function _calculatePendingReward(

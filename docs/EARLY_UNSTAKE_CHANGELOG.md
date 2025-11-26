@@ -11,7 +11,7 @@
 
 - **申请阶段**: 用户可以在锁定期内申请提前解除质押
 - **等待期**: 申请后需要等待7天才能完成提前解除
-- **收益停止**: 申请提前解除后，收益计算停止，不能再领取收益
+- **收益停止**: 申请提前解除后，收益计算停止（`completeEarlyUnstake()` 会基于申请时间计算收益）
 - **收益计算**: 收益计算到申请提前解除的时间，而不是完成提前解除的时间
 - **收益罚没**: 提前退出将丧失50%的收益（用户获得50%，50%进入罚没池），罚没比例由 `EARLY_UNSTAKE_PENALTY_RATE` 常量定义（默认5000 basis points = 50%）
 - **本金扣除**: 如果用户已经提前领取的收益超过应得的50%，超出部分将从本金中扣除
@@ -32,10 +32,10 @@
 ```solidity
 uint256 public penaltyPoolBalance;           // 罚没池余额
 mapping(uint256 => uint256) public claimedRewards;  // positionId => 已领取的收益总额
-    mapping(uint256 => uint256) public earlyUnstakeRequestTime;  // positionId => 提前退出申请时间（0表示未申请）
-    mapping(uint256 => uint256) public penaltyPoolClaimed;  // positionId => 已领取的罚没池份额累计金额
-    mapping(uint256 => uint256) public penaltyPoolSnapshotTotalStaked;  // positionId => 首次领取时的totalStaked快照（0表示未领取过）
+mapping(uint256 => uint256) public earlyUnstakeRequestTime;  // positionId => 提前退出申请时间（0表示未申请）
 ```
+
+**注意**: `isCompletedStake` 字段已合并到 `Position` 结构体中，不再使用独立的 mapping。
 
 ### 2. 常量定义变更 (`StakingConstants.sol`)
 
@@ -54,6 +54,7 @@ uint256 public constant EARLY_UNSTAKE_PENALTY_RATE = 5000;  // 提前解除质�
 function requestEarlyUnstake(uint256 positionId) external;
 function completeEarlyUnstake(uint256 positionId) external;
 function getPositionRewardInfo(address user, uint256 positionId) external view returns (uint256 claimedReward, uint256 pendingRewardAmount, uint256 totalReward);
+function distributePenaltyPool(uint256[] calldata positionIds) external;  // 管理员手动分配罚没池
 ```
 
 #### 新增事件
@@ -97,7 +98,7 @@ event PenaltyPoolDistributed(
 
 **效果**:
 - 记录申请时间戳到 `earlyUnstakeRequestTime[positionId]`
-- **从申请时刻起，收益计算停止，不能再领取收益**
+- **从申请时刻起，收益计算停止**（`completeEarlyUnstake()` 会基于申请时间计算收益）
 - 触发 `EarlyUnstakeRequested` 事件
 
 **重要说明**:
@@ -118,14 +119,16 @@ event PenaltyPoolDistributed(
 1. **计算总收益（基于实际质押时间，但只计算到申请提前解除的时间）**
    - 收益计算到 `requestTime`（申请时间），而不是 `block.timestamp`（完成时间）
    - 等待的7天不产生收益
-   - 使用 `_calculateTimeElapsed()` 函数，该函数会自动检查 `earlyUnstakeRequestTime` 并使用申请时间
+   - **直接计算时间**：不依赖 `_calculateTimeElapsed()`，在函数内部直接计算
+   - 计算公式：`endTime = requestTime < lockEndTime ? requestTime : lockEndTime`
+   - `timeElapsed = endTime > position.lastRewardAt ? endTime - position.lastRewardAt : 0`
 2. 计算应得收益（使用 `EARLY_UNSTAKE_PENALTY_RATE` 常量，默认50%）
 3. 计算已领取收益（`claimedRewards[positionId]`）
 4. 如果已领取 > 应得，从本金扣除超出部分
 5. 计算罚没金额（总收益 - 应得收益）
 6. 将罚没金额从未领取收益转移到罚没池
-7. **自动领取罚没池份额**（计算增量部分，支持多次领取）
-8. 返回本金 + 应得收益（扣除已领取部分）+ 罚没池份额
+7. 返回本金 + 应得收益（扣除已领取部分）
+8. **注意**：提前解除质押的位置不会获得罚没池分配（只有完整质押周期的位置才能获得）
 
 **收益计算示例**:
 ```
@@ -146,10 +149,9 @@ event PenaltyPoolDistributed(
 返还金额:
 - 本金: 100 HSK
 - 奖励返还: 0.411 - 0.3 = 0.111 HSK
-- 罚没池份额: 假设 10 HSK（来自其他用户的罚没）
-- 总计: 100 + 0.111 + 10 = 110.111 HSK
+- 总计: 100 + 0.111 = 100.111 HSK
 
-罚没池增加: 0.411 HSK
+罚没池增加: 0.411 HSK（由管理员后续分配给完整质押用户）
 ```
 
 ##### `pendingReward(uint256 positionId) → uint256`
@@ -170,228 +172,99 @@ event PenaltyPoolDistributed(
 - 用户查询自己的位置收益
 - 如果需要查询位置所有者，可以通过 `positions[positionId].owner` 查询
 
-##### `getPositionRewardInfo(address user, uint256 positionId) → (uint256 claimedReward, uint256 pendingRewardAmount, uint256 totalReward)`
-
-**功能**: 查询指定位置的所有收益信息（已领取 + 待领取）
-
-**要求**:
-- ✅ **任何人都可以调用**（view函数）
-- `user` 参数必须与该 position 的所有者匹配，用于验证查询的正确性
-- 查询不需要任何权限验证
-- 但只有位置所有者可以领取（通过 `claimReward` 函数）
-
-**参数**:
-- `user`: 用户地址（必须与 position.owner 匹配）
-- `positionId`: 位置ID
-
-**返回**:
-- `claimedReward`: 该位置的已领取收益
-- `pendingRewardAmount`: 该位置的待领取收益
-- `totalReward`: 总收益（claimed + pending）
-
-**用途**: 
-- ✅ **管理员查询**：管理员可以查询任何用户的位置收益信息（传入正确的 user 地址）
-- ✅ **用户查询**：用户可以查询自己的位置收益信息
-- ✅ **前端查询**：前端可以查询任何位置的收益信息
-- 一次调用获取所有收益信息，比分别调用 `pendingReward` 和 `claimedRewards` 更高效
-
-**注意**: 
-- 查询是公开的，任何人都可以查询
-- 但领取需要权限：只有位置所有者可以调用 `claimReward` 来领取收益
-
 ### 罚没池分配机制
 
-**重要变更**: 罚没池不再通过外部函数分配，而是在以下时机自动领取：
+**重要变更**: 罚没池改为管理员手动分配机制，在质押周期完成后由管理员调用接口进行分配。
 
-1. **在 `claimReward()` 时自动领取**
-   - 用户领取收益时，自动计算并领取该位置的罚没池份额（增量部分）
-   - 支持多次领取，每次都能领取新增的罚没池份额
-
-2. **在 `completeEarlyUnstake()` 时自动领取**
-   - 用户完成提前解除质押时，自动领取罚没池份额（增量部分）
-   - 确保即使从未调用过 `claimReward()` 的用户也能获得罚没池份额
-   - 如果之前已经领取过，会计算并领取新增的增量部分
+1. **分配时机**: 质押周期完成后，由管理员手动调用分配接口
+2. **分配对象**: 只分配给完成完整质押周期的用户（通过 `unstake()` 正常解除质押的位置）
+3. **分配方式**: 根据 `penaltyPoolBalance` 和用户质押金额按比例分配
+4. **合约接口**: 合约保留管理员分配接口，供线下调用
 
 **分配规则**:
-- **按每个位置独立计算，不合并计算**
-- **公平性保证**：每个位置在首次领取时记录 `totalStaked` 快照，使用快照值计算份额
-- **多次领取支持**：用户可以多次调用 `claimReward()`，每次都能领取新增的罚没池份额
-- 计算公式：
-  - 首次领取：`currentTotalShare = (penaltyPoolBalance * position.amount) / snapshotTotalStaked`
-  - 后续领取：`incrementalShare = currentTotalShare - penaltyPoolClaimed[positionId]`
-- 每个位置使用首次领取时的 `totalStaked` 快照，确保公平性
-- 如果用户有多个位置，每个位置独立领取
-- **重要**：使用快照机制确保公平性，同时支持多次领取新增的罚没池份额
+- **只给完整质押用户分配**：只有通过 `unstake()` 完成完整质押周期的位置才能获得罚没池分配
+- **按质押金额比例分配**：根据每个位置的质押金额占所有完整质押位置总金额的比例进行分配
+- **计算公式**：
+  - 计算所有完整质押位置的总金额：`totalCompletedStaked`
+  - 每个位置的份额：`share = (penaltyPoolBalance * position.amount) / totalCompletedStaked`
+- **标记机制**：`unstake()` 时会标记该位置已完成完整质押周期，用于后续分配时的筛选
 
-**为什么需要 `penaltyPoolSnapshotTotalStaked` 快照机制？**
+##### `distributePenaltyPool(uint256[] calldata positionIds)`
 
-### 核心问题：如何公平地分配罚没池？
+**功能**: 管理员手动分配罚没池（仅限完整质押周期的位置）
 
-想象一下，罚没池就像一个大蛋糕，需要按照每个人的"股份"来分配。
+**要求**:
+- 必须是合约所有者（管理员）
+- 只能分配给完成完整质押周期的位置（通过 `unstake()` 正常解除质押）
+- 质押周期必须已完成（`stakeEndTime` 已过）
 
-**关键概念**：
-- **罚没池** = 蛋糕的总大小（会不断增长）
-- **totalStaked** = 所有质押的总金额（会不断变化，因为有人解除质押）
-- **你的质押金额** = 你的股份
-- **你的份额比例** = 你的质押金额 / totalStaked
+**逻辑**:
+1. 验证所有位置都已完成完整质押周期（`positions[positionId].isCompletedStake == true`）
+2. 计算所有完整质押位置的总金额
+3. 根据每个位置的质押金额比例分配罚没池
+4. 将分配的金额发送给位置所有者
+5. 更新罚没池余额
 
-### 问题场景（不使用快照）：
-
+**分配示例**:
 ```
-初始状态（就像分蛋糕的规则）：
-- 蛋糕（罚没池）：1000 HSK
-- 总质押：10000 HSK
-- 用户A：1000 HSK（占 10%，应得 100 HSK）
-- 用户B：2000 HSK（占 20%，应得 200 HSK）
+假设：
+- 罚没池余额：1000 HSK
+- 完整质押位置：
+  - 位置1：1000 HSK（用户A）
+  - 位置2：2000 HSK（用户B）
+  - 位置3：2000 HSK（用户C）
+- 总完整质押金额：5000 HSK
 
-时刻T1：用户A来领取
-- 当前规则：totalStaked = 10000
-- A的份额 = 1000 / 10000 = 10%
-- A领取 = 1000 * 10% = 100 HSK ✅
-
-时刻T2：用户C提前解除质押（拿走3000 HSK）
-- 总质押变成：7000 HSK（减少了！）
-- 蛋糕还剩：900 HSK
-
-时刻T3：用户B来领取
-- 当前规则：totalStaked = 7000（变小了！）
-- B的份额 = 2000 / 7000 = 28.57%（变大了！）
-- B领取 = 900 * 28.57% = 257.14 HSK ❌
-
-问题：B本来应该得200 HSK，但因为totalStaked变小了，B的"股份比例"变大了，所以得了257 HSK，不公平！
+分配计算：
+- 用户A份额 = 1000 * 1000 / 5000 = 200 HSK
+- 用户B份额 = 1000 * 2000 / 5000 = 400 HSK
+- 用户C份额 = 1000 * 2000 / 5000 = 400 HSK
+- 总计：200 + 400 + 400 = 1000 HSK ✅
 ```
 
-**问题根源**：`totalStaked` 会变化，如果每次都使用"当前"的 `totalStaked` 计算，后领取的人会因为分母变小而获得更多份额。
-
-### 解决方案（使用快照）：
-
-**核心思想**：每个位置在"第一次领取时"拍一张快照，记录当时的 `totalStaked`，以后都用这个快照值来计算份额。
-
-```
-初始状态：
-- 蛋糕（罚没池）：1000 HSK
-- 总质押：10000 HSK
-- 用户A：1000 HSK
-- 用户B：2000 HSK
-
-时刻T1：用户A第一次领取
-- 📸 拍快照：snapshotTotalStaked[1] = 10000（记录下这个时刻的totalStaked）
-- A的份额比例 = 1000 / 10000 = 10%（固定不变）
-- A领取 = 1000 * 10% = 100 HSK ✅
-- 记录：penaltyPoolClaimed[1] = 100（已领取100）
-
-时刻T2：用户C提前解除质押（拿走3000 HSK），并增加500 HSK到罚没池
-- 蛋糕变成：1400 HSK（新增了500）
-- 总质押变成：7000 HSK（但A的快照还是10000！）
-
-时刻T3：用户A第二次领取（领取新增的500 HSK）
-- 📸 使用快照：snapshotTotalStaked[1] = 10000（不变，还是第一次的快照）
-- A的份额比例 = 1000 / 10000 = 10%（还是10%，不会变）
-- 当前应得总额 = 1400 * 10% = 140 HSK
-- 已领取 = 100 HSK
-- 本次领取 = 140 - 100 = 40 HSK ✅（新增500中的40，比例正确）
-
-时刻T4：用户B第一次领取
-- 📸 拍快照：snapshotTotalStaked[2] = 7000（B领取时的totalStaked）
-- B的份额比例 = 2000 / 7000 = 28.57%（固定不变）
-- B领取 = 1360 * 28.57% = 388.57 HSK ✅
-```
-
-### 快照机制的作用（简单理解）：
-
-1. **📸 拍快照**：每个位置第一次领取时，记录当时的 `totalStaked` 值
-2. **🔒 固定比例**：以后都用这个快照值计算份额比例，不会因为 `totalStaked` 变化而改变
-3. **➕ 支持增量**：每次领取时，计算"当前应得总额 - 已领取金额 = 本次可领取"
-4. **🎯 确保公平**：每个位置的比例基准是固定的，不会因为别人解除质押而改变
-
-### 为什么每个位置要记录自己的快照？
-
-因为不同位置可能在不同时间首次领取：
-- 位置A在 `totalStaked = 10000` 时首次领取 → 快照 = 10000
-- 位置B在 `totalStaked = 7000` 时首次领取 → 快照 = 7000
-
-每个位置用自己的快照，确保公平性。
-
-### 代码中的实现：
-
-```solidity
-// 首次领取时，记录快照
-if (snapshotTotalStaked == 0) {
-    snapshotTotalStaked = totalStaked;  // 📸 拍快照
-    penaltyPoolSnapshotTotalStaked[positionId] = snapshotTotalStaked;
-}
-
-// 以后都用快照值计算（不会用当前的totalStaked）
-uint256 currentTotalShare = (penaltyPoolBalance * position.amount) / snapshotTotalStaked;
-```
-
-**示例**:
-```
-初始状态：
-- 罚没池：1000 HSK
-- 总质押：10000 HSK
-- 用户A位置1：1000 HSK
-
-时刻T1：用户A第一次 claimReward
-- 记录快照：snapshotTotalStaked[1] = 10000
-- 应得份额 = 1000 * 1000 / 10000 = 100 HSK
-- 领取：100 HSK
-- penaltyPoolClaimed[1] = 100
-- penaltyPoolBalance = 900 HSK
-
-时刻T2：用户B提前解除，增加500 HSK到罚没池
-- penaltyPoolBalance = 1400 HSK
-- totalStaked = 8000 HSK（假设B质押了2000 HSK）
-
-时刻T3：用户A第二次 claimReward
-- 使用快照：snapshotTotalStaked[1] = 10000（不变）
-- 当前应得份额 = 1400 * 1000 / 10000 = 140 HSK
-- 已领取：100 HSK
-- 增量份额 = 140 - 100 = 40 HSK
-- 领取：40 HSK
-- penaltyPoolClaimed[1] = 140
-- penaltyPoolBalance = 1360 HSK
-```
-
-**关于提前解除质押的惩罚计算**:
-- 用户提前解除质押时，惩罚基于**该用户自己的收益**计算
-- **不考虑已领取的 penaltyPool**（那是其他用户的罚没，不是该用户的收益）
-- 示例：
-  - userA 提前解除质押 → 50%收益进入 penaltyPool
-  - userB 领取奖励（自动领取 penaltyPool 份额）
-  - userB 之后也提前解除质押 → 惩罚基于 userB 自己的收益计算，与已领取的 penaltyPool 无关
+**注意**:
+- 此函数由管理员在质押周期完成后手动调用
+- 可以分批分配，支持传入多个位置ID数组
+- 提前解除质押的位置不会参与分配
 
 #### 修改现有函数
 
 ##### `claimReward(uint256 positionId)`
 
 **变更**: 
-1. 记录已领取的收益总额
-2. 自动领取罚没池份额
-3. 禁止在申请提前解除后领取收益
+1. 记录已领取的收益总额（用于提前退出时计算）
+2. **移除自动领取罚没池份额**（改为管理员手动分配）
 
+**变更内容**:
 ```solidity
-// 新增检查：如果已申请提前解除，不能再领取收益
-uint256 requestTime = earlyUnstakeRequestTime[positionId];
-if (requestTime > 0) {
-    revert EarlyUnstakeRequested();
-}
-
-// 记录已领取的收益总额
+// 记录已领取的收益总额（用于提前退出时计算）
 claimedRewards[positionId] += reward;
 
-// 自动领取罚没池份额（计算增量部分，支持多次领取）
-uint256 penaltyShare = _claimPenaltyPoolInternal(positionId);
-
-// 发送正常奖励 + 罚没池份额
-uint256 totalToSend = reward + penaltyShare;
+// 发送正常奖励（不再自动领取罚没池份额）
+(bool success, ) = msg.sender.call{value: reward}("");
+require(success, "Reward transfer failed");
 ```
 
 **影响**: 
-- 每次领取奖励时，累计记录到 `claimedRewards[positionId]`
-- 自动领取罚没池份额（计算增量部分，支持多次领取）
-- 如果已申请提前解除，不能再领取收益
-- 用于在提前退出时计算是否需要从本金扣除
+- 每次领取奖励时，累计记录到 `claimedRewards[positionId]`（用于提前退出时计算）
+- **罚没池份额由管理员在质押周期完成后手动分配**
+
+##### `unstake(uint256 positionId)`
+
+**变更**: 
+1. 添加完整质押周期标记
+2. 标记该位置已完成完整质押周期，用于后续罚没池分配
+
+**逻辑**:
+1. 验证锁定期已结束
+2. 计算并发放收益
+3. **标记该位置已完成完整质押周期**（`position.isCompletedStake = true`）
+4. 返回本金 + 收益
+
+**影响**: 
+- 只有通过 `unstake()` 正常解除质押的位置才会被标记为完整质押
+- 提前解除质押的位置不会被标记，不能参与罚没池分配
+- 标记后的位置可以在质押周期完成后由管理员分配罚没池份额
 
 ## 脚本变更
 
@@ -410,7 +283,7 @@ uint256 totalToSend = reward + penaltyShare;
    - 用法: `npm run query:statistics:testnet`
    - 功能：遍历所有位置，按用户聚合收益，显示Top 20用户和总体统计
 
-**注意**: `distribute-penalty-pool.ts` 脚本已不再需要，因为罚没池现在自动分配
+**注意**: `distribute-penalty-pool.ts` 脚本需要更新，改为管理员手动分配接口，在质押周期完成后调用
 
 ## 测试变更
 
@@ -423,9 +296,10 @@ uint256 totalToSend = reward + penaltyShare;
 - ✅ 7天后完成提前退出
 - ✅ 收益罚没计算（50%）
 - ✅ 已领取收益从本金扣除
-- ✅ 罚没池自动分配（在claimReward和completeEarlyUnstake时）
+- ✅ 完整质押标记（unstake时标记）
+- ✅ 罚没池手动分配（管理员在质押周期完成后分配）
 - ✅ 收益计算到申请时间（不是完成时间）
-- ✅ 申请后不能再领取收益
+- ✅ 收益计算到申请时间（completeEarlyUnstake中直接计算）
 - ✅ 边界条件（已领取超过应得、罚没池为空等）
 - ✅ 重复申请检查
 - ✅ 等待期检查
@@ -443,6 +317,10 @@ uint256 totalToSend = reward + penaltyShare;
 - `false`: 活跃状态（未解除质押）
 - `true`: 已解除质押状态
 
+**`isCompletedStake: bool`**
+- `false`: 未完成完整质押周期（提前解除或未解除）
+- `true`: 已完成完整质押周期（通过 `unstake()` 正常解除质押）
+
 #### 2. 提前解除质押相关状态
 
 **`earlyUnstakeRequestTime[positionId]: uint256`**
@@ -455,19 +333,7 @@ uint256 totalToSend = reward + penaltyShare;
 - `0`: 未领取过收益
 - `> 0`: 已领取的收益总额（累计值）
 
-**`penaltyPoolClaimed[positionId]: uint256`**
-- `0`: 未领取过罚没池份额
-- `> 0`: 已领取的罚没池份额累计金额
-
-**`penaltyPoolSnapshotTotalStaked[positionId]: uint256`**
-- `0`: 未领取过罚没池份额
-- `> 0`: 首次领取时的 `totalStaked` 快照（用于公平计算份额，后续领取时保持不变）
-
-**字段意义**：
-- 该字段用于解决罚没池分配中的公平性问题
-- 每个位置在首次领取时记录 `totalStaked` 快照，作为该位置的比例基准
-- 后续所有领取都使用这个快照值计算份额，确保不会因为 `totalStaked` 变化而影响公平性
-- 例如：如果位置在 `totalStaked = 10000` 时首次领取，那么后续即使 `totalStaked` 变为 `7000`，该位置仍然使用 `10000` 作为基准计算份额
+**注意**: `isCompletedStake` 字段已合并到 `Position` 结构体中，作为位置的一个属性，而不是独立的 mapping。
 
 #### 4. 时间相关状态
 
@@ -490,27 +356,25 @@ uint256 totalToSend = reward + penaltyShare;
 isUnstaked = false
 earlyUnstakeRequestTime = 0
 claimedRewards >= 0
-penaltyPoolClaimed >= 0（累计已领取的罚没池份额）
-penaltyPoolSnapshotTotalStaked = 0 或 > 0（0表示未领取过，>0表示首次领取时的快照）
+isCompletedStake = false
 锁定期：可能在内或已结束
 ```
 **可执行操作**：
 - ✅ 领取收益 (`claimReward`)
 - ✅ 申请提前解除质押 (`requestEarlyUnstake`)
-- ✅ 正常解除质押 (`unstake`) - 如果锁定期已结束
+- ✅ 正常解除质押 (`unstake`) - 如果锁定期已结束（解除后会标记 `isCompletedStake = true`）
 
 #### 状态2：已申请提前解除，等待7天
 ```
 isUnstaked = false
 earlyUnstakeRequestTime > 0
 claimedRewards >= 0
-penaltyPoolClaimed >= 0（累计已领取的罚没池份额）
-penaltyPoolSnapshotTotalStaked = 0 或 > 0（0表示未领取过，>0表示首次领取时的快照）
+isCompletedStake = false（提前解除不会标记为完整质押）
 锁定期：在锁定期内
 等待期：block.timestamp < requestTime + 7 days
 ```
 **可执行操作**：
-- ❌ 不能再领取收益（申请后收益停止计算）
+- ⚠️ 可以领取收益，但收益计算到申请时间（`completeEarlyUnstake` 时会基于申请时间计算）
 - ❌ 不能重复申请提前解除
 - ❌ 不能完成提前解除（等待期未过）
 - ✅ 等待7天后可以完成提前解除 (`completeEarlyUnstake`)
@@ -520,8 +384,7 @@ penaltyPoolSnapshotTotalStaked = 0 或 > 0（0表示未领取过，>0表示首�
 isUnstaked = false
 earlyUnstakeRequestTime > 0
 claimedRewards >= 0
-penaltyPoolClaimed >= 0（累计已领取的罚没池份额）
-penaltyPoolSnapshotTotalStaked = 0 或 > 0（0表示未领取过，>0表示首次领取时的快照）
+isCompletedStake = false（提前解除不会标记为完整质押）
 锁定期：在锁定期内
 等待期：block.timestamp >= requestTime + 7 days
 ```
@@ -531,26 +394,26 @@ penaltyPoolSnapshotTotalStaked = 0 或 > 0（0表示未领取过，>0表示首�
 #### 状态4：正常解除质押（锁定期结束后）
 ```
 isUnstaked = true
-earlyUnstakeRequestTime = 0 或 > 0（如果之前申请过）
+earlyUnstakeRequestTime = 0（正常解除不会申请提前解除）
 claimedRewards >= 0
-penaltyPoolClaimed >= 0（累计已领取的罚没池份额）
-penaltyPoolSnapshotTotalStaked = 0 或 > 0（0表示未领取过，>0表示首次领取时的快照）
+isCompletedStake = true（通过unstake正常解除，标记为完整质押）
 锁定期：已结束
 ```
 **可执行操作**：
 - ❌ 所有操作都不可用（位置已解除质押）
+- ✅ 可以参与罚没池分配（由管理员在质押周期完成后手动分配）
 
 #### 状态5：提前解除质押完成
 ```
 isUnstaked = true
 earlyUnstakeRequestTime > 0
 claimedRewards >= 0
-penaltyPoolClaimed >= 0（累计已领取的罚没池份额，可能在解除时领取）
-penaltyPoolSnapshotTotalStaked = 0 或 > 0（0表示未领取过，>0表示首次领取时的快照）
+isCompletedStake = false（提前解除不会标记为完整质押）
 锁定期：在锁定期内（提前解除）
 ```
 **可执行操作**：
 - ❌ 所有操作都不可用（位置已解除质押）
+- ❌ 不能参与罚没池分配（只有完整质押的位置才能获得分配）
 
 ### 状态转换图
 
@@ -588,11 +451,10 @@ bool canComplete = block.timestamp >= requestTime + EARLY_UNLOCK_PERIOD;
 
 #### 查询收益状态
 ```solidity
+Position memory position = positions[positionId];
 uint256 claimed = claimedRewards[positionId];
-uint256 penaltyClaimed = penaltyPoolClaimed[positionId];  // 累计已领取的罚没池份额
-uint256 penaltySnapshot = penaltyPoolSnapshotTotalStaked[positionId];  // 首次领取时的快照
-bool hasClaimedPenalty = penaltySnapshot > 0;  // >0 表示已领取过
 uint256 pending = pendingReward(positionId);
+bool isCompleted = position.isCompletedStake;  // 是否完成完整质押周期（从Position结构体中读取）
 ```
 
 #### 查询锁定期状态
@@ -612,9 +474,9 @@ bool isActive = !position.isUnstaked;
 ```solidity
 bool canClaimReward = 
     !position.isUnstaked && 
-    earlyUnstakeRequestTime[positionId] == 0 &&
     !emergencyMode &&
     !paused();
+// 注意：claimReward() 不检查提前解除状态，但 completeEarlyUnstake() 会基于申请时间计算收益
 ```
 
 #### 判断是否可以申请提前解除
@@ -648,7 +510,7 @@ bool canUnstake =
 1. **质押状态**：活跃 / 已解除
 2. **提前解除状态**：未申请 / 已申请等待中 / 可完成
 3. **收益状态**：未领取 / 部分领取 / 全部领取
-4. **罚没池状态**：未领取 / 已领取
+4. **完整质押标记**：未完成 / 已完成（只有完整质押的位置才能参与罚没池分配）
 5. **锁定期状态**：锁定期内 / 锁定期已结束
 
 这些状态可以组合成多种情况，但主要的状态转换路径是：
@@ -660,39 +522,32 @@ bool canUnstake =
 ### 用户提前退出流程
 
 ```typescript
-// 1. 申请提前退出（收益计算停止）
+// 1. 申请提前退出
 await staking.requestEarlyUnstake(positionId);
-// 注意：申请后不能再调用 claimReward()
+// 注意：申请后，completeEarlyUnstake() 会基于申请时间计算收益
 
 // 2. 等待7天（这7天不产生收益）
 await advanceTime(7 * 24 * 60 * 60);
 
-// 3. 完成提前退出（自动领取罚没池份额）
+// 3. 完成提前退出
 await staking.completeEarlyUnstake(positionId);
+// 注意：提前解除质押的位置不会获得罚没池分配
 ```
 
-### 查询位置收益信息
+### 罚没池手动分配（管理员）
 
 ```typescript
-// 查询用户的位置收益信息（需要提供用户地址和位置ID）
-const rewardInfo = await staking.getPositionRewardInfo(userAddress, positionId);
-// rewardInfo.claimedReward - 已领取收益
-// rewardInfo.pendingRewardAmount - 待领取收益
-// rewardInfo.totalReward - 总收益
+// 质押周期完成后，管理员手动分配罚没池
+// 只分配给完成完整质押周期的位置（通过unstake正常解除）
 
-// 注意：如果 positionId 不属于 userAddress，函数会 revert
+// 1. 正常解除质押（标记为完整质押）
+await staking.unstake(positionId); // 会标记 isCompletedStake[positionId] = true
 
-### 罚没池自动分配
+// 2. 等待质押周期结束（stakeEndTime已过）
 
-```typescript
-// 罚没池在以下时机自动领取，无需手动操作：
-// 1. 用户调用 claimReward() 时（每次领取增量部分）
-await staking.claimReward(positionId); // 自动领取罚没池份额（增量部分）
-
-// 2. 用户完成提前解除质押时（每次领取增量部分）
-await staking.completeEarlyUnstake(positionId); // 自动领取罚没池份额（增量部分）
-
-// 注意：支持多次领取，每次都能领取新增的罚没池份额
+// 3. 管理员调用分配接口（线下调用）
+await staking.distributePenaltyPool([positionId1, positionId2, ...]); 
+// 只分配给 isCompletedStake = true 的位置
 ```
 
 ## 影响评估
@@ -712,10 +567,11 @@ await staking.completeEarlyUnstake(positionId); // 自动领取罚没池份额�
 
 - `requestEarlyUnstake`: ~50,000 gas
 - `completeEarlyUnstake`: ~150,000 gas（取决于计算复杂度）
-- `claimReward`: ~80,000 gas（包括自动领取罚没池份额）
-- `getPositionRewardInfo`: view函数，无gas消耗（链下调用）
+- `claimReward`: ~60,000 gas（移除自动分配后gas消耗降低）
+- `unstake`: ~80,000 gas（包括标记完整质押）
+- `distributePenaltyPool`: ~100,000 gas（取决于分配的位置数量）
 
-**注意**: 罚没池现在自动分配，不再需要一次性分配函数，避免了gas消耗过高的问题
+**注意**: 罚没池改为管理员手动分配，在质押周期完成后由管理员调用接口分配，避免gas消耗过高的问题
 
 ## 安全考虑
 
@@ -740,7 +596,7 @@ await staking.completeEarlyUnstake(positionId); // 自动领取罚没池份额�
 
 2. **收益计算停止**: 申请提前解除后，收益计算立即停止，等待的7天不产生收益。这是设计行为，确保用户不能通过延迟完成来获得额外收益。
 
-3. **罚没池余额**: 如果用户从未调用过 `claimReward()` 或 `completeEarlyUnstake()`，罚没池份额会一直保留在合约中，直到用户操作时自动领取。
+3. **罚没池分配**: 罚没池由管理员在质押周期完成后手动分配，只分配给完成完整质押周期的位置。
 
 ## 部署检查清单
 
@@ -769,19 +625,19 @@ await staking.completeEarlyUnstake(positionId); // 自动领取罚没池份额�
 - **v2.1.0** (2024): 添加提前解除质押功能
   - 新增 `requestEarlyUnstake()` 函数 - 申请提前解除质押
   - 新增 `completeEarlyUnstake()` 函数 - 完成提前解除质押（7天后）
-  - 新增 `getPositionRewardInfo()` 函数 - 查询单个位置的收益信息
   - 修改 `claimReward()` 函数：
-    - 记录已领取收益
-    - 自动领取罚没池份额
-    - 禁止在申请提前解除后领取收益
+    - 记录已领取收益（用于提前退出时计算）
+    - **移除自动领取罚没池份额**（改为管理员手动分配）
+  - 修改 `unstake()` 函数：
+    - 添加完整质押周期标记（`position.isCompletedStake = true`）
   - 修改 `completeEarlyUnstake()` 函数：
-    - 收益计算到申请时间（不是完成时间）
-    - 自动领取罚没池份额
-  - 修改 `_calculateTimeElapsed()` 函数：
-    - 如果已申请提前解除，收益计算到申请时间
-    - 删除了 `_calculateTimeElapsedForEarlyUnstake()` 函数，合并到 `_calculateTimeElapsed()`
+    - 收益计算到申请时间（不是完成时间），在函数内部直接计算时间
+    - **移除自动领取罚没池份额**（提前解除不参与分配）
   - 新增常量 `EARLY_UNSTAKE_PENALTY_RATE`（50%罚没比例）
   - 优化罚没池转移逻辑，简化代码
+  - 新增管理员分配接口 `distributePenaltyPool()` - 手动分配罚没池（只分配给完整质押位置）
+  - 在 `Position` 结构体中新增字段 `isCompletedStake` - 标记完整质押周期（不再使用独立的 mapping）
+  - 移除存储变量 `penaltyPoolClaimed` 和 `penaltyPoolSnapshotTotalStaked`（不再需要快照机制）
   - 新增相关事件和存储变量
   - 新增统计脚本 `scripts/staking/query/statistics.ts`
 
@@ -796,48 +652,37 @@ await staking.completeEarlyUnstake(positionId); // 自动领取罚没池份额�
 - 确保公平性：申请后收益立即停止
 
 **实现**: 
-- `_calculateTimeElapsed()` 检查 `earlyUnstakeRequestTime`
-- 如果已申请，使用申请时间作为结束时间
+- `completeEarlyUnstake()` 函数内部直接计算时间，基于 `requestTime` 计算收益
+- 不依赖 `_calculateTimeElapsed()` 函数（该函数保持原始逻辑）
 
-### 2. 罚没池自动分配
+### 2. 罚没池手动分配
 
-**设计**: 罚没池在 `claimReward()` 和 `completeEarlyUnstake()` 时自动领取
-
-**原因**:
-- 用户体验好，无需等待管理员操作
-- 实时分配，用户随时可以领取
-- 避免在 stakeEndTime 后一次性分配的问题（用户可能还在质押中）
-- 避免gas消耗过高的问题
-
-**实现**: 
-- `_claimPenaltyPoolInternal()` 内部函数处理共同逻辑
-- `claimReward()` 和 `completeEarlyUnstake()` 都调用此函数
-
-### 3. 申请后禁止领取收益
-
-**设计**: 申请提前解除后，不能再调用 `claimReward()`
+**设计**: 罚没池在质押周期完成后由管理员手动分配，只分配给完成完整质押周期的位置
 
 **原因**:
-- 收益计算已停止，不应该再领取
-- 简化逻辑，避免状态不一致
+- 确保公平性：只奖励完成完整质押周期的用户
+- 避免提前解除质押的用户获得罚没池分配
+- 管理员可以控制分配时机，在质押周期结束后统一分配
+- 避免gas消耗过高的问题（分批分配）
 
 **实现**: 
-- `claimReward()` 检查 `earlyUnstakeRequestTime`
-- 如果已申请，抛出 `EarlyUnstakeRequested` 错误
+- `unstake()` 函数标记位置为完整质押（`isCompletedStake[positionId] = true`）
+- `distributePenaltyPool()` 管理员函数只分配给标记为完整质押的位置
+- 根据质押金额比例分配罚没池余额
 
-### 4. 罚没池快照机制
+### 3. 完整质押标记机制
 
-**设计**: 使用 `penaltyPoolSnapshotTotalStaked` 记录每个位置首次领取时的 `totalStaked` 快照
+**设计**: 使用 `isCompletedStake` 标记完成完整质押周期的位置
 
 **原因**:
-- 确保公平性：所有位置使用固定的比例基准，不会因为后续 `totalStaked` 变化而影响分配
-- 支持多次领取：用户可以多次调用 `claimReward()`，每次都能领取新增的罚没池份额
-- 避免先领取的用户份额被锁定，后领取的用户获得更多份额的问题
+- 区分完整质押和提前解除质押的位置
+- 确保只有完成完整质押周期的用户才能获得罚没池分配
+- 公平性：提前解除质押的用户不应获得其他用户罚没的收益
 
 **实现**: 
-- `_claimPenaltyPoolInternal()` 在首次领取时记录 `totalStaked` 快照
-- 后续所有领取都使用快照值计算份额：`currentTotalShare = (penaltyPoolBalance * position.amount) / snapshotTotalStaked`
-- 计算增量份额：`incrementalShare = currentTotalShare - penaltyPoolClaimed[positionId]`
+- `unstake()` 函数在正常解除质押时标记 `position.isCompletedStake = true`（字段在Position结构体中）
+- `completeEarlyUnstake()` 不会标记（提前解除不视为完整质押）
+- `distributePenaltyPool()` 只分配给 `position.isCompletedStake = true` 的位置
 
 ---
 

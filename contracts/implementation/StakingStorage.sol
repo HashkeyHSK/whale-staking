@@ -37,8 +37,6 @@ abstract contract StakingStorage is Initializable, Ownable2StepUpgradeable {
     uint256 public penaltyPoolBalance;           // Penalty pool balance
     mapping(uint256 => uint256) public claimedRewards;  // positionId => Total claimed rewards
     mapping(uint256 => uint256) public earlyUnstakeRequestTime;  // positionId => Early unstake request time (0 means not requested)
-    mapping(uint256 => uint256) public penaltyPoolClaimed;  // positionId => Cumulative claimed penalty pool share amount
-    mapping(uint256 => uint256) public penaltyPoolSnapshotTotalStaked;  // positionId => totalStaked snapshot at first claim (0 means never claimed)
     
     // Gap for future storage variables (reserves 50 slots for upgrades)
     uint256[50] private __gap;
