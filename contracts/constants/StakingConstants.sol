@@ -12,5 +12,7 @@ contract StakingConstants {
     uint256 public constant PRECISION = 1e18;
     uint256 public constant LOCK_PERIOD = 365 days;
     uint256 public constant HSK_DECIMALS = 18; // HSK token decimals
+    uint256 public constant EARLY_UNLOCK_PERIOD = 7 days;  // Early unlock waiting period
+    uint256 public constant EARLY_UNSTAKE_PENALTY_RATE = 5000;  // Early unstake penalty rate (50% = 5000 basis points)
 }
 

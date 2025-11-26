@@ -23,6 +23,12 @@ interface IStaking {
 
     function calculatePotentialReward(uint256 amount) external view returns (uint256);
 
+    function getPositionRewardInfo(address user, uint256 positionId) external view returns (uint256 claimedReward, uint256 pendingRewardAmount, uint256 totalReward);
+
+    function requestEarlyUnstake(uint256 positionId) external;
+
+    function completeEarlyUnstake(uint256 positionId) external;
+
     event PositionCreated(
         address indexed user,
         uint256 indexed positionId,
@@ -52,6 +58,27 @@ interface IStaking {
     event EmergencyWithdrawn(
         address indexed user,
         uint256 indexed positionId,
+        uint256 amount,
+        uint256 timestamp
+    );
+
+    event EarlyUnstakeRequested(
+        address indexed user,
+        uint256 indexed positionId,
+        uint256 timestamp
+    );
+
+    event EarlyUnstakeCompleted(
+        address indexed user,
+        uint256 indexed positionId,
+        uint256 principal,
+        uint256 reward,
+        uint256 penalty,
+        uint256 timestamp
+    );
+
+    event PenaltyPoolDistributed(
+        address indexed user,
         uint256 amount,
         uint256 timestamp
     );
