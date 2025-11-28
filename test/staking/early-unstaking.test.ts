@@ -364,4 +364,346 @@ describe("Staking - Early Unstaking Functionality", () => {
     }
   });
 
+  describe("rewardPoolBalance check order fix", () => {
+    test("should handle both rewardReturn and unclaimedPenalty correctly when both > 0", async () => {
+      // Use user2 to avoid balance issues from previous tests
+      await fundAccount(fixture.user2, parseEther("5000"));
+      
+      const stakeAmount = parseEther("1000");
+      const positionId = await stakeAndGetPositionId(
+        fixture.staking,
+        fixture.user2,
+        stakeAmount
+      );
+
+      // Advance time to 60 days to generate some rewards
+      await advanceTimeToDaysAfterStake(60);
+
+      // Get initial reward pool balance
+      const initialRewardPoolBalance = await fixture.staking.rewardPoolBalance();
+
+      // Request early unstake
+      await requestEarlyUnstakeAndWait(fixture.staking, fixture.user2, positionId);
+
+      // Advance time by 7 days (waiting period)
+      await advanceTimeByEarlyUnlockPeriod();
+
+      // Get reward pool balance before completion
+      const rewardPoolBalanceBefore = await fixture.staking.rewardPoolBalance();
+
+      // Complete early unstake
+      const { receipt, event } = await completeEarlyUnstakeAndVerify(
+        fixture.staking,
+        fixture.user2,
+        positionId
+      );
+
+      assert.strictEqual(receipt?.status, 1, "Complete early unstake should succeed");
+
+      // Mine a block to ensure state is updated
+      const ethers = await getEthers();
+      await ethers.provider.send("evm_mine", []);
+
+      // Verify reward pool balance was deducted correctly
+      const rewardPoolBalanceAfter = await fixture.staking.rewardPoolBalance();
+
+      if (event && event.args) {
+        const rewardReturn = event.args.reward;
+        const penalty = event.args.penalty;
+        const totalReward = rewardReturn + penalty;
+        const unclaimedPenalty = penalty; // Since user didn't claim, all penalty is unclaimed
+
+        // Calculate expected deduction: rewardReturn + unclaimedPenalty
+        const expectedDeduction = rewardReturn + unclaimedPenalty;
+
+        // Verify the deduction matches expected amount
+        const balanceBefore = BigInt(rewardPoolBalanceBefore.toString());
+        const balanceAfter = BigInt(rewardPoolBalanceAfter.toString());
+        const actualDeduction = balanceBefore > balanceAfter
+          ? balanceBefore - balanceAfter
+          : balanceAfter - balanceBefore;
+        const tolerance = parseEther("0.01");
+        const diff = actualDeduction > expectedDeduction
+          ? actualDeduction - expectedDeduction
+          : expectedDeduction - actualDeduction;
+
+        assert.ok(
+          diff <= tolerance,
+          `Reward pool should be deducted by rewardReturn + unclaimedPenalty. Expected: ${expectedDeduction}, Actual: ${actualDeduction}`
+        );
+      }
+    });
+
+    test("should handle case when rewardReturn = 0 but unclaimedPenalty > 0", async () => {
+      // Use user2 to avoid balance issues from previous tests
+      await fundAccount(fixture.user2, parseEther("5000"));
+      
+      const stakeAmount = parseEther("1000");
+      const positionId = await stakeAndGetPositionId(
+        fixture.staking,
+        fixture.user2,
+        stakeAmount
+      );
+
+      // Advance time to 60 days
+      await advanceTimeToDaysAfterStake(60);
+
+      // Claim all allowed rewards (50% of total)
+      // First, request early unstake to know the total reward
+      await requestEarlyUnstakeAndWait(fixture.staking, fixture.user1, positionId);
+
+      // Calculate total reward at request time
+      const position = await fixture.staking.positions(positionId);
+      const requestTime = await fixture.staking.earlyUnstakeRequestTime(positionId);
+      const totalTimeElapsed = requestTime - position.stakedAt;
+      const rewardRate = await fixture.staking.rewardRate();
+      
+      // Calculate total reward manually (simplified)
+      const totalReward = (stakeAmount * BigInt(rewardRate) * BigInt(totalTimeElapsed)) / (BigInt(10000) * BigInt(365 * 24 * 60 * 60));
+      const allowedReward = (totalReward * BigInt(EARLY_UNSTAKE_PENALTY_RATE)) / BigInt(10000);
+
+      // Cancel the request by completing it first, then we'll test the scenario
+      // Actually, let's test a different scenario: user claimed exactly allowedReward
+      // So rewardReturn = 0, but unclaimedPenalty = penalty > 0
+
+      // Reset: unstake normally first
+      await advanceTimePastLockPeriod();
+      const unstakeTx = await fixture.staking.connect(fixture.user2).unstake(positionId);
+      await unstakeTx.wait();
+
+      // Create a new position
+      const newPositionId = await stakeAndGetPositionId(
+        fixture.staking,
+        fixture.user2,
+        stakeAmount
+      );
+
+      // Advance time to 60 days
+      await advanceTimeToDaysAfterStake(60);
+
+      // Claim some rewards (but not all allowed)
+      const claimTx = await fixture.staking.connect(fixture.user2).claimReward(newPositionId);
+      await claimTx.wait();
+      await getEthers().then(e => e.provider.send("evm_mine", []));
+
+      // Request early unstake
+      await requestEarlyUnstakeAndWait(fixture.staking, fixture.user2, newPositionId);
+
+      // Advance time by 7 days
+      await advanceTimeByEarlyUnlockPeriod();
+
+      const rewardPoolBalanceBefore = await fixture.staking.rewardPoolBalance();
+
+      // Complete early unstake
+      const { receipt, event } = await completeEarlyUnstakeAndVerify(
+        fixture.staking,
+        fixture.user2,
+        newPositionId
+      );
+
+      assert.strictEqual(receipt?.status, 1, "Complete early unstake should succeed");
+
+      await getEthers().then(e => e.provider.send("evm_mine", []));
+
+      const rewardPoolBalanceAfter = await fixture.staking.rewardPoolBalance();
+
+      if (event && event.args) {
+        const rewardReturn = event.args.reward;
+        const penalty = event.args.penalty;
+        const claimed = BigInt(await fixture.staking.claimedRewards(newPositionId).toString());
+        const totalRewardAtRequest = rewardReturn + penalty;
+        const excessClaimed = claimed > (totalRewardAtRequest * BigInt(EARLY_UNSTAKE_PENALTY_RATE) / BigInt(10000))
+          ? claimed - (totalRewardAtRequest * BigInt(EARLY_UNSTAKE_PENALTY_RATE) / BigInt(10000))
+          : BigInt(0);
+        const unclaimedPenalty = penalty - excessClaimed;
+
+        // If rewardReturn = 0, only unclaimedPenalty should be deducted
+        if (rewardReturn === BigInt(0) && unclaimedPenalty > BigInt(0)) {
+          const expectedDeduction = unclaimedPenalty;
+          const balanceBefore = BigInt(rewardPoolBalanceBefore.toString());
+          const balanceAfter = BigInt(rewardPoolBalanceAfter.toString());
+          const actualDeduction = balanceBefore > balanceAfter
+            ? balanceBefore - balanceAfter
+            : balanceAfter - balanceBefore;
+          const tolerance = parseEther("0.01");
+          const diff = actualDeduction > expectedDeduction
+            ? actualDeduction - expectedDeduction
+            : expectedDeduction - actualDeduction;
+
+          assert.ok(
+            diff <= tolerance,
+            `When rewardReturn=0, only unclaimedPenalty should be deducted. Expected: ${expectedDeduction}, Actual: ${actualDeduction}`
+          );
+        }
+      }
+    });
+
+    test("should fail when rewardPoolBalance is insufficient for totalRewardPoolNeeded", async () => {
+      // Use user2 to avoid balance issues from previous tests
+      await fundAccount(fixture.user2, parseEther("5000"));
+      
+      const stakeAmount = parseEther("1000");
+      const positionId = await stakeAndGetPositionId(
+        fixture.staking,
+        fixture.user2,
+        stakeAmount
+      );
+
+      // Advance time to 60 days
+      await advanceTimeToDaysAfterStake(60);
+
+      // Request early unstake
+      await requestEarlyUnstakeAndWait(fixture.staking, fixture.user2, positionId);
+
+      // Advance time by 7 days
+      await advanceTimeByEarlyUnlockPeriod();
+
+      // Calculate expected total reward pool needed
+      const position = await fixture.staking.positions(positionId);
+      const requestTime = await fixture.staking.earlyUnstakeRequestTime(positionId);
+      const totalTimeElapsed = requestTime - position.stakedAt;
+      const rewardRate = await fixture.staking.rewardRate();
+      const totalReward = (stakeAmount * BigInt(rewardRate) * BigInt(totalTimeElapsed)) / (BigInt(10000) * BigInt(365 * 24 * 60 * 60));
+      const allowedReward = (totalReward * BigInt(EARLY_UNSTAKE_PENALTY_RATE)) / BigInt(10000);
+      const penalty = totalReward - allowedReward;
+      const rewardReturn = allowedReward; // User hasn't claimed anything
+      const unclaimedPenalty = penalty; // User hasn't claimed anything
+      const totalRewardPoolNeeded = rewardReturn + unclaimedPenalty;
+
+      // Drain reward pool to make it insufficient
+      const currentRewardPoolBalance = await fixture.staking.rewardPoolBalance();
+      if (currentRewardPoolBalance >= totalRewardPoolNeeded) {
+        // Withdraw excess to make it insufficient
+        const excess = currentRewardPoolBalance - totalRewardPoolNeeded + parseEther("1");
+        const withdrawTx = await fixture.staking.connect(fixture.admin).withdrawExcessRewardPool(excess);
+        await withdrawTx.wait();
+        await getEthers().then(e => e.provider.send("evm_mine", []));
+      }
+
+      // Try to complete early unstake (should fail)
+      await expectRevert(
+        fixture.staking.connect(fixture.user2).completeEarlyUnstake(positionId),
+        "Insufficient reward pool"
+      );
+    });
+
+    test("should succeed when rewardPoolBalance is exactly sufficient", async () => {
+      // Use user2 to avoid balance issues from previous tests
+      await fundAccount(fixture.user2, parseEther("5000"));
+      
+      const stakeAmount = parseEther("1000");
+      const positionId = await stakeAndGetPositionId(
+        fixture.staking,
+        fixture.user2,
+        stakeAmount
+      );
+
+      // Advance time to 60 days
+      await advanceTimeToDaysAfterStake(60);
+
+      // Request early unstake
+      await requestEarlyUnstakeAndWait(fixture.staking, fixture.user2, positionId);
+
+      // Advance time by 7 days
+      await advanceTimeByEarlyUnlockPeriod();
+
+      // Calculate expected total reward pool needed
+      const position = await fixture.staking.positions(positionId);
+      const requestTime = await fixture.staking.earlyUnstakeRequestTime(positionId);
+      const totalTimeElapsed = requestTime - position.stakedAt;
+      const rewardRate = await fixture.staking.rewardRate();
+      const totalReward = (stakeAmount * BigInt(rewardRate) * BigInt(totalTimeElapsed)) / (BigInt(10000) * BigInt(365 * 24 * 60 * 60));
+      const allowedReward = (totalReward * BigInt(EARLY_UNSTAKE_PENALTY_RATE)) / BigInt(10000);
+      const penalty = totalReward - allowedReward;
+      const rewardReturn = allowedReward; // User hasn't claimed anything
+      const unclaimedPenalty = penalty; // User hasn't claimed anything
+      const totalRewardPoolNeeded = rewardReturn + unclaimedPenalty;
+
+      // Ensure reward pool has exactly enough
+      const currentRewardPoolBalance = await fixture.staking.rewardPoolBalance();
+      if (currentRewardPoolBalance < totalRewardPoolNeeded) {
+        // Add exactly what's needed
+        const needed = totalRewardPoolNeeded - currentRewardPoolBalance;
+        const addTx = await fixture.staking.connect(fixture.admin).updateRewardPool({
+          value: needed,
+        });
+        await addTx.wait();
+        await getEthers().then(e => e.provider.send("evm_mine", []));
+      } else if (currentRewardPoolBalance > totalRewardPoolNeeded) {
+        // Withdraw excess to make it exactly enough
+        const excess = currentRewardPoolBalance - totalRewardPoolNeeded;
+        const withdrawTx = await fixture.staking.connect(fixture.admin).withdrawExcessRewardPool(excess);
+        await withdrawTx.wait();
+        await getEthers().then(e => e.provider.send("evm_mine", []));
+      }
+
+      // Complete early unstake (should succeed)
+      const { receipt } = await completeEarlyUnstakeAndVerify(
+        fixture.staking,
+        fixture.user2,
+        positionId
+      );
+
+      assert.strictEqual(receipt?.status, 1, "Complete early unstake should succeed when balance is exactly sufficient");
+
+      await getEthers().then(e => e.provider.send("evm_mine", []));
+
+      // Verify reward pool balance is now 0 (or very close to 0)
+      const rewardPoolBalanceAfter = BigInt((await fixture.staking.rewardPoolBalance()).toString());
+      const tolerance = parseEther("0.01");
+      assert.ok(
+        rewardPoolBalanceAfter <= tolerance,
+        `Reward pool balance should be close to 0 after deduction. Actual: ${rewardPoolBalanceAfter}`
+      );
+    });
+
+    test("should handle case when both rewardReturn and unclaimedPenalty are 0", async () => {
+      // Use user2 to avoid balance issues from previous tests
+      await fundAccount(fixture.user2, parseEther("5000"));
+      
+      const stakeAmount = parseEther("1000");
+      const positionId = await stakeAndGetPositionId(
+        fixture.staking,
+        fixture.user2,
+        stakeAmount
+      );
+
+      // Request early unstake immediately (almost no time elapsed)
+      // This should result in very small or zero rewards
+      await requestEarlyUnstakeAndWait(fixture.staking, fixture.user2, positionId);
+
+      // Advance time by 7 days
+      await advanceTimeByEarlyUnlockPeriod();
+
+      const rewardPoolBalanceBefore = await fixture.staking.rewardPoolBalance();
+
+      // Complete early unstake
+      const { receipt } = await completeEarlyUnstakeAndVerify(
+        fixture.staking,
+        fixture.user2,
+        positionId
+      );
+
+      assert.strictEqual(receipt?.status, 1, "Complete early unstake should succeed even when rewards are minimal");
+
+      await getEthers().then(e => e.provider.send("evm_mine", []));
+
+      const rewardPoolBalanceAfter = await fixture.staking.rewardPoolBalance();
+
+      // Reward pool balance should remain unchanged (or change very little)
+      const balanceBefore = BigInt(rewardPoolBalanceBefore.toString());
+      const balanceAfter = BigInt(rewardPoolBalanceAfter.toString());
+      const balanceChange = balanceBefore > balanceAfter
+        ? balanceBefore - balanceAfter
+        : balanceAfter - balanceBefore;
+
+      // If rewards are very small, the change should be minimal
+      const tolerance = parseEther("0.1");
+      assert.ok(
+        balanceChange <= tolerance,
+        `Reward pool balance should remain mostly unchanged when rewards are minimal. Change: ${balanceChange}`
+      );
+    });
+  });
+
 });

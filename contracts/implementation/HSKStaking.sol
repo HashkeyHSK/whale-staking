@@ -271,21 +271,21 @@ contract HSKStaking is
         
         uint256 rewardReturn = allowedReward > claimed ? allowedReward - claimed : 0;
         
-        // Update reward pool and pending rewards
-        if (rewardReturn > 0) {
-            require(rewardPoolBalance >= rewardReturn, "Insufficient reward pool");
-            rewardPoolBalance -= rewardReturn;
+        uint256 unclaimedPenalty = penalty - excessClaimed;
+        
+        // Calculate total reward pool needed and update in one go to avoid double-checking
+        uint256 totalRewardPoolNeeded = rewardReturn + unclaimedPenalty;
+        if (totalRewardPoolNeeded > 0) {
+            require(rewardPoolBalance >= totalRewardPoolNeeded, "Insufficient reward pool");
+            rewardPoolBalance -= totalRewardPoolNeeded;
         }
- 
+        
+        // Update pending rewards accounting
         uint256 toDeduct = totalReward - claimed;
         totalPendingRewards -= toDeduct;
         
-        uint256 unclaimedPenalty = penalty - excessClaimed;
-        
         // Deposit unclaimed penalty to penalty pool contract
         if (unclaimedPenalty > 0) {
-            require(rewardPoolBalance >= unclaimedPenalty, "Insufficient reward pool for penalty");
-            rewardPoolBalance -= unclaimedPenalty;
             IPenaltyPool(penaltyPoolContract).deposit{value: unclaimedPenalty}();
             emit PenaltyDeposited(unclaimedPenalty, block.timestamp);
         }
