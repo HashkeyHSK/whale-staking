@@ -57,9 +57,12 @@ export async function deployStaking(): Promise<{
   // This seems wrong. Let me check the deploy script...
   // Actually, in TransparentUpgradeableProxy, when _data is provided, it's called via delegatecall
   // So msg.sender should be the admin (deployer), not the proxy!
-  // Deploy PenaltyPool first
+  // Deploy PenaltyPool first with temporary authorizedDepositor
   const PenaltyPool = await ethers.getContractFactory("PenaltyPool");
-  const penaltyPool = await PenaltyPool.deploy();
+  const penaltyPool = await PenaltyPool.deploy(
+    deployer.address,      // Owner
+    deployer.address       // Temporary authorizedDepositor (will be updated to Staking address)
+  );
   await penaltyPool.waitForDeployment();
   const penaltyPoolAddress = await penaltyPool.getAddress();
   
@@ -106,12 +109,9 @@ export async function deployStaking(): Promise<{
     throw new Error(`Proxy contract deployment failed. Code length: ${proxyCode.length} bytes. Address: ${proxyAddress}`);
   }
   
-  // Initialize PenaltyPool with Staking contract address
-  const penaltyPoolInitTx = await penaltyPool.initialize(
-    deployer.address,      // Owner
-    proxyAddress          // Authorized depositor (Staking contract)
-  );
-  await penaltyPoolInitTx.wait();
+  // Update PenaltyPool's authorizedDepositor to Staking contract address
+  const penaltyPoolUpdateTx = await penaltyPool.setAuthorizedDepositor(proxyAddress);
+  await penaltyPoolUpdateTx.wait();
   
   // Connect to contract through proxy using getContractAt (more reliable than attach)
   // This ensures we get the correct ABI and can interact with the proxy

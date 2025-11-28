@@ -82,43 +82,30 @@ describe("PenaltyPool - Contract Tests", () => {
     }
   });
 
-  test("should reject initialization with zero owner address", async () => {
+  test("should reject deployment with zero owner address", async () => {
     const ethers = await getEthers();
     const PenaltyPool = await ethers.getContractFactory("PenaltyPool");
-    const newPool = await PenaltyPool.deploy();
-    await newPool.waitForDeployment();
 
     await expectRevert(
-      newPool.initialize(
+      PenaltyPool.deploy(
         "0x0000000000000000000000000000000000000000", // zero owner
         stakingAddress
       ),
-      "PenaltyPool: zero owner address"
+      "OwnableInvalidOwner"
     );
   });
 
-  test("should reject initialization with zero authorized depositor address", async () => {
+  test("should reject deployment with zero authorized depositor address", async () => {
     const ethers = await getEthers();
     const PenaltyPool = await ethers.getContractFactory("PenaltyPool");
-    const newPool = await PenaltyPool.deploy();
-    await newPool.waitForDeployment();
     const deployerAddress = await fixture.deployer.getAddress();
 
     await expectRevert(
-      newPool.initialize(
+      PenaltyPool.deploy(
         deployerAddress,
         "0x0000000000000000000000000000000000000000" // zero depositor
       ),
       "PenaltyPool: zero depositor address"
-    );
-  });
-
-  test("should reject re-initialization", async () => {
-    const deployerAddress = await fixture.deployer.getAddress();
-    
-    await expectRevert(
-      penaltyPool.initialize(deployerAddress, stakingAddress),
-      "Initializable: contract is already initialized"
     );
   });
 

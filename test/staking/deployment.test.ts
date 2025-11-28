@@ -68,14 +68,14 @@ describe("Staking - Deployment", () => {
 
     // Deploy PenaltyPool for the test
     const PenaltyPool = await ethers.getContractFactory("PenaltyPool");
-    const penaltyPool = await PenaltyPool.deploy();
+    // Deploy PenaltyPool with temporary authorizedDepositor (deployer.address)
+    // This is just for testing invalid Staking initialization, so the authorizedDepositor doesn't matter
+    const penaltyPool = await PenaltyPool.deploy(
+      deployer.address,      // Owner
+      deployer.address       // Temporary authorizedDepositor
+    );
     await penaltyPool.waitForDeployment();
     const penaltyPoolAddress = await penaltyPool.getAddress();
-    
-    // Initialize PenaltyPool (we need a valid Staking address, but we'll use a placeholder)
-    // Actually, for this test we just need to deploy Staking with invalid params, so we can use zero address temporarily
-    // But PenaltyPool requires non-zero address, so let's use deployer address temporarily
-    await penaltyPool.initialize(deployer.address, deployer.address);
     
     // Test invalid endTime < startTime
     const invalidInitData = impl.interface.encodeFunctionData("initialize", [

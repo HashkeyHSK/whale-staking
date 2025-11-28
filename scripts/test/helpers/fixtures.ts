@@ -47,9 +47,12 @@ export async function deployTestContracts(): Promise<{
   const [deployer] = await ethers.getSigners();
   const now = Math.floor(Date.now() / 1000);
   
-  // Deploy PenaltyPool first
+  // Deploy PenaltyPool first with temporary authorizedDepositor
   const PenaltyPool = await ethers.getContractFactory("PenaltyPool");
-  const penaltyPool = await PenaltyPool.deploy();
+  const penaltyPool = await PenaltyPool.deploy(
+    deployer.address,      // Owner
+    deployer.address       // Temporary authorizedDepositor (will be updated to Staking address)
+  );
   await penaltyPool.waitForDeployment();
   const penaltyPoolAddress = await penaltyPool.getAddress();
   
@@ -88,12 +91,9 @@ export async function deployTestContracts(): Promise<{
   
   const proxyAddress = await proxy.getAddress();
   
-  // Initialize PenaltyPool with Staking contract address
-  const penaltyPoolInitTx = await penaltyPool.initialize(
-    deployer.address,      // Owner
-    proxyAddress          // Authorized depositor (Staking contract)
-  );
-  await penaltyPoolInitTx.wait();
+  // Update PenaltyPool's authorizedDepositor to Staking contract address
+  const penaltyPoolUpdateTx = await penaltyPool.setAuthorizedDepositor(proxyAddress);
+  await penaltyPoolUpdateTx.wait();
   
   // Connect to contract through proxy
   const staking = HSKStaking.attach(proxyAddress);

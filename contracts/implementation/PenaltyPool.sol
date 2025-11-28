@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.27;
 
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts/access/Ownable2Step.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "../interfaces/IPenaltyPool.sol";
 
 /**
@@ -15,9 +14,8 @@ import "../interfaces/IPenaltyPool.sol";
  */
 contract PenaltyPool is 
     IPenaltyPool,
-    Initializable, 
-    Ownable2StepUpgradeable,
-    ReentrancyGuardUpgradeable 
+    Ownable2Step,
+    ReentrancyGuard 
 {
     address public authorizedDepositor;
     
@@ -29,19 +27,15 @@ contract PenaltyPool is
     }
     
     /**
-     * @dev Initializes the penalty pool contract
+     * @dev Constructor to initialize the penalty pool contract
      * @param _owner Address of the contract owner
      * @param _authorizedDepositor Address authorized to deposit penalties (HSKStaking contract)
      */
-    function initialize(
+    constructor(
         address _owner,
         address _authorizedDepositor
-    ) external initializer {
-        require(_owner != address(0), "PenaltyPool: zero owner address");
+    ) Ownable(_owner) {
         require(_authorizedDepositor != address(0), "PenaltyPool: zero depositor address");
-        
-        __Ownable_init(_owner);
-        __ReentrancyGuard_init();
         
         authorizedDepositor = _authorizedDepositor;
     }

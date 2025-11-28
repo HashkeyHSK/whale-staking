@@ -24,15 +24,19 @@ async function main() {
   console.log("Deployer address:", deployer.address);
   console.log("Account balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "HSK");
 
-  // 1. Deploy PenaltyPool contract (we'll initialize it after Staking is deployed)
-  console.log("\nDeploying PenaltyPool contract...");
+  // 1. Deploy PenaltyPool contract with temporary authorizedDepositor
+  // We'll update authorizedDepositor after Staking is deployed
+  console.log("\nDeploying PenaltyPool contract (with temporary authorizedDepositor)...");
   const PenaltyPool = await ethers.getContractFactory("PenaltyPool");
-  const penaltyPool = await PenaltyPool.deploy();
+  const penaltyPool = await PenaltyPool.deploy(
+    deployer.address,      // Owner
+    deployer.address       // Temporary authorizedDepositor (will be updated to Staking address)
+  );
   await penaltyPool.waitForDeployment();
   const penaltyPoolAddress = await penaltyPool.getAddress();
   printSuccess(`PenaltyPool deployed: ${penaltyPoolAddress}`);
 
-  // 3. Deploy HSKStaking implementation contract
+  // 2. Deploy HSKStaking implementation contract
   console.log("\nDeploying HSKStaking implementation contract...");
   const HSKStaking = await ethers.getContractFactory("HSKStaking");
   const implementation = await HSKStaking.deploy();
@@ -111,14 +115,11 @@ async function main() {
   
   printSuccess(`StakingProxy deployed: ${proxyAddress}`);
 
-  // 7. Initialize PenaltyPool with Staking contract address as authorized depositor
-  console.log("\nInitializing PenaltyPool...");
-  const initTx = await penaltyPool.initialize(
-    deployer.address,      // Owner
-    proxyAddress            // Authorized depositor (Staking contract)
-  );
-  await initTx.wait();
-  printSuccess(`PenaltyPool initialized with Staking contract as authorized depositor`);
+  // 7. Update PenaltyPool's authorizedDepositor to Staking contract address
+  console.log("\nUpdating PenaltyPool authorizedDepositor to Staking contract...");
+  const updateTx = await penaltyPool.setAuthorizedDepositor(proxyAddress);
+  await updateTx.wait();
+  printSuccess(`PenaltyPool authorizedDepositor updated to Staking contract`);
   
   // 8. Connect to HSKStaking contract through proxy for verification
   const staking = HSKStaking.attach(proxyAddress);
