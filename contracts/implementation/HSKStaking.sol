@@ -247,10 +247,7 @@ contract HSKStaking is
         require(block.timestamp >= requestTime + EARLY_UNLOCK_PERIOD, "Waiting period not completed");
         
         // From the moment of requesting early unstake, no new rewards are generated
-        uint256 lockEndTime = position.stakedAt + LOCK_PERIOD;
-        uint256 endTime = requestTime;
-        
-        uint256 totalTimeElapsed = endTime - position.stakedAt;
+        uint256 totalTimeElapsed = requestTime - position.stakedAt;
         uint256 totalReward = _calculateReward(position.amount, totalTimeElapsed, rewardRate);
         
         // Calculate allowed reward (after deducting penalty rate)
@@ -279,15 +276,15 @@ contract HSKStaking is
             require(rewardPoolBalance >= rewardReturn, "Insufficient reward pool");
             rewardPoolBalance -= rewardReturn;
         }
-        
-        uint256 initialPotentialReward = _calculateReward(position.amount, LOCK_PERIOD, rewardRate);
-        uint256 toDeduct = initialPotentialReward - claimed;
+ 
+        uint256 toDeduct = totalReward - claimed;
         totalPendingRewards -= toDeduct;
         
         uint256 unclaimedPenalty = penalty - excessClaimed;
         
         // Deposit unclaimed penalty to penalty pool contract
-        if (unclaimedPenalty > 0 && rewardPoolBalance >= unclaimedPenalty) {
+        if (unclaimedPenalty > 0) {
+            require(rewardPoolBalance >= unclaimedPenalty, "Insufficient reward pool for penalty");
             rewardPoolBalance -= unclaimedPenalty;
             IPenaltyPool(penaltyPoolContract).deposit{value: unclaimedPenalty}();
             emit PenaltyDeposited(unclaimedPenalty, block.timestamp);
