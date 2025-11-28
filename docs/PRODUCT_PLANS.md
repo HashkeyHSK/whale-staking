@@ -23,7 +23,7 @@ Delegated staking product for general users, lowering participation threshold, p
 
 | Parameter | Configuration | Notes |
 |-----------|---------------|-------|
-| **Minimum Stake Threshold** | 1000 HSK | Minimum amount per user stake |
+| **Minimum Stake Threshold** | 1 HSK | Minimum amount per user stake |
 | **Annual Yield Rate** | 5% | Fixed annual yield rate (configured at deployment) |
 | **Lock Period** | 365 days | Fixed 365-day lock period |
 | **Whitelist Mode** | Disabled | All users can freely participate in staking |
@@ -182,7 +182,7 @@ Premium staking product for whales and institutions, providing high returns but 
 | Feature | Staking |  |
 |---------|---------------|----------------|
 | **Target Users** | General users | Whales/Institutions |
-| **Minimum Stake** | 1000 HSK | 500,000 HSK |
+| **Minimum Stake** | 1 HSK | 500,000 HSK |
 | **Annual Yield** | 5% | 16% |
 | **Lock Period** | 365 days | 365 days |
 | **Participation Method** | Open (no approval required) | Whitelist (requires approval) |

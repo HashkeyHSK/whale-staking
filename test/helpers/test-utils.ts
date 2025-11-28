@@ -388,7 +388,7 @@ export async function getUserPositions(
 /**
  * Safely call pendingReward with validation and error handling
  * This function verifies the position exists before calling pendingReward
- * Note: pendingReward requires msg.sender to match position.owner, so use connect() when calling
+ * Note: pendingReward can now be called by anyone (no owner check required)
  */
 export async function getPendingReward(
   staking: ethers.Contract,
@@ -399,7 +399,6 @@ export async function getPendingReward(
   try {
     const position = await staking.positions(positionId);
     const positionOwner = position.owner.toLowerCase();
-    const userAddr = (await userSigner.getAddress()).toLowerCase();
     
     if (positionOwner === "0x0000000000000000000000000000000000000000") {
       // Position doesn't exist - this might be because stake() didn't execute
@@ -411,16 +410,11 @@ export async function getPendingReward(
       );
     }
     
-    if (positionOwner !== userAddr) {
-      throw new Error(
-        `Position ${positionId} owner mismatch: expected ${userAddr}, got ${positionOwner}`
-      );
-    }
+    // Note: pendingReward can now be called by anyone, no owner check needed
     
-    // Position exists and belongs to user, now call pendingReward with the correct signer
+    // Position exists, now call pendingReward
     try {
-      // Call pendingReward using the user's signer (msg.sender must match position.owner)
-      // Use staticCall to ensure it's a view call
+      // Call pendingReward - can be called by anyone
       const stakingWithSigner = staking.connect(userSigner) as any;
       const pendingReward = await stakingWithSigner.pendingReward(positionId);
       return pendingReward;
@@ -442,7 +436,7 @@ export async function getPendingReward(
         // Try to get more information
         throw new Error(
           `Failed to decode pendingReward result for position ${positionId}. ` +
-          `Position exists: true, Owner matches: true, Emergency mode: ${emergencyMode}, ` +
+          `Position exists: true, Emergency mode: ${emergencyMode}, ` +
           `Is unstaked: ${position.isUnstaked}. ` +
           `Original error: ${error.message}`
         );
@@ -453,7 +447,7 @@ export async function getPendingReward(
     }
   } catch (error: any) {
     // If position doesn't exist or other error, throw with helpful message
-    if (error.message && (error.message.includes("does not exist") || error.message.includes("owner mismatch"))) {
+    if (error.message && error.message.includes("does not exist")) {
       throw error;
     }
     
@@ -463,6 +457,46 @@ export async function getPendingReward(
       `Failed to get pending reward for position ${positionId}: ${error.message}. ` +
       `Next position ID: ${nextPositionId}, User: ${await userSigner.getAddress()}`
     );
+  }
+}
+
+/**
+ * Get pending reward for any position (can be called by anyone)
+ * This is a simpler version that doesn't validate owner
+ */
+export async function getPendingRewardForAnyPosition(
+  staking: ethers.Contract,
+  positionId: bigint,
+  caller?: ethers.Signer
+): Promise<bigint> {
+  try {
+    // Check if position exists
+    const position = await staking.positions(positionId);
+    if (position.owner === "0x0000000000000000000000000000000000000000") {
+      throw new Error(`Position ${positionId} does not exist`);
+    }
+    
+    // Call pendingReward - can be called by anyone
+    if (caller) {
+      const stakingWithSigner = staking.connect(caller) as any;
+      return await stakingWithSigner.pendingReward(positionId);
+    } else {
+      // Use default signer
+      return await (staking as any).pendingReward(positionId);
+    }
+  } catch (error: any) {
+    // Check if it's emergency mode or unstaked position
+    const emergencyMode = await staking.emergencyMode();
+    if (emergencyMode) {
+      return 0n; // Emergency mode returns 0
+    }
+    
+    const position = await staking.positions(positionId);
+    if (position.isUnstaked) {
+      return 0n; // Unstaked positions return 0
+    }
+    
+    throw error;
   }
 }
 

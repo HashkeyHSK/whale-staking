@@ -49,7 +49,7 @@ Write complete test cases for the Whale Staking project, covering all functional
 - `stake() external payable returns (uint256)`: Stake HSK, returns positionId
 - `unstake(uint256 positionId) external`: Unstake, automatically claim all accumulated rewards and return principal
 - `claimReward(uint256 positionId) external returns (uint256)`: Claim rewards for specified position, does not unstake
-- `pendingReward(uint256 positionId) external view returns (uint256)`: Query pending rewards for specified position
+- `pendingReward(uint256 positionId) external view returns (uint256)`: Query pending rewards for specified position (can be called by anyone, no owner restriction)
 - `emergencyWithdraw(uint256 positionId) external`: Emergency withdraw principal (only available in emergency mode)
 
 **Reward Pool Management**

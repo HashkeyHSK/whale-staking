@@ -218,14 +218,18 @@ Claim rewards (without unstaking).
 - `!paused()` - Contract not paused
 
 #### `pendingReward(uint256 positionId) view → uint256`
-Query pending rewards.
+Query pending rewards for any position.
 
 **Parameters**:
 - `positionId`: Staking position ID
 
 **Returns**: Pending reward amount
 
-**Note**: Returns 0 in emergency mode
+**Notes**:
+- **Anyone can query** - No owner restriction, can query any position's pending reward
+- Returns 0 in emergency mode
+- Returns 0 if position is unstaked
+- View function, no gas cost for read-only queries
 
 #### View User Staking Positions
 

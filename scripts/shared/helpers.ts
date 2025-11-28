@@ -113,18 +113,20 @@ export function parsePosition(position: any): {
   stakedAt: bigint;
   lastRewardAt: bigint;
   isUnstaked: boolean;
+  isCompletedStake?: boolean;
 } {
-  // Position struct: [positionId, owner, amount, stakedAt, lastRewardAt, isUnstaked]
+  // Position struct: [positionId, owner, amount, stakedAt, lastRewardAt, isUnstaked, isCompletedStake]
   let positionId: bigint;
   let owner: string;
   let amount: bigint;
   let stakedAt: bigint;
   let lastRewardAt: bigint;
   let isUnstaked: boolean;
+  let isCompletedStake: boolean | undefined;
   
   if (Array.isArray(position)) {
     // If array, destructure in order
-    [positionId, owner, amount, stakedAt, lastRewardAt, isUnstaked] = position;
+    [positionId, owner, amount, stakedAt, lastRewardAt, isUnstaked, isCompletedStake] = position;
   } else {
     // If object, use directly
     positionId = position.positionId;
@@ -133,6 +135,7 @@ export function parsePosition(position: any): {
     stakedAt = position.stakedAt;
     lastRewardAt = position.lastRewardAt;
     isUnstaked = position.isUnstaked;
+    isCompletedStake = position.isCompletedStake;
   }
   
   // Validate required fields
@@ -146,6 +149,7 @@ export function parsePosition(position: any): {
     amount,
     stakedAt,
     lastRewardAt,
-    isUnstaked
+    isUnstaked,
+    isCompletedStake
   };
 }

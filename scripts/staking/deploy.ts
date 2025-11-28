@@ -1,10 +1,11 @@
 import hre from "hardhat";
 import { STAKING_CONFIG } from "../shared/constants.js";
 import { printSeparator, printSuccess, printWarning } from "../shared/helpers.js";
+import { validateTimestamp, validateTimestampRange } from "../shared/validations.js";
 
 /**
  * Deploy Staking product
- * - Min stake: 1000 HSK
+ * - Min stake: 1 HSK
  * - APY: 5%
  * - For regular users
  * 
@@ -63,20 +64,10 @@ async function main() {
     );
   }
   
-  const stakeStartTime = parseInt(stakeStartTimeStr);
-  const stakeEndTime = parseInt(stakeEndTimeStr);
-  
-  if (isNaN(stakeStartTime) || stakeStartTime <= 0) {
-    throw new Error(`Invalid start timestamp: ${stakeStartTimeStr}, please provide a valid Unix timestamp (seconds)`);
-  }
-  
-  if (isNaN(stakeEndTime) || stakeEndTime <= 0) {
-    throw new Error(`Invalid end timestamp: ${stakeEndTimeStr}, please provide a valid Unix timestamp (seconds)`);
-  }
-  
-  if (stakeEndTime <= stakeStartTime) {
-    throw new Error("End time must be later than start time");
-  }
+  // Validate timestamps using shared validation functions
+  const stakeStartTime = validateTimestamp(stakeStartTimeStr, "start");
+  const stakeEndTime = validateTimestamp(stakeEndTimeStr, "end");
+  validateTimestampRange(stakeStartTime, stakeEndTime);
 
   console.log("\nInitialization parameters:");
   console.log(`  - Min stake amount: ${ethers.formatEther(minStakeAmount)} HSK`);

@@ -12,7 +12,7 @@ async function main() {
   const stakingAddress = process.env.STAKING_ADDRESS || getStakingAddress(network);
 
   // Read new minimum stake amount from environment variable
-  const newMinStakeAmountEther = process.env.NEW_MIN_STAKE || "1000";
+  const newMinStakeAmountEther = process.env.NEW_MIN_STAKE || "1";
   const newMinStakeAmount = ethers.parseEther(newMinStakeAmountEther);
 
   printSeparator("Set Minimum Stake Amount");

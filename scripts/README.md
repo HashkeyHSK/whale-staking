@@ -166,7 +166,7 @@ scripts/
 export STAKING_ADDRESS="0x..."
 
 # Operation related
-export STAKE_AMOUNT="1000"         # Staking amount (minimum: 1000 HSK)
+export STAKE_AMOUNT="100"          # Staking amount (minimum: 1 HSK)
 export REWARD_AMOUNT="100"        # Reward amount
 export POSITION_ID="1"            # Position ID
 export USER_ADDRESS="0x..."       # Query specific user
@@ -183,7 +183,7 @@ export STAKE_END_TIME="1767225600"    # Staking end time (Unix timestamp, second
 # Configuration related
 export START_TIME="1735689600"      # Start time (Unix timestamp, seconds, for modifying configuration)
 export END_TIME="1735689600"       # End time (Unix timestamp, seconds, for modifying configuration)
-export NEW_MIN_STAKE="1000"        # New minimum staking amount
+export NEW_MIN_STAKE="1"          # New minimum staking amount
 export NEW_MAX_TOTAL_STAKED="10000000"  # New maximum total staked (HSK, 0 means unlimited)
 
 # Advanced operations
@@ -289,7 +289,7 @@ The contract uses OpenZeppelin's `Ownable2StepUpgradeable` standard for enhanced
 2. **Reward Rate**: 
    - Staking: 5% APY (500 basis points)
 3. **Minimum Stake**: 
-   - Staking: 1000 HSK (can be modified by owner)
+   - Staking: 1 HSK (can be modified by owner)
 4. **Maximum Total Staked**: 
    - Staking: 30,000,000 HSK (can be modified by owner, 0 means unlimited)
 5. **Whitelist**: 
@@ -458,7 +458,7 @@ npm run tools:compare-contracts HSKStaking
 
 | Configuration | Value | Notes |
 |--------------|-------|-------|
-| Minimum Stake | 1000 HSK | Can be modified by owner |
+| Minimum Stake | 1 HSK | Can be modified by owner |
 | Maximum Total Staked | 30,000,000 HSK | Can be modified by owner (0 means unlimited) |
 | Annual Yield | 5% | Fixed at initialization |
 | Lock Period | 365 days | Contract constant, cannot be modified |
@@ -481,7 +481,7 @@ START_TIME="1735689600" npm run config:set-start-time:testnet
 END_TIME="1735689600" npm run config:set-end-time:testnet
 
 # Set minimum staking amount
-NEW_MIN_STAKE="1000" npm run config:set-min-stake:testnet
+NEW_MIN_STAKE="1" npm run config:set-min-stake:testnet
 
 # Set maximum total staked (0 means unlimited)
 NEW_MAX_TOTAL_STAKED="15000000" npm run config:set-max-total-staked:testnet

@@ -1,10 +1,6 @@
 import { test, describe, before } from "node:test";
 import { strict as assert } from "node:assert";
-import {
-  createTestFixture,
-  fundAccount,
-  advanceTime,
-} from "../helpers/fixtures.js";
+import { fundAccount, advanceTime } from "../helpers/fixtures.js";
 import { getEthers } from "../helpers/test-utils.js";
 import {
   expectBigIntEqual,
@@ -14,31 +10,18 @@ import {
   getPendingReward,
   getEvent,
 } from "../helpers/test-utils.js";
+import { setupStakingTest } from "../helpers/staking-helpers.js";
 
 describe("Staking - Edge Cases and Error Handling", () => {
-  let fixture: Awaited<ReturnType<typeof createTestFixture>>;
+  let fixture: Awaited<ReturnType<typeof setupStakingTest>>;
 
   before(async () => {
-    fixture = await createTestFixture();
-    await fundAccount(fixture.user1, parseEther("10000"));
-    await fundAccount(fixture.user2, parseEther("10000"));
-    
-    // Fund admin account
-    await fundAccount(fixture.admin, parseEther("200000"));
-
-    const rewardTx = await fixture.staking.connect(fixture.admin).updateRewardPool({
-      value: parseEther("10000"), // Reduced from 100000 to avoid gas issues
+    fixture = await setupStakingTest({
+      user1Balance: parseEther("10000"),
+      user2Balance: parseEther("10000"),
+      adminBalance: parseEther("200000"),
+      rewardPoolAmount: parseEther("10000"),
     });
-    await rewardTx.wait();
-
-    const startTime = await fixture.staking.stakeStartTime();
-    const ethers = await getEthers();
-    const now = await ethers.provider
-      .getBlock("latest")
-      .then((b) => b?.timestamp || 0);
-    if (now < startTime) {
-      await advanceTime(Number(startTime - BigInt(now)) + 1);
-    }
   });
 
   test("should handle maximum amount staking correctly", async () => {

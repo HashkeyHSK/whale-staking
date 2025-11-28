@@ -55,7 +55,8 @@
   - 返回领取的奖励金额
 - `pendingReward(uint256 positionId) external view returns (uint256)`: 
   - 查询指定位置的待领取奖励（只读函数）
-  - 紧急模式下返回 0
+  - 任何人都可以调用 - 无所有者限制
+  - 紧急模式下或位置已解除质押时返回 0
 - `emergencyWithdraw(uint256 positionId) external`: 
   - 紧急提取本金（仅在紧急模式下可用）
   - 不含奖励，只返还本金
@@ -200,7 +201,8 @@ scripts/
 │   └── query/                # 状态查询
 │       ├── check-status.ts
 │       ├── check-stakes.ts
-│       └── pending-reward.ts
+│       ├── pending-reward.ts
+│       └── pending-reward-any-user.ts
 ├── premium/                  # 高级质押脚本（✅ 已完成）
 │   ├── deploy.ts             # 部署合约
 │   ├── upgrade.ts            # 升级合约
@@ -229,6 +231,7 @@ scripts/
 │       ├── check-status.ts
 │       ├── check-stakes.ts
 │       ├── pending-reward.ts
+│       ├── pending-reward-any-user.ts
 │       └── check-whitelist.ts
 ├── dev/                      # 开发脚本
 │   ├── compile.ts            # 编译合约
@@ -290,7 +293,8 @@ scripts/
 | `scripts/staking/config/accept-ownership.ts` | ✅ 已完成 | 第二步：接受所有权转移 |
 | `scripts/staking/query/check-status.ts` | ✅ 已完成 | 查询合约状态 |
 | `scripts/staking/query/check-stakes.ts` | ✅ 已完成 | 查询质押信息 |
-| `scripts/staking/query/pending-reward.ts` | ✅ 已完成 | 查询待领取奖励 |
+| `scripts/staking/query/pending-reward.ts` | ✅ 已完成 | 查询待领取奖励（自己的位置） |
+| `scripts/staking/query/pending-reward-any-user.ts` | ✅ 已完成 | 查询任意用户/位置的待领取奖励 |
 | `scripts/staking/upgrade.ts` | ✅ 已完成 | 升级合约 |
 
 ### 共享模块（✅ 已完成）
@@ -337,7 +341,8 @@ scripts/
 | `/config/accept-ownership.ts` | ✅ 已完成 | 第二步：接受所有权转移 |
 | `/query/check-status.ts` | ✅ 已完成 | 查询合约状态 |
 | `/query/check-stakes.ts` | ✅ 已完成 | 查询质押信息 |
-| `/query/pending-reward.ts` | ✅ 已完成 | 查询待领取奖励 |
+| `/query/pending-reward.ts` | ✅ 已完成 | 查询待领取奖励（自己的位置） |
+| `/query/pending-reward-any-user.ts` | ✅ 已完成 | 查询任意用户/位置的待领取奖励 |
 | `/query/check-whitelist.ts` | ✅ 已完成 | 查询白名单配置 |
 
 ### 开发脚本（✅ 已完成）
@@ -382,7 +387,7 @@ scripts/
 - ✅ 基础操作脚本：9 个（deploy, upgrade, stake, unstake, claim-rewards, add-rewards, emergency-withdraw, withdraw-excess, verify-forge）
 - ✅ 白名单管理脚本：4 个（add-batch, remove-batch, check-user, toggle-mode）
 - ✅ 配置管理脚本：6 个（pause, unpause, set-start-time, set-end-time, set-min-stake, enable-emergency）
-- ✅ 查询脚本：4 个（check-status, check-stakes, pending-reward, check-whitelist）
+- ✅ 查询脚本：5 个（check-status, check-stakes, pending-reward, pending-reward-any-user, check-whitelist）
 
 **架构支持状态**：
 - ✅  配置已定义（`PREMIUM_STAKING_CONFIG`）
@@ -494,7 +499,7 @@ scripts/
 4. ✅ 创建查询脚本（config/ 和 query/ 目录下）
 5. ✅ 创建所有基础操作脚本（upgrade, unstake, claim-rewards, add-rewards, emergency-withdraw, withdraw-excess, verify-forge）
 6. ✅ 创建所有配置管理脚本（pause, unpause, set-start-time, set-end-time, set-min-stake, enable-emergency）
-7. ✅ 创建所有查询脚本（check-status, check-stakes, pending-reward, check-whitelist）
+7. ✅ 创建所有查询脚本（check-status, check-stakes, pending-reward, pending-reward-any-user, check-whitelist）
 
 ### 步骤 5：创建开发和测试脚本
 

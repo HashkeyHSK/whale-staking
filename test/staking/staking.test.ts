@@ -1,10 +1,6 @@
 import { test, describe, before } from "node:test";
 import { strict as assert } from "node:assert";
-import {
-  createTestFixture,
-  fundAccount,
-  advanceTime,
-} from "../helpers/fixtures.js";
+import { fundAccount, advanceTime } from "../helpers/fixtures.js";
 import {
   expectBigIntEqual,
   parseEther,
@@ -16,39 +12,19 @@ import {
   waitForCondition,
   waitForStateValue,
 } from "../helpers/test-utils.js";
-// State sync utilities are now imported from test-utils
+import { setupStakingTest } from "../helpers/staking-helpers.js";
 
 describe("Staking - Staking Functionality", () => {
-  let fixture: Awaited<ReturnType<typeof createTestFixture>>;
+  let fixture: Awaited<ReturnType<typeof setupStakingTest>>;
   const LOCK_PERIOD = 365 * 24 * 60 * 60; // 365 days
 
   before(async () => {
-    fixture = await createTestFixture();
-
-    // Fund user accounts
-    await fundAccount(fixture.user1, parseEther("1000"));
-    await fundAccount(fixture.user2, parseEther("1000"));
-
-    // Fund admin account
-    await fundAccount(fixture.admin, parseEther("20000"));
-    
-    // Add reward pool
-    const rewardTx = await fixture.staking.connect(fixture.admin).updateRewardPool({
-      value: parseEther("10000"),
+    fixture = await setupStakingTest({
+      user1Balance: parseEther("1000"),
+      user2Balance: parseEther("1000"),
+      adminBalance: parseEther("20000"),
+      rewardPoolAmount: parseEther("10000"),
     });
-    await rewardTx.wait();
-
-    // Advance time to start time
-    const ethers = await getEthers();
-    const startTime = await fixture.staking.stakeStartTime();
-    const now = await ethers.provider
-      .getBlock("latest")
-      .then((b) => b?.timestamp || 0);
-    if (now < startTime) {
-      const timeToAdvance = Number(startTime - BigInt(now)) + 1;
-      await advanceTime(timeToAdvance);
-      // advanceTime now verifies internally, so we don't need to check again
-    }
   });
 
   test("users should be able to stake successfully", async () => {

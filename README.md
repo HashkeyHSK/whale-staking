@@ -20,11 +20,13 @@ A decentralized staking contract based on HashKey Layer2 network, supporting fix
 
 ### Core Features
 - **Fixed Lock Period**: Fixed 365-day lock period, simplifying user choices and unified management
+- **Early Unstake**: Supports early unstake with 50% penalty and 7-day waiting period
+- **Penalty Pool**: Penalties from early unstake are distributed to users who complete full staking period
 - **Upgradeable Proxy**: Uses Transparent Proxy pattern, supporting contract upgrades
 - **Whitelist Mechanism**: Supports whitelist mode, can restrict staking to whitelisted users only
 - **Staking Time Control**: Supports setting staking start and end times, flexible control of staking time windows
 - **Reward Pool Management**: Independent reward pool system ensuring security of reward distribution
-- **Fixed Yield Rate**: Fixed annual yield rate (5%) configured at deployment, clear and explicit
+- **Configurable Yield Rate**: Annual yield rate configured at deployment (in basis points), flexible and explicit
 
 ### Security Features
 - **Reentrancy Attack Protection**: Uses OpenZeppelin's ReentrancyGuard
@@ -63,7 +65,7 @@ HSKStaking (Main Implementation Contract)
 Proxy Contract Architecture
 └── StakingProxy (TransparentUpgradeableProxy)
     ├── Points to HSKStaking implementation
-    ├── Minimum stake: 1000 HSK
+    ├── Minimum stake: 1 HSK
     ├── Annual yield: 5% (500 basis points)
     └── Max total staked: 30,000,000 HSK
 ```
@@ -153,13 +155,15 @@ Claim rewards (without unstaking)
 - **Reentrancy Protection**: Uses `nonReentrant` modifier to prevent reentrancy attacks
 
 #### `pendingReward(uint256 positionId) view → uint256 reward`
-Query pending rewards
+Query pending rewards for any position
 - **Parameters**: `positionId` - Staking position ID
 - **Returns**: `reward` - Pending reward amount
 - **Notes**: 
+  - **Anyone can query** - No owner restriction, can query any position's pending reward
   - Returns 0 in emergency mode
-  - Can only query own staking positions
+  - Returns 0 if position is unstaked
   - Rewards accumulate continuously per second, precise to the second
+  - View function, no gas cost for read-only queries
 
 #### `getUserPositionIds(address user) view → uint256[] memory`
 Get all staking position IDs for a user
@@ -176,6 +180,45 @@ Calculate potential reward for a specified amount
 - **Notes**: 
   - Used to preview rewards before staking
   - Calculated based on current reward rate
+
+#### `requestEarlyUnstake(uint256 positionId)`
+Request early unstake for a position
+- **Parameters**: `positionId` - Staking position ID
+- **Requirements**: 
+  - Must be position owner (checked via `validPosition` modifier)
+  - Position not unstaked (`!position.isUnstaked`)
+  - Must be within lock period (`block.timestamp < position.stakedAt + LOCK_PERIOD`)
+  - Early unstake not already requested (`earlyUnstakeRequestTime[positionId] == 0`)
+  - Contract not paused (`whenNotPaused`)
+- **Errors**:
+  - `"Early unstake already requested"` - If position already has an early unstake request
+  - `"Lock period already ended"` - If lock period has ended (should use normal `unstake()`)
+  - `AlreadyUnstaked()` - If position is already unstaked
+- **Effects**: 
+  - Records request time (`earlyUnstakeRequestTime[positionId] = block.timestamp`)
+  - Reward calculation stops at request time
+- **Events**: Emits `EarlyUnstakeRequested` event
+- **Reentrancy Protection**: Uses `nonReentrant` modifier
+
+#### `completeEarlyUnstake(uint256 positionId)`
+Complete early unstake after 7-day waiting period
+- **Parameters**: `positionId` - Staking position ID
+- **Requirements**: 
+  - Must be position owner (checked via `validPosition` modifier)
+  - Position not unstaked (`!position.isUnstaked`)
+  - Early unstake requested (`earlyUnstakeRequestTime[positionId] > 0`)
+  - Waiting period completed (`block.timestamp >= requestTime + 7 days`)
+  - Contract not paused (`whenNotPaused`)
+- **Errors**:
+  - `AlreadyUnstaked()` - If position is already unstaked (cannot complete twice)
+  - `"Early unstake not requested"` - If no early unstake request exists
+  - `"Waiting period not completed"` - If 7-day waiting period has not passed
+- **Withdrawal Amount**: 
+  - Principal (may be reduced if excess rewards claimed)
+  - 50% of calculated rewards (based on request time)
+  - 50% penalty goes to penalty pool
+- **Reentrancy Protection**: Uses `nonReentrant` modifier
+- **Events**: Emits `EarlyUnstakeCompleted` and `PositionUnstaked` events
 
 ### Admin Functions
 
@@ -268,6 +311,19 @@ Emergency withdrawal (principal only, no rewards)
 - **Reentrancy Protection**: Uses `nonReentrant` modifier to prevent reentrancy attacks
 - **Events**: Emits `EmergencyWithdrawn` event
 
+#### `distributePenaltyPool(uint256[] calldata positionIds)`
+Distribute penalty pool to users who completed full staking period
+- **Parameters**: `positionIds` - Array of position IDs eligible for distribution
+- **Requirements**: 
+  - Only admin can call (`onlyOwner`)
+  - Staking period ended (`block.timestamp >= stakeEndTime`)
+  - Penalty pool not empty (`penaltyPoolBalance > 0`)
+  - All positions must be completed (`position.isCompletedStake == true`)
+  - All positions must be unstaked (`position.isUnstaked == true`)
+- **Distribution**: Proportional based on staked amounts
+- **Reentrancy Protection**: Uses `nonReentrant` modifier
+- **Events**: Emits `PenaltyPoolDistributed` event for each distribution
+
 ## 🔒 Lock Period and Yield
 
 ### Fixed Lock Period
@@ -299,7 +355,7 @@ V2 version simplified lock period selection:
 
 ## 🔓 Unstake Mechanism
 
-### Unstake
+### Unstake (Normal)
 
 **Time Restrictions**:
 - Must wait for lock period to fully end (365 days)
@@ -308,6 +364,7 @@ V2 version simplified lock period selection:
 **Withdrawal Amount**:
 - ✅ Principal + all accrued rewards
 - Rewards calculated based on actual staking time (but not exceeding lock period)
+- Position marked as `isCompletedStake = true` (eligible for penalty pool distribution)
 
 **Example**:
 ```
@@ -317,6 +374,58 @@ Unlock time: 2027-11-01 00:00:00
 
 Can withdraw: After 2027-11-01 00:00:00
 Withdrawal amount: Principal + rewards within 365 days
+```
+
+### Early Unstake
+
+**Process**:
+1. **Request**: User calls `requestEarlyUnstake(positionId)` during lock period
+2. **Waiting Period**: Must wait 7 days after request
+3. **Complete**: After 7 days, call `completeEarlyUnstake(positionId)`
+
+**Penalty**:
+- User receives 50% of calculated rewards (based on request time)
+- 50% penalty goes to penalty pool
+- If user claimed more than 50% before request, excess is deducted from principal
+- Rewards calculated up to request time, not completion time
+
+**Example**:
+```
+Staking time: Day 0
+Request early unstake: Day 60
+Complete early unstake: Day 67 (after 7-day waiting period)
+
+Rewards calculated: Up to Day 60 only
+User receives: 50% of calculated rewards
+Penalty pool: 50% of calculated rewards
+```
+
+**Important Notes**:
+- Reward calculation stops at request time
+- Waiting period (7 days) does not generate additional rewards
+- Early unstake positions are NOT eligible for penalty pool distribution
+
+### Penalty Pool Distribution
+
+**Mechanism**:
+- Penalties from early unstake accumulate in penalty pool
+- After staking period ends (`stakeEndTime`), admin distributes penalty pool
+- Only users who completed full staking period (via `unstake()`) are eligible
+- Distribution is proportional based on staked amounts
+
+**Example**:
+```
+Penalty pool: 1000 HSK
+Completed positions:
+  - Position 1: 1000 HSK
+  - Position 2: 2000 HSK
+  - Position 3: 2000 HSK
+Total: 5000 HSK
+
+Distribution:
+  - Position 1: 1000 * 1000 / 5000 = 200 HSK
+  - Position 2: 1000 * 2000 / 5000 = 400 HSK
+  - Position 3: 1000 * 2000 / 5000 = 400 HSK
 ```
 
 ### Emergency Withdrawal
@@ -336,16 +445,19 @@ Withdrawal amount: Principal + rewards within 365 days
 
 ### Summary Comparison
 
-| Withdrawal Method | Time Restrictions | Withdrawable Amount | Use Case |
-|------------------|-------------------|---------------------|----------|
-| Unstake | Lock period ended (365 days) | Principal + rewards | Standard situations |
-| Emergency withdrawal | No restrictions (requires emergency mode) | Principal only | Emergency situations |
+| Withdrawal Method | Time Restrictions | Withdrawable Amount | Penalty | Use Case |
+|------------------|-------------------|---------------------|---------|----------|
+| Unstake | Lock period ended (365 days) | Principal + rewards | None | Standard situations |
+| Early unstake | 7-day waiting period after request | Principal + 50% rewards | 50% penalty | Need early exit |
+| Emergency withdrawal | No restrictions (requires emergency mode) | Principal only | 100% penalty (no rewards) | Emergency situations |
 
 ### Important Notes
 
-1. **Strict Locking**: Must wait for the full 365-day lock period, early withdrawal not supported
-2. **Rewards can be claimed during lock period**: Although unstaking is not allowed, accumulated rewards can be claimed at any time
-3. **Emergency Mode**: Emergency withdrawal function can only be used after admin enables emergency mode
+1. **Normal Unstake**: Must wait for the full 365-day lock period, receives full rewards
+2. **Early Unstake**: Can request during lock period, incurs 50% penalty, eligible for penalty pool distribution
+3. **Rewards can be claimed during lock period**: Although unstaking is not allowed, accumulated rewards can be claimed at any time
+4. **Penalty Pool**: Distributed to users who complete full staking period, proportional to staked amounts
+5. **Emergency Mode**: Emergency withdrawal function can only be used after admin enables emergency mode
 
 ## 💰 Reward Calculation
 
@@ -430,7 +542,7 @@ STAKE_START_TIME="1735689600" STAKE_END_TIME="1767225600" npm run deploy
 | Feature | Staking |
 |---------|---------|
 | Target Users | All users |
-| Minimum Stake | 1000 HSK |
+| Minimum Stake | 1 HSK |
 | Annual Yield | 5% |
 | Max Total Staked | 30,000,000 HSK |
 | Whitelist Mode | Disabled (Open) |
@@ -512,9 +624,10 @@ PROXY_ADMIN_ADDRESS="0x..." NEW_IMPLEMENTATION_ADDRESS="0x..." npm run upgrade:t
 | `staking/stake.ts` | Execute staking | `npm run stake:testnet` |
 | `stake.ts` |  | `` |
 | `staking/unstake.ts` | Unstake | `npm run unstake:testnet` |
-| `unstake.ts` |  | `` |
 | `staking/claim-rewards.ts` | Claim rewards | `npm run claim:testnet` |
-| `claim-rewards.ts` |  | `` |
+| `staking/request-early-unstake.ts` | Request early unstake | `npm run request-early-unstake:testnet` |
+| `staking/complete-early-unstake.ts` | Complete early unstake | `npm run complete-early-unstake:testnet` |
+| `staking/distribute-penalty-pool.ts` | Distribute penalty pool | `npm run distribute-penalty-pool:testnet` |
 | `staking/query/check-stakes.ts` | Query user staking status | `npm run query:stakes:testnet` |
 | `staking/config/set-start-time.ts` | Set staking start time | `npm run config:set-start-time:testnet` |
 | `staking/config/set-end-time.ts` | Set staking end time | `npm run config:set-end-time:testnet` |
@@ -533,10 +646,9 @@ PROXY_ADMIN_ADDRESS="0x..." NEW_IMPLEMENTATION_ADDRESS="0x..." npm run upgrade:t
 | `check-status.ts` |  | `` |
 | `staking/query/check-stakes.ts` | Query user staking status | `npm run query:stakes:testnet` |
 | `check-stakes.ts` |  | `` |
-| `staking/query/pending-reward.ts` | Query pending rewards | `npm run query:pending-reward:testnet` |
-| `pending-reward.ts` |  | `` |
+| `staking/query/pending-reward.ts` | Query pending rewards (for own positions) | `npm run query:pending-reward:testnet` |
+| `staking/query/pending-reward-any-user.ts` | Query pending rewards for any user/position | `npm run query:pending-reward-any-user:testnet` |
 | `staking/query/position-info.ts` | Query position details | `npm run query:position-info:testnet` |
-| `position-info.ts` |  | `` |
 | `check-whitelist.ts` | Check whitelist status | `` |
 
 ## 🧪 Testing
@@ -623,10 +735,12 @@ For detailed testing guide, please refer to: [Testing Guide](./docs/TESTING_GUID
 
 ## 🔍 Contract Version
 
-### Current Version: HSKStaking V2.0.0
+### Current Version: HSKStaking V2.1.0
 
 **Core Features**:
 - **Fixed 365-day lock period**: Simplifies user operations, no need to choose lock period
+- **Early unstake mechanism**: Supports early unstake with 50% penalty and 7-day waiting period
+- **Penalty pool**: Penalties from early unstake distributed to users who complete full staking period
 - **Single proxy architecture**: Single staking pool with unified configuration through `StakingProxy`
 - **Transparent Proxy pattern**: Upgrades controlled by ProxyAdmin, secure and reliable
 - **Unified implementation contract**: `HSKStaking.sol` as common implementation, configured with different products through initialization parameters
@@ -636,27 +750,30 @@ For detailed testing guide, please refer to: [Testing Guide](./docs/TESTING_GUID
 **Architecture Advantages**:
 - **Modular design**: Implementation, storage, constants, interfaces separated, clear and maintainable
 - **Reusability**: Same implementation contract supports multiple product instances
-- **Independent upgrades**: Two proxy contracts can be upgraded independently
+- **Independent upgrades**: Proxy contracts can be upgraded independently
 - **Flexible configuration**: Different product features configured through initialization parameters
 
 **Version History**:
 - V1.0.0 (`staking.sol`): Initial version, supported multiple lock period options
-- V2.0.0 (`HSKStaking.sol`): Current version, fixed lock period + single proxy architecture
+- V2.0.0 (`HSKStaking.sol`): Fixed lock period + single proxy architecture
+- V2.1.0 (`HSKStaking.sol`): Added early unstake mechanism with penalty pool distribution
 
 ## ⚠️ Important Reminders
 
 1. **Staking Time Window**: Contract supports setting staking start and end times. Must provide `STAKE_START_TIME` and `STAKE_END_TIME` environment variables at deployment (Unix timestamp, in seconds). Admin can adjust via `setStakeStartTime` and `setStakeEndTime` functions
 2. **Reward Calculation Limit**: Rewards are only calculated up to the end of lock period, extra staking time does not increase rewards
 3. **Whitelist Mode**: Contract supports whitelist mode, can be configured at deployment. Current configuration has whitelist disabled (open to all users)
-4. **Minimum Staking Amount**: Configured as 1000 HSK at deployment, can be modified after deployment via `setMinStakeAmount`
+4. **Minimum Staking Amount**: Configured as 1 HSK at deployment, can be modified after deployment via `setMinStakeAmount`
 5. **Maximum Total Staked**: Configured as 30,000,000 HSK at deployment, can be modified after deployment via `setMaxTotalStaked`. Sets the upper limit for the entire staking pool, total staking amount of all users cannot exceed this limit
 6. **Reward Pool**: Ensure reward pool has sufficient funds, otherwise new staking may fail. Contract checks if reward pool balance is sufficient to pay all pending rewards
 7. **Reward Pool Withdrawal**: Admin can withdraw excess reward pool funds via `withdrawExcessRewardPool` (amount exceeding totalPendingRewards)
+8. **Early Unstake**: Users can request early unstake during lock period, but must wait 7 days and incur 50% penalty. Penalties go to penalty pool, distributed to users who complete full staking period
+9. **Penalty Pool Distribution**: Admin distributes penalty pool after staking period ends (`stakeEndTime`), only to users who completed full staking period (via `unstake()`)
 
 ### Product Configuration
 
 - **Staking**:
-  - Minimum stake: 1000 HSK
+  - Minimum stake: 1 HSK
   - Annual yield: 5%
   - Lock period: 365 days
   - Whitelist: Disabled (Open)
@@ -692,8 +809,9 @@ MIT License
 ### Reference Documentation
 - [Technical FAQ](./docs/TECHNICAL_FAQ.md) - Technical mechanism explanations
 - [Error Handling Guide](./docs/ERROR_HANDLING.md) - Common error handling
+- [Early Unstake Changelog](./docs/EARLY_UNSTAKE_CHANGELOG.md) - Early unstake feature details
 
 ---
 
-**Document Version**: 1.0.0  
+**Document Version**: 2.0.0  
 **Maintainer**: HashKey Technical Team

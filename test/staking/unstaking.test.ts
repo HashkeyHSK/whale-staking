@@ -1,10 +1,6 @@
 import { test, describe, before } from "node:test";
 import { strict as assert } from "node:assert";
-import {
-  createTestFixture,
-  fundAccount,
-  advanceTime,
-} from "../helpers/fixtures.js";
+import { advanceTime } from "../helpers/fixtures.js";
 import { getEthers } from "../helpers/test-utils.js";
 import {
   expectBigIntEqual,
@@ -13,45 +9,29 @@ import {
   getEvent,
   getPendingReward,
 } from "../helpers/test-utils.js";
+import { setupStakingTest, getPositionIdFromReceipt } from "../helpers/staking-helpers.js";
+import { stakeAndGetPositionId } from "../helpers/early-unstake-helpers.js";
 
 describe("Staking - Unstaking Functionality", () => {
-  let fixture: Awaited<ReturnType<typeof createTestFixture>>;
+  let fixture: Awaited<ReturnType<typeof setupStakingTest>>;
   const LOCK_PERIOD = 365 * 24 * 60 * 60; // 365 days
 
   before(async () => {
-    fixture = await createTestFixture();
-
-    // Fund user accounts
-    await fundAccount(fixture.user1, parseEther("1000"));
-    await fundAccount(fixture.user2, parseEther("1000"));
-    
-    // Fund admin account
-    await fundAccount(fixture.admin, parseEther("20000"));
-
-    // Add reward pool
-    const rewardTx = await fixture.staking.connect(fixture.admin).updateRewardPool({
-      value: parseEther("10000"),
+    fixture = await setupStakingTest({
+      user1Balance: parseEther("1000"),
+      user2Balance: parseEther("1000"),
+      adminBalance: parseEther("20000"),
+      rewardPoolAmount: parseEther("10000"),
     });
-    await rewardTx.wait();
-
-    // Advance time to start time
-    const startTime = await fixture.staking.stakeStartTime();
-    const ethers = await getEthers();
-    const now = await ethers.provider
-      .getBlock("latest")
-      .then((b) => b?.timestamp || 0);
-    if (now < startTime) {
-      await advanceTime(Number(startTime - BigInt(now)) + 1);
-    }
   });
 
   test("should unstake correctly after lock period", async () => {
     const stakeAmount = parseEther("100");
-    await fixture.staking.connect(fixture.user1).stake({
-      value: stakeAmount,
-    });
-
-    const positionId = (await fixture.staking.nextPositionId()) - BigInt(1);
+    const positionId = await stakeAndGetPositionId(
+      fixture.staking,
+      fixture.user1,
+      stakeAmount
+    );
 
     // Advance time past lock period
     await advanceTime(LOCK_PERIOD + 1);
@@ -90,11 +70,11 @@ describe("Staking - Unstaking Functionality", () => {
 
   test("should reject unstaking during lock period", async () => {
     const stakeAmount = parseEther("100");
-    await fixture.staking.connect(fixture.user1).stake({
-      value: stakeAmount,
-    });
-
-    const positionId = (await fixture.staking.nextPositionId()) - BigInt(1);
+    const positionId = await stakeAndGetPositionId(
+      fixture.staking,
+      fixture.user1,
+      stakeAmount
+    );
 
     // Don't advance time, so still in lock period
     await expectRevert(
@@ -105,11 +85,11 @@ describe("Staking - Unstaking Functionality", () => {
 
   test("should automatically claim all accumulated rewards", async () => {
     const stakeAmount = parseEther("1000");
-    await fixture.staking.connect(fixture.user1).stake({
-      value: stakeAmount,
-    });
-
-    const positionId = (await fixture.staking.nextPositionId()) - BigInt(1);
+    const positionId = await stakeAndGetPositionId(
+      fixture.staking,
+      fixture.user1,
+      stakeAmount
+    );
 
     // Advance time by 30 days
     await advanceTime(30 * 24 * 60 * 60);
@@ -152,11 +132,11 @@ describe("Staking - Unstaking Functionality", () => {
 
   test("should return principal correctly", async () => {
     const stakeAmount = parseEther("100");
-    await fixture.staking.connect(fixture.user1).stake({
-      value: stakeAmount,
-    });
-
-    const positionId = (await fixture.staking.nextPositionId()) - BigInt(1);
+    const positionId = await stakeAndGetPositionId(
+      fixture.staking,
+      fixture.user1,
+      stakeAmount
+    );
 
     // Advance time past lock period
     await advanceTime(LOCK_PERIOD + 1);
@@ -196,32 +176,25 @@ describe("Staking - Unstaking Functionality", () => {
 
   test("should update totalStaked correctly", async () => {
     const stakeAmount = parseEther("100");
+    const nextPositionIdBefore = await fixture.staking.nextPositionId();
     const stakeTx = await fixture.staking.connect(fixture.user1).stake({
       value: stakeAmount,
     });
     const stakeReceipt = await stakeTx.wait();
     assert.strictEqual(stakeReceipt?.status, 1, "Stake transaction should succeed");
 
-    // Get positionId from event or state
-    let positionId: bigint | null = null;
-    if (stakeReceipt && stakeReceipt.logs && stakeReceipt.logs.length > 0) {
-      const event = getEvent(stakeReceipt, "PositionCreated", fixture.staking);
-      if (event && event.args && event.args.positionId !== undefined) {
-        positionId = event.args.positionId;
-      }
-    }
+    // Get positionId using helper function
+    const positionId = await getPositionIdFromReceipt(
+      fixture.staking,
+      stakeReceipt,
+      nextPositionIdBefore
+    );
     
     if (positionId === null) {
-      const nextPositionIdBefore = await fixture.staking.nextPositionId();
-      const nextPositionIdAfter = await fixture.staking.nextPositionId();
-      if (nextPositionIdAfter > nextPositionIdBefore) {
-        positionId = nextPositionIdBefore;
-      } else {
-        // State not updated - accept stake as passed
-        console.warn("Warning: Stake transaction succeeded but state not updated. This is a Hardhat EDR limitation.");
-        assert.strictEqual(stakeReceipt?.status, 1, "Stake transaction should succeed");
-        return;
-      }
+      // State not updated - accept stake as passed
+      console.warn("Warning: Stake transaction succeeded but state not updated. This is a Hardhat EDR limitation.");
+      assert.strictEqual(stakeReceipt?.status, 1, "Stake transaction should succeed");
+      return;
     }
 
     // Advance time past lock period
@@ -255,11 +228,11 @@ describe("Staking - Unstaking Functionality", () => {
 
   test("should mark position as unstaked correctly", async () => {
     const stakeAmount = parseEther("100");
-    await fixture.staking.connect(fixture.user1).stake({
-      value: stakeAmount,
-    });
-
-    const positionId = (await fixture.staking.nextPositionId()) - BigInt(1);
+    const positionId = await stakeAndGetPositionId(
+      fixture.staking,
+      fixture.user1,
+      stakeAmount
+    );
 
     // Advance time past lock period
     await advanceTime(LOCK_PERIOD + 1);
@@ -284,11 +257,11 @@ describe("Staking - Unstaking Functionality", () => {
 
   test("should emit PositionUnstaked event correctly", async () => {
     const stakeAmount = parseEther("100");
-    await fixture.staking.connect(fixture.user1).stake({
-      value: stakeAmount,
-    });
-
-    const positionId = (await fixture.staking.nextPositionId()) - BigInt(1);
+    const positionId = await stakeAndGetPositionId(
+      fixture.staking,
+      fixture.user1,
+      stakeAmount
+    );
 
     // Advance time past lock period
     await advanceTime(LOCK_PERIOD + 1);
@@ -330,11 +303,11 @@ describe("Staking - Unstaking Functionality", () => {
 
   test("should reject duplicate unstaking", async () => {
     const stakeAmount = parseEther("100");
-    await fixture.staking.connect(fixture.user1).stake({
-      value: stakeAmount,
-    });
-
-    const positionId = (await fixture.staking.nextPositionId()) - BigInt(1);
+    const positionId = await stakeAndGetPositionId(
+      fixture.staking,
+      fixture.user1,
+      stakeAmount
+    );
 
     // Advance time past lock period
     await advanceTime(LOCK_PERIOD + 1);
@@ -366,11 +339,11 @@ describe("Staking - Unstaking Functionality", () => {
 
   test("should reject unstaking from non-position owner", async () => {
     const stakeAmount = parseEther("100");
-    await fixture.staking.connect(fixture.user1).stake({
-      value: stakeAmount,
-    });
-
-    const positionId = (await fixture.staking.nextPositionId()) - BigInt(1);
+    const positionId = await stakeAndGetPositionId(
+      fixture.staking,
+      fixture.user1,
+      stakeAmount
+    );
 
     // Advance time past lock period
     await advanceTime(LOCK_PERIOD + 1);
@@ -394,15 +367,17 @@ describe("Staking - Unstaking Functionality", () => {
     const stakeAmount1 = parseEther("100");
     const stakeAmount2 = parseEther("200");
 
-    await fixture.staking.connect(fixture.user1).stake({
-      value: stakeAmount1,
-    });
-    const positionId1 = (await fixture.staking.nextPositionId()) - BigInt(1);
+    const positionId1 = await stakeAndGetPositionId(
+      fixture.staking,
+      fixture.user1,
+      stakeAmount1
+    );
 
-    await fixture.staking.connect(fixture.user1).stake({
-      value: stakeAmount2,
-    });
-    const positionId2 = (await fixture.staking.nextPositionId()) - BigInt(1);
+    const positionId2 = await stakeAndGetPositionId(
+      fixture.staking,
+      fixture.user1,
+      stakeAmount2
+    );
 
     // Advance time past lock period
     await advanceTime(LOCK_PERIOD + 1);
@@ -446,11 +421,11 @@ describe("Staking - Unstaking Functionality", () => {
 
   test("should reject unstaking when paused", async () => {
     const stakeAmount = parseEther("100");
-    await fixture.staking.connect(fixture.user1).stake({
-      value: stakeAmount,
-    });
-
-    const positionId = (await fixture.staking.nextPositionId()) - BigInt(1);
+    const positionId = await stakeAndGetPositionId(
+      fixture.staking,
+      fixture.user1,
+      stakeAmount
+    );
 
     // Advance time past lock period
     await advanceTime(LOCK_PERIOD + 1);
@@ -496,11 +471,11 @@ describe("Staking - Unstaking Functionality", () => {
 
   test("should reject unstaking in emergency mode", async () => {
     const stakeAmount = parseEther("100");
-    await fixture.staking.connect(fixture.user1).stake({
-      value: stakeAmount,
-    });
-
-    const positionId = (await fixture.staking.nextPositionId()) - BigInt(1);
+    const positionId = await stakeAndGetPositionId(
+      fixture.staking,
+      fixture.user1,
+      stakeAmount
+    );
 
     // Advance time past lock period
     await advanceTime(LOCK_PERIOD + 1);

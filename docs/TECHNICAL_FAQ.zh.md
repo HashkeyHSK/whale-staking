@@ -274,11 +274,11 @@
 
 **A:** 通过合约函数查询。
 
-- 使用 `userPositions(address, uint256)` 查询用户的第N个质押位置ID（需要遍历索引）
+- 使用 `getUserPositionIds(address)` 获取用户的所有质押位置ID（推荐）
 - 使用 `positions(positionId)` 查询指定位置的详细信息
-- 使用 `pendingReward(positionId)` 查询待提取奖励
+- 使用 `pendingReward(positionId)` 查询待提取奖励（任何人都可以查询，无所有者限制）
 - 可以通过前端界面或调用合约函数查询
-- **注意**: `userPositions` 是 public mapping，返回 positionId，需要再通过 `positions` 查询详情
+- **注意**: `pendingReward` 可以被任何人调用 - 不需要是位置所有者
 
 ---
 

@@ -61,7 +61,7 @@ export const STAKING_CONSTANTS = {
 // Staking product configuration
 // Note: Lock period is fixed at 365 days, defined in contract constant LOCK_PERIOD
 export const STAKING_CONFIG = {
-  minStakeAmount: "1000",        // 1000 HSK
+  minStakeAmount: "1",          // 1 HSK
   rewardRate: 500,               // 5% APY (basis points: 500/10000 = 0.05 = 5%)
   whitelistMode: false,          // Whitelist mode disabled
   maxTotalStaked: "30000000",    // 30,000,000 HSK (30 million HSK pool cap)

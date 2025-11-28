@@ -218,14 +218,18 @@ npx hardhat run /query/check-whitelist.ts --network hashkeyTestnet \
 - `!paused()` - 合约未暂停
 
 #### `pendingReward(uint256 positionId) view → uint256`
-查询待提取奖励。
+查询任何位置的待提取奖励。
 
 **参数**：
 - `positionId`: 质押位置 ID
 
 **返回**：待提取的奖励金额
 
-**说明**：紧急模式下返回 0
+**注意事项**：
+- **任何人都可以查询** - 无所有者限制，可以查询任何位置的待提取奖励
+- 紧急模式下返回 0
+- 如果位置已解除质押，返回 0
+- View 函数，只读查询无需 gas 费用
 
 #### 查看用户质押位置
 

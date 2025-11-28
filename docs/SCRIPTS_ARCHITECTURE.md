@@ -55,7 +55,8 @@ Before starting, please understand the following key information:
   - Returns claimed reward amount
 - `pendingReward(uint256 positionId) external view returns (uint256)`: 
   - Query pending rewards for specified position (read-only function)
-  - Returns 0 in emergency mode
+  - Can be called by anyone - no owner restriction
+  - Returns 0 in emergency mode or if position is unstaked
 - `emergencyWithdraw(uint256 positionId) external`: 
   - Emergency withdraw principal (only available in emergency mode)
   - No rewards, only returns principal
@@ -200,7 +201,8 @@ scripts/
 │   └── query/                # State queries
 │       ├── check-status.ts
 │       ├── check-stakes.ts
-│       └── pending-reward.ts
+│       ├── pending-reward.ts
+│       └── pending-reward-any-user.ts
 ├── premium/                  # Premium staking scripts (✅ Completed)
 │   ├── deploy.ts             # Deploy contract
 │   ├── upgrade.ts            # Upgrade contract
@@ -229,6 +231,7 @@ scripts/
 │       ├── check-status.ts
 │       ├── check-stakes.ts
 │       ├── pending-reward.ts
+│       ├── pending-reward-any-user.ts
 │       └── check-whitelist.ts
 ├── dev/                      # Development scripts
 │   ├── compile.ts            # Compile contracts
@@ -290,7 +293,8 @@ The following table lists script completion status:
 | `scripts/staking/config/accept-ownership.ts` | ✅ Completed | Step 2: Accept ownership transfer |
 | `scripts/staking/query/check-status.ts` | ✅ Completed | Query contract status |
 | `scripts/staking/query/check-stakes.ts` | ✅ Completed | Query staking information |
-| `scripts/staking/query/pending-reward.ts` | ✅ Completed | Query pending rewards |
+| `scripts/staking/query/pending-reward.ts` | ✅ Completed | Query pending rewards (for own positions) |
+| `scripts/staking/query/pending-reward-any-user.ts` | ✅ Completed | Query pending rewards for any user/position |
 | `scripts/staking/upgrade.ts` | ✅ Completed | Upgrade contract |
 
 ### Shared Modules (✅ Completed)
@@ -337,7 +341,8 @@ The following table lists script completion status:
 | `/config/accept-ownership.ts` | ✅ Completed | Step 2: Accept ownership transfer |
 | `/query/check-status.ts` | ✅ Completed | Query contract status |
 | `/query/check-stakes.ts` | ✅ Completed | Query staking information |
-| `/query/pending-reward.ts` | ✅ Completed | Query pending rewards |
+| `/query/pending-reward.ts` | ✅ Completed | Query pending rewards (for own positions) |
+| `/query/pending-reward-any-user.ts` | ✅ Completed | Query pending rewards for any user/position |
 | `/query/check-whitelist.ts` | ✅ Completed | Query whitelist configuration |
 
 ### Development Scripts (✅ Completed)
@@ -382,7 +387,7 @@ The following table lists script completion status:
 - ✅ Basic operation scripts: 9 scripts (deploy, upgrade, stake, unstake, claim-rewards, add-rewards, emergency-withdraw, withdraw-excess, verify-forge)
 - ✅ Whitelist management scripts: 4 scripts (add-batch, remove-batch, check-user, toggle-mode)
 - ✅ Configuration management scripts: 6 scripts (pause, unpause, set-start-time, set-end-time, set-min-stake, enable-emergency)
-- ✅ Query scripts: 4 scripts (check-status, check-stakes, pending-reward, check-whitelist)
+- ✅ Query scripts: 5 scripts (check-status, check-stakes, pending-reward, pending-reward-any-user, check-whitelist)
 
 **Architecture Support Status**:
 - ✅  configuration defined (`PREMIUM_STAKING_CONFIG`)
@@ -494,7 +499,7 @@ Similar to `scripts/staking/deploy.ts`, uses `PREMIUM_STAKING_CONFIG`, and enabl
 4. ✅ Create query scripts (under config/ and query/ directories)
 5. ✅ Create all basic operation scripts (upgrade, unstake, claim-rewards, add-rewards, emergency-withdraw, withdraw-excess, verify-forge)
 6. ✅ Create all configuration management scripts (pause, unpause, set-start-time, set-end-time, set-min-stake, enable-emergency)
-7. ✅ Create all query scripts (check-status, check-stakes, pending-reward, check-whitelist)
+7. ✅ Create all query scripts (check-status, check-stakes, pending-reward, pending-reward-any-user, check-whitelist)
 
 ### Step 5: Create Development and Test Scripts
 

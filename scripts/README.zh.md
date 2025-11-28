@@ -166,7 +166,7 @@ scripts/
 export STAKING_ADDRESS="0x..."
 
 # 操作相关
-export STAKE_AMOUNT="1000"        # 质押金额（最低：1000 HSK）
+export STAKE_AMOUNT="100"         # 质押金额（最低：1 HSK）
 export REWARD_AMOUNT="100"        # 奖励金额
 export POSITION_ID="1"              # Position ID
 export USER_ADDRESS="0x..."         # 查询指定用户
@@ -183,7 +183,7 @@ export STAKE_END_TIME="1767225600"    # 质押结束时间（Unix 时间戳，�
 # 配置相关
 export START_TIME="1735689600"      # 开始时间（Unix 时间戳，秒级，用于修改配置）
 export END_TIME="1735689600"        # 结束时间（Unix 时间戳，秒级，用于修改配置）
-export NEW_MIN_STAKE="1000"        # 新的最小质押金额
+export NEW_MIN_STAKE="1"          # 新的最小质押金额
 export NEW_MAX_TOTAL_STAKED="10000000"  # 新的最大总质押量（HSK，0 表示无限制）
 
 # 高级操作
@@ -286,7 +286,7 @@ export const TESTNET_ADDRESSES: ContractAddresses = {
 2. **奖励率**: 
    - Staking: 5% APY (500 basis points)
 3. **最小质押**: 
-   - Staking: 1000 HSK（可通过 owner 修改）
+   - Staking: 1 HSK（可通过 owner 修改）
 4. **最大总质押量**: 
    - Staking: 30,000,000 HSK（可通过 owner 修改，0 表示无限制）
 5. **白名单**: 
@@ -455,7 +455,7 @@ npm run tools:compare-contracts HSKStaking
 
 | 配置项 | 值 | 说明 |
 |-------|---|------|
-| 最小质押 | 1000 HSK | 可通过 owner 修改 |
+| 最小质押 | 1 HSK | 可通过 owner 修改 |
 | 最大总质押量 | 30,000,000 HSK | 可通过 owner 修改（0 表示无限制） |
 | 年化收益 | 5% | 固定在初始化时设置 |
 | 锁定期 | 365 天 | 合约常量，不可修改 |

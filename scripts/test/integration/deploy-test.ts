@@ -22,7 +22,7 @@ async function main() {
     const whitelistMode = await fixture.staking.onlyWhitelistCanStake();
     const maxTotalStaked = await fixture.staking.maxTotalStaked();
     
-    expectBigIntEqual(minStake, parseEther("1000"), "Min stake should be 1000 HSK");
+    expectBigIntEqual(minStake, parseEther("1"), "Min stake should be 1 HSK");
     expectBigIntEqual(rewardRate: 500), "Reward rate should be 5%");
     expectBigIntEqual(maxTotalStaked, parseEther("30000000"), "Max total staked should be 30,000,000 HSK");
     if (whitelistMode) {

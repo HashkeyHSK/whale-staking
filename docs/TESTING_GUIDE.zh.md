@@ -49,7 +49,7 @@
 - `stake() external payable returns (uint256)`: 质押 HSK，返回 positionId
 - `unstake(uint256 positionId) external`: 解除质押，自动领取所有累积奖励并返还本金
 - `claimReward(uint256 positionId) external returns (uint256)`: 领取指定位置的奖励，不解除质押
-- `pendingReward(uint256 positionId) external view returns (uint256)`: 查询指定位置的待领取奖励
+- `pendingReward(uint256 positionId) external view returns (uint256)`: 查询指定位置的待领取奖励（任何人都可以调用，无所有者限制）
 - `emergencyWithdraw(uint256 positionId) external`: 紧急提取本金（仅在紧急模式下可用）
 
 **奖励池管理**

@@ -15,7 +15,7 @@ Error: Insufficient stake amount
 - Staking amount is less than the minimum staking amount requirement
 
 **Solution**:
-- Check minimum staking amount requirement: 1000 HSK
+- Check minimum staking amount requirement: 1 HSK
 - Ensure sent amount >= minimum staking amount
 
 **Example**:
@@ -24,7 +24,7 @@ Error: Insufficient stake amount
 await staking.stake({ value: ethers.parseEther("500") });
 
 // ✅ Correct: Meets minimum staking amount
-await staking.stake({ value: ethers.parseEther("1000") });
+await staking.stake({ value: ethers.parseEther("1") });
 ```
 
 **Note**: V2 version uses fixed 365-day lock period, `stake()` function does not require `lockPeriod` parameter.
@@ -84,7 +84,193 @@ if (timeRemaining > 0) {
 }
 ```
 
-**Note**: V2 version strictly enforces 365-day lock period, no early unlock mechanism.
+**Note**: V2 version supports early unstake mechanism. Users can request early unstake during lock period, but must wait 7 days and incur a 50% penalty.
+
+---
+
+### 3a. "Early unstake already requested" - Early Unstake Already Requested
+
+**Error Message**:
+```
+Error: Early unstake already requested
+```
+
+**Cause**:
+- Attempting to request early unstake for a position that already has an early unstake request
+- `earlyUnstakeRequestTime[positionId] > 0` means request already exists
+
+**Solution**:
+- Check if early unstake was already requested: `await staking.earlyUnstakeRequestTime(positionId)`
+- If request exists, wait for 7-day waiting period and then call `completeEarlyUnstake()`
+- Cannot request early unstake twice for the same position
+
+**Example**:
+```typescript
+const requestTime = await staking.earlyUnstakeRequestTime(positionId);
+if (requestTime > 0) {
+  const waitingPeriod = 7 * 24 * 60 * 60; // 7 days
+  const canComplete = (await time.latest()) >= requestTime + waitingPeriod;
+  if (canComplete) {
+    // Can complete early unstake
+    await staking.completeEarlyUnstake(positionId);
+  } else {
+    // Still in waiting period
+    console.log("Still in 7-day waiting period");
+  }
+}
+```
+
+---
+
+### 3b. "Early unstake not requested" - Early Unstake Not Requested
+
+**Error Message**:
+```
+Error: Early unstake not requested
+```
+
+**Cause**:
+- Attempting to complete early unstake without first requesting it
+- `earlyUnstakeRequestTime[positionId] == 0` means no request exists
+
+**Solution**:
+- First call `requestEarlyUnstake(positionId)` to request early unstake
+- Wait for 7-day waiting period
+- Then call `completeEarlyUnstake(positionId)`
+
+**Example**:
+```typescript
+// Step 1: Request early unstake
+await staking.requestEarlyUnstake(positionId);
+
+// Step 2: Wait 7 days (or advance time in test)
+await time.increase(7 * 24 * 60 * 60);
+
+// Step 3: Complete early unstake
+await staking.completeEarlyUnstake(positionId);
+```
+
+---
+
+### 3c. "Waiting period not completed" - Early Unstake Waiting Period Not Completed
+
+**Error Message**:
+```
+Error: Waiting period not completed
+```
+
+**Cause**:
+- Attempting to complete early unstake before 7-day waiting period ends
+- Current time < request time + 7 days
+
+**Solution**:
+- Wait for 7-day waiting period to complete
+- Query request time: `await staking.earlyUnstakeRequestTime(positionId)`
+- Calculate remaining time: `remainingTime = requestTime + 7 days - currentTime`
+
+**Example**:
+```typescript
+const requestTime = await staking.earlyUnstakeRequestTime(positionId);
+const EARLY_UNLOCK_PERIOD = 7 * 24 * 60 * 60; // 7 days
+const currentTime = await time.latest();
+const unlockTime = requestTime + EARLY_UNLOCK_PERIOD;
+
+if (currentTime < unlockTime) {
+  const remaining = unlockTime - currentTime;
+  console.log(`Need to wait ${remaining} seconds (${remaining / 86400} days)`);
+}
+```
+
+---
+
+### 3d. `AlreadyUnstaked()` - Cannot Complete Early Unstake Twice
+
+**Error Message**:
+```
+Error: AlreadyUnstaked()
+```
+
+**Error Type**: Custom Error (not a string message)
+
+**Cause**:
+- Attempting to complete early unstake for a position that is already unstaked
+- `position.isUnstaked == true` means position was already unstaked
+- Cannot complete early unstake twice for the same position
+
+**Solution**:
+- Check if position is already unstaked: `const position = await staking.positions(positionId); if (position.isUnstaked) { ... }`
+- Once a position is unstaked, it cannot be unstaked again
+- If you need to stake again, create a new position by calling `stake()`
+
+**Example**:
+```typescript
+const position = await staking.positions(positionId);
+if (position.isUnstaked) {
+  console.log("Position already unstaked, cannot complete again");
+  return;
+}
+
+// Only proceed if not unstaked
+await staking.completeEarlyUnstake(positionId);
+```
+
+**Note**: This error also occurs when trying to call `unstake()` or `completeEarlyUnstake()` on an already unstaked position.
+
+---
+
+### 3e. "Lock period already ended" - Cannot Request Early Unstake After Lock Period
+
+**Error Message**:
+```
+Error: Lock period already ended
+```
+
+**Cause**:
+- Attempting to request early unstake after lock period has ended
+- `block.timestamp >= position.stakedAt + LOCK_PERIOD`
+- After lock period ends, should use normal `unstake()` instead
+
+**Solution**:
+- Check if lock period has ended
+- If lock period ended, use `unstake()` instead of early unstake
+- Early unstake is only available during lock period
+
+**Example**:
+```typescript
+const position = await staking.positions(positionId);
+const LOCK_PERIOD = 365 * 24 * 60 * 60; // 365 days
+const lockEndTime = position.stakedAt + LOCK_PERIOD;
+const currentTime = await time.latest();
+
+if (currentTime >= lockEndTime) {
+  // Lock period ended, use normal unstake
+  await staking.unstake(positionId);
+} else {
+  // Still in lock period, can request early unstake
+  await staking.requestEarlyUnstake(positionId);
+}
+```
+
+---
+
+### 3e. "EarlyUnstakeRequested" - Cannot Claim Reward After Requesting Early Unstake
+
+**Error Message**:
+```
+Error: EarlyUnstakeRequested
+```
+
+**Cause**:
+- Attempting to claim reward after requesting early unstake
+- Once early unstake is requested, reward calculation stops at request time
+- Cannot claim additional rewards after request
+
+**Solution**:
+- If early unstake is requested, rewards are calculated up to request time only
+- Complete early unstake to receive 50% of calculated rewards
+- Cannot claim rewards separately after requesting early unstake
+
+**Note**: This is a design decision - once early unstake is requested, rewards stop accumulating and are calculated at completion time based on request time.
 
 ---
 
@@ -237,6 +423,7 @@ Error: OwnableUnauthorizedAccount(address account)
 - Deposit/withdraw reward pool (`updateRewardPool`, `withdrawExcessRewardPool`)
 - Pause/resume contract (`pause`, `unpause`)
 - Enable emergency mode (`enableEmergencyMode`)
+- Distribute penalty pool (`distributePenaltyPool`)
 
 ---
 
@@ -324,18 +511,19 @@ console.log(`Whitelist mode: ${whitelistMode ? 'Enabled' : 'Disabled'}`);
 const emergencyMode = await staking.emergencyMode();
 console.log(`Emergency mode: ${emergencyMode ? 'Enabled' : 'Disabled'}`);
 
-// Query user staking positions (need to iterate through indices)
-// Note: userPositions is a mapping, need to query one by one through indices
-let positionCount = 0;
-try {
-  while (true) {
-    await staking.userPositions(userAddress, positionCount);
-    positionCount++;
+// Query user staking positions (recommended method)
+const positionIds = await staking.getUserPositionIds(userAddress);
+console.log(`User staking position count: ${positionIds.length}`);
+
+// Query early unstake status
+for (const positionId of positionIds) {
+  const requestTime = await staking.earlyUnstakeRequestTime(positionId);
+  if (requestTime > 0) {
+    const EARLY_UNLOCK_PERIOD = 7 * 24 * 60 * 60; // 7 days
+    const canComplete = (await time.latest()) >= requestTime + EARLY_UNLOCK_PERIOD;
+    console.log(`Position ${positionId}: Early unstake requested, can complete: ${canComplete}`);
   }
-} catch (e) {
-  // Exception thrown when index is out of range
 }
-console.log(`User staking position count: ${positionCount}`);
 ```
 
 ### Use Scripts to Check
@@ -350,7 +538,7 @@ npx hardhat run scripts/checkWhitelist.ts --network <network> \
   -- --contract <CONTRACT_ADDRESS> --user <USER_ADDRESS>
 ```
 
-**Note**: V2 version uses fixed 365-day lock period (`LOCK_PERIOD = 365 days`), no need to check lock period options.
+**Note**: V2 version uses fixed 365-day lock period (`LOCK_PERIOD = 365 days`). Early unstake is supported with 7-day waiting period and 50% penalty.
 
 ### Query Contract Constants
 
@@ -382,6 +570,18 @@ If you encounter errors not covered in this document, please:
 
 ---
 
-**Document Version**: 1.0.0  
+## Early Unstake Related Errors Summary
+
+| Error | Function | Cause | Solution |
+|-------|----------|-------|----------|
+| "Early unstake already requested" | `requestEarlyUnstake` | Already requested | Wait and complete instead |
+| `AlreadyUnstaked()` | `completeEarlyUnstake` | Position already unstaked | Cannot complete twice |
+| "Early unstake not requested" | `completeEarlyUnstake` | No request exists | Request first |
+| "Waiting period not completed" | `completeEarlyUnstake` | Less than 7 days passed | Wait for 7 days |
+| "Lock period already ended" | `requestEarlyUnstake` | Lock period ended | Use `unstake()` instead |
+
+---
+
+**Document Version**: 2.0.0  
 **Maintainer**: HashKey Technical Team
 

@@ -27,7 +27,7 @@ describe("Staking - Deployment", () => {
     const rewardRate = await fixture.staking.rewardRate();
     const maxTotalStaked = await fixture.staking.maxTotalStaked();
 
-    expectBigIntEqual(minStake, parseEther("1000"), "Min stake should be 1000 HSK");
+    expectBigIntEqual(minStake, parseEther("1"), "Min stake should be 1 HSK");
     assert.strictEqual(rewardRate.toString(), "500", "Reward rate should be 5%");
     expectBigIntEqual(maxTotalStaked, parseEther("30000000"), "Max total staked should be 30,000,000 HSK");
   });

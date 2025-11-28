@@ -39,7 +39,6 @@ contract HSKStaking is
     error NoReward();
     error PositionNotFound();
     error NotWhitelisted();
-    error EarlyUnstakeRequested();
 
     modifier validPosition(uint256 positionId) {
         if (positions[positionId].owner != msg.sender) revert PositionNotFound();

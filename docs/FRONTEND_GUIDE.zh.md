@@ -71,14 +71,14 @@ async function getUserPendingRewards(
       const position = await stakingContract.positions(positionId);
       
       // 查询待提取奖励
-      // 注意：pendingReward 需要 msg.sender 匹配 position.owner
-      // 所以必须使用 signer 来调用
+      // 注意：pendingReward 可以被任何人调用（无所有者限制）
+      // 可以使用 provider（只读）或 signer
       let pendingReward = BigInt(0);
       
-      if (signer && !position.isUnstaked) {
+      if (!position.isUnstaked) {
         try {
-          const stakingWithSigner = stakingContract.connect(signer);
-          pendingReward = await stakingWithSigner.pendingReward(positionId);
+          // 可以使用 provider 进行只读查询（不需要 signer）
+          pendingReward = await stakingContract.pendingReward(positionId);
         } catch (error) {
           console.error(`Failed to query reward for position ${positionId}:`, error);
         }
@@ -125,10 +125,11 @@ async function example() {
 
 ### 重要注意事项
 
-1. **`pendingReward` 函数要求 `msg.sender` 匹配 `position.owner`**
-   - 即使这是一个 view 函数，它也会检查调用者的地址
-   - 如果地址不匹配，函数会返回 0（不会 revert）
-   - **必须使用 signer 来调用 `pendingReward`**，不能只使用 provider
+1. **`pendingReward` 函数可以被任何人调用**
+   - 无所有者限制 - 任何人都可以查询任何位置的待提取奖励
+   - 可以使用 provider（只读）或 signer - 不需要 signer
+   - 如果位置已解除质押或合约处于紧急模式，返回 0
+   - View 函数，只读查询无需 gas 费用
 
 2. **获取用户质押ID**
    - 使用 `getUserPositionIds(userAddress)` 直接获取所有 positionId
@@ -198,7 +199,7 @@ function calculatePotentialReward(uint256 amount) external view returns (uint256
 // 查询位置详情
 function positions(uint256 positionId) external view returns (Position memory);
 
-// 查询待提取奖励（需要 msg.sender == position.owner）
+// 查询待提取奖励（任何人都可以查询）
 function pendingReward(uint256 positionId) external view returns (uint256);
 
 // 获取下一个位置ID
