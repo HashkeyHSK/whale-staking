@@ -243,7 +243,7 @@ contract HSKStaking is
         // Important: Reward is calculated up to the early unstake request time (requestTime), not the completion time
         // From the moment of requesting early unstake, no new rewards are generated
         uint256 lockEndTime = position.stakedAt + LOCK_PERIOD;
-        uint256 endTime = requestTime < lockEndTime ? requestTime : lockEndTime;
+        uint256 endTime = requestTime;
         
         // Calculate total reward from stakedAt to endTime (includes both claimed and unclaimed rewards)
         // This is the complete reward earned during the staking period up to the request time
@@ -334,69 +334,6 @@ contract HSKStaking is
         require(success, "Transfer failed");
     }
 
-
-    /**
-     * @dev Distribute penalty pool to positions that completed full staking period
-     * Only positions that completed full staking period (via unstake) are eligible
-     * Distribution is based on staked amount proportion
-     * @param positionIds Array of position IDs to distribute penalty pool to
-     */
-    function distributePenaltyPool(uint256[] calldata positionIds) external onlyOwner nonReentrant {
-        require(block.timestamp >= stakeEndTime, "Staking period not ended");
-        require(penaltyPoolBalance > 0, "Penalty pool is empty");
-        require(positionIds.length > 0, "Empty position array");
-        
-        // Save current penalty pool balance (will be used for calculations)
-        uint256 currentPenaltyPoolBalance = penaltyPoolBalance;
-        
-        // Calculate total staked amount of all completed positions
-        uint256 totalCompletedStaked = 0;
-        
-        // First pass: validate all positions and calculate total
-        for (uint256 i = 0; i < positionIds.length;) {
-            Position storage position = positions[positionIds[i]];
-            
-            // Verify position exists and completed full staking period
-            require(position.owner != address(0), "Position does not exist");
-            require(position.isCompletedStake, "Position did not complete full staking period");
-            require(position.isUnstaked, "Position must be unstaked");
-            
-            totalCompletedStaked += position.amount;
-            
-            unchecked { ++i; }
-        }
-        
-        require(totalCompletedStaked > 0, "No valid completed positions");
-        
-        // Second pass: distribute penalty pool proportionally
-        uint256 totalDistributed = 0;
-        for (uint256 i = 0; i < positionIds.length;) {
-            Position storage position = positions[positionIds[i]];
-            
-            // Calculate share based on staked amount proportion
-            // Use saved currentPenaltyPoolBalance to ensure accurate calculation
-            uint256 share = (currentPenaltyPoolBalance * position.amount) / totalCompletedStaked;
-            
-            if (share > 0) {
-                // Ensure we don't exceed remaining balance
-                uint256 remainingBalance = currentPenaltyPoolBalance - totalDistributed;
-                uint256 actualShare = share < remainingBalance ? share : remainingBalance;
-                
-                if (actualShare > 0) {
-                    totalDistributed += actualShare;
-                    penaltyPoolBalance -= actualShare;
-                    
-                    // Transfer to position owner
-                    (bool success, ) = position.owner.call{value: actualShare}("");
-                    require(success, "Penalty pool transfer failed");
-                    
-                    emit PenaltyPoolDistributed(position.owner, actualShare, block.timestamp);
-                }
-            }
-            
-            unchecked { ++i; }
-        }
-    }
 
     function emergencyWithdraw(uint256 positionId) external nonReentrant {
         require(emergencyMode, "Not in emergency mode");

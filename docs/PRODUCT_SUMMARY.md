@@ -117,10 +117,8 @@ HSKStaking is a single staking contract type that supports flexible configuratio
 
 **Mechanism**:
 - Penalties from early unstake go to penalty pool
-- Penalty pool is distributed to users who complete full staking period
-- Distribution happens after staking period ends (`stakeEndTime`)
-- Admin calls `distributePenaltyPool()` to distribute proportionally based on staked amounts
-- Only positions marked as `isCompletedStake = true` are eligible
+- Penalty pool accumulates in the contract
+- The distribution mechanism is managed separately and not part of the core staking contract
 
 ### 7. Emergency Withdrawal Mechanism
 

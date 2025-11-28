@@ -423,7 +423,6 @@ Error: OwnableUnauthorizedAccount(address account)
 - Deposit/withdraw reward pool (`updateRewardPool`, `withdrawExcessRewardPool`)
 - Pause/resume contract (`pause`, `unpause`)
 - Enable emergency mode (`enableEmergencyMode`)
-- Distribute penalty pool (`distributePenaltyPool`)
 
 ---
 

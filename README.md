@@ -311,19 +311,6 @@ Emergency withdrawal (principal only, no rewards)
 - **Reentrancy Protection**: Uses `nonReentrant` modifier to prevent reentrancy attacks
 - **Events**: Emits `EmergencyWithdrawn` event
 
-#### `distributePenaltyPool(uint256[] calldata positionIds)`
-Distribute penalty pool to users who completed full staking period
-- **Parameters**: `positionIds` - Array of position IDs eligible for distribution
-- **Requirements**: 
-  - Only admin can call (`onlyOwner`)
-  - Staking period ended (`block.timestamp >= stakeEndTime`)
-  - Penalty pool not empty (`penaltyPoolBalance > 0`)
-  - All positions must be completed (`position.isCompletedStake == true`)
-  - All positions must be unstaked (`position.isUnstaked == true`)
-- **Distribution**: Proportional based on staked amounts
-- **Reentrancy Protection**: Uses `nonReentrant` modifier
-- **Events**: Emits `PenaltyPoolDistributed` event for each distribution
-
 ## 🔒 Lock Period and Yield
 
 ### Fixed Lock Period
@@ -627,7 +614,6 @@ PROXY_ADMIN_ADDRESS="0x..." NEW_IMPLEMENTATION_ADDRESS="0x..." npm run upgrade:t
 | `staking/claim-rewards.ts` | Claim rewards | `npm run claim:testnet` |
 | `staking/request-early-unstake.ts` | Request early unstake | `npm run request-early-unstake:testnet` |
 | `staking/complete-early-unstake.ts` | Complete early unstake | `npm run complete-early-unstake:testnet` |
-| `staking/distribute-penalty-pool.ts` | Distribute penalty pool | `npm run distribute-penalty-pool:testnet` |
 | `staking/query/check-stakes.ts` | Query user staking status | `npm run query:stakes:testnet` |
 | `staking/config/set-start-time.ts` | Set staking start time | `npm run config:set-start-time:testnet` |
 | `staking/config/set-end-time.ts` | Set staking end time | `npm run config:set-end-time:testnet` |

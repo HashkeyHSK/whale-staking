@@ -147,16 +147,6 @@ NEW_MAX_TOTAL_STAKED="20000000" npm run config:set-max-total-staked:testnet
 WHITELIST_MODE="true" npm run config:set-whitelist-mode:testnet
 ```
 
-### Distribute Penalty Pool
-
-After staking period ends, admin can distribute penalty pool to users who completed full staking period:
-
-```bash
-# Distribute penalty pool (requires position IDs)
-POSITION_IDS="1,2,3" npm run distribute-penalty-pool:testnet
-```
-
-**Note**: Only positions that completed full staking period (via `unstake()`) are eligible for penalty pool distribution.
 
 ## 📝 Important Notes
 
@@ -207,7 +197,7 @@ If different lock periods or yield rate configurations are needed, deploy new co
 
 ### Q: Who gets the penalty pool?
 
-Penalty pool is distributed to users who complete the full staking period (via `unstake()`). Distribution happens after staking period ends (`stakeEndTime`), and admin calls `distributePenaltyPool()` to distribute proportionally based on staked amounts.
+Penalty pool accumulates from early unstake penalties. The distribution mechanism is managed separately and not part of the core staking contract.
 
 ## 📚 More Documentation
 

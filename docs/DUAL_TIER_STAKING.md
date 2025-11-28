@@ -168,10 +168,8 @@ Users can request early unstake during the lock period, but must wait 7 days bef
 
 ### Penalty Pool Distribution
 
-- Penalty pool is distributed to users who complete the full staking period (via `unstake()`)
-- Distribution happens after staking period ends (`stakeEndTime`)
-- Admin calls `distributePenaltyPool()` to distribute penalties proportionally based on staked amounts
-- Only positions marked as `isCompletedStake = true` are eligible for penalty pool distribution
+- Penalty pool accumulates from early unstake penalties
+- The distribution mechanism is managed separately and not part of the core staking contract
 
 ## 📊 Contract Features
 

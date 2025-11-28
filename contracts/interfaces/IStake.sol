@@ -28,8 +28,6 @@ interface IStaking {
 
     function completeEarlyUnstake(uint256 positionId) external;
 
-    function distributePenaltyPool(uint256[] calldata positionIds) external;
-
     event PositionCreated(
         address indexed user,
         uint256 indexed positionId,
@@ -75,12 +73,6 @@ interface IStaking {
         uint256 principal,
         uint256 reward,
         uint256 penalty,
-        uint256 timestamp
-    );
-
-    event PenaltyPoolDistributed(
-        address indexed user,
-        uint256 amount,
         uint256 timestamp
     );
 }
