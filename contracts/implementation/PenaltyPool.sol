@@ -21,13 +21,10 @@ contract PenaltyPool is
     Ownable2StepUpgradeable,
     ReentrancyGuardUpgradeable 
 {
-    /// @dev Address authorized to deposit penalties (HSKStaking contract)
     address public authorizedDepositor;
     
-    /// @dev Total penalty pool balance
     uint256 public penaltyPoolBalance;
     
-    /// @dev Gap for future storage variables (reserves 50 slots for upgrades)
     uint256[50] private __gap;
     
     modifier onlyAuthorizedDepositor() {
@@ -113,8 +110,6 @@ contract PenaltyPool is
      * This should not be used in normal operations
      */
     receive() external payable {
-        // Direct ETH transfers are not counted in penaltyPoolBalance
-        // to maintain strict accounting
         revert("PenaltyPool: use deposit() function");
     }
 }
