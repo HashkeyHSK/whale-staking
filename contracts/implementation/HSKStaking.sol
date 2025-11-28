@@ -39,6 +39,7 @@ contract HSKStaking is
     error NoReward();
     error PositionNotFound();
     error NotWhitelisted();
+    error EarlyUnstakeRequested();
 
     modifier validPosition(uint256 positionId) {
         if (positions[positionId].owner != msg.sender) revert PositionNotFound();
@@ -173,6 +174,8 @@ contract HSKStaking is
     ) external override nonReentrant whenNotPaused whenNotEmergency validPosition(positionId) returns (uint256) {
         Position storage position = positions[positionId];
         
+        if (earlyUnstakeRequestTime[positionId] != 0) revert EarlyUnstakeRequested();
+        
         uint256 reward = _updateReward(positionId);
         
         if (reward == 0) revert NoReward();
@@ -210,7 +213,7 @@ contract HSKStaking is
      * User can request early unstake during lock period, but must wait 7 days before completing
      * @param positionId The position ID to request early unstake for
      */
-    function requestEarlyUnstake(uint256 positionId) external override nonReentrant whenNotPaused validPosition(positionId) {
+    function requestEarlyUnstake(uint256 positionId) external override nonReentrant whenNotPaused whenNotEmergency validPosition(positionId) {
         Position storage position = positions[positionId];
         
         if (position.isUnstaked) revert AlreadyUnstaked();
@@ -265,7 +268,6 @@ contract HSKStaking is
             principalReturn -= excessClaimed;
         }
         
-        // Calculate eward return (allowed reward - claimed reward)
         uint256 rewardReturn = allowedReward > claimed ? allowedReward - claimed : 0;
         
         // Update reward pool and pending rewards
@@ -274,31 +276,24 @@ contract HSKStaking is
             rewardPoolBalance -= rewardReturn;
         }
         
-        uint256 remainingTime = lockEndTime > requestTime ? lockEndTime - requestTime : 0;
-        uint256 remainingReward = _calculateReward(position.amount, remainingTime, rewardRate);
+        uint256 initialPotentialReward = _calculateReward(position.amount, LOCK_PERIOD, rewardRate);
+        uint256 toDeduct = initialPotentialReward - claimed;
+        totalPendingRewards -= toDeduct;
         
-        // Subtract remaining unexpired rewards from totalPendingRewards (this part no longer needs to be reserved)
-        // Note: Claimed rewards have already been subtracted from totalPendingRewards in claimReward
-        if (totalPendingRewards >= remainingReward) {
-            totalPendingRewards -= remainingReward;
-        } else {
-            // If totalPendingRewards is insufficient, there may be other issues, but set to 0 for safety
-            totalPendingRewards = 0;
+        uint256 unclaimedPenalty = penalty - excessClaimed;
+        
+        if (unclaimedPenalty > 0 && rewardPoolBalance >= unclaimedPenalty) {
+            rewardPoolBalance -= unclaimedPenalty;
+            penaltyPoolBalance += unclaimedPenalty;
         }
         
-        uint256 unclaimedReward = totalReward - claimed;
-        
-        uint256 penaltyToPool = unclaimedReward < allowedReward ? unclaimedReward : allowedReward;
-        
-        if (penaltyToPool != 0) {
-            // Transfer penalty amount to penalty pool (take smaller value to prevent insufficient balance)
-            uint256 actualPenalty = penaltyToPool < rewardPoolBalance ? penaltyToPool : rewardPoolBalance;
-            rewardPoolBalance -= actualPenalty;
-            penaltyPoolBalance += actualPenalty;
+        if (excessClaimed > 0) {
+            penaltyPoolBalance += excessClaimed;
         }
         
         position.isUnstaked = true;
         totalStaked -= position.amount;
+        delete earlyUnstakeRequestTime[positionId]; 
         
         uint256 totalReturn = principalReturn + rewardReturn;
         
@@ -310,7 +305,7 @@ contract HSKStaking is
             penalty,
             block.timestamp
         );
-        emit PositionUnstaked(msg.sender, positionId, position.amount, block.timestamp);
+        emit PositionUnstaked(msg.sender, positionId, principalReturn, block.timestamp);
         
         (bool success, ) = msg.sender.call{value: totalReturn}("");
         require(success, "Transfer failed");
