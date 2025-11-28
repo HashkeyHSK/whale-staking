@@ -42,7 +42,6 @@ contract HSKStaking is
     error NoReward();
     error PositionNotFound();
     error NotWhitelisted();
-    error EarlyUnstakeRequested();
 
     modifier validPosition(uint256 positionId) {
         if (positions[positionId].owner != msg.sender) revert PositionNotFound();
@@ -179,7 +178,7 @@ contract HSKStaking is
     ) external override nonReentrant whenNotPaused whenNotEmergency validPosition(positionId) returns (uint256) {
         Position storage position = positions[positionId];
         
-        if (earlyUnstakeRequestTime[positionId] != 0) revert EarlyUnstakeRequested();
+        require(earlyUnstakeRequestTime[positionId] == 0, "Early unstake already requested");
         
         uint256 reward = _updateReward(positionId);
         

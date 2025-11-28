@@ -57,6 +57,22 @@ export async function deployStaking(): Promise<{
   // This seems wrong. Let me check the deploy script...
   // Actually, in TransparentUpgradeableProxy, when _data is provided, it's called via delegatecall
   // So msg.sender should be the admin (deployer), not the proxy!
+  // Deploy PenaltyPool first
+  const PenaltyPool = await ethers.getContractFactory("PenaltyPool");
+  const penaltyPoolImpl = await PenaltyPool.deploy();
+  await penaltyPoolImpl.waitForDeployment();
+  const penaltyPoolImplAddress = await penaltyPoolImpl.getAddress();
+  
+  // Deploy PenaltyPool proxy without init data
+  const PenaltyPoolProxy = await ethers.getContractFactory("PenaltyPoolProxy");
+  const penaltyPoolProxy = await PenaltyPoolProxy.deploy(
+    penaltyPoolImplAddress,
+    deployer.address,
+    "0x" // Empty init data
+  );
+  await penaltyPoolProxy.waitForDeployment();
+  const penaltyPoolProxyAddress = await penaltyPoolProxy.getAddress();
+  
   const minStake = ethers.parseEther(STAKING_CONFIG.minStakeAmount);
   const maxTotalStaked = ethers.parseEther(STAKING_CONFIG.maxTotalStaked);
   const initData = implementation.interface.encodeFunctionData("initialize", [
@@ -66,6 +82,7 @@ export async function deployStaking(): Promise<{
     now + 7 * 86400, // End in 7 days
     STAKING_CONFIG.whitelistMode, // Whitelist mode from config
     maxTotalStaked, // Max total staked (30 million HSK)
+    penaltyPoolProxyAddress, // Penalty pool contract address
   ]);
   
   // Deploy proxy
@@ -98,6 +115,14 @@ export async function deployStaking(): Promise<{
   if (!proxyCode || proxyCode === "0x" || proxyCode.length < 100) {
     throw new Error(`Proxy contract deployment failed. Code length: ${proxyCode.length} bytes. Address: ${proxyAddress}`);
   }
+  
+  // Initialize PenaltyPool with Staking contract address
+  const penaltyPool = PenaltyPool.attach(penaltyPoolProxyAddress);
+  const penaltyPoolInitTx = await penaltyPool.initialize(
+    deployer.address,      // Owner
+    proxyAddress          // Authorized depositor (Staking contract)
+  );
+  await penaltyPoolInitTx.wait();
   
   // Connect to contract through proxy using getContractAt (more reliable than attach)
   // This ensures we get the correct ABI and can interact with the proxy

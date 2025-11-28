@@ -66,6 +66,28 @@ describe("Staking - Deployment", () => {
     const [deployer] = await ethers.getSigners();
     const now = Math.floor(Date.now() / 1000);
 
+    // Deploy PenaltyPool for the test
+    const PenaltyPool = await ethers.getContractFactory("PenaltyPool");
+    const penaltyPoolImpl = await PenaltyPool.deploy();
+    await penaltyPoolImpl.waitForDeployment();
+    const penaltyPoolImplAddress = await penaltyPoolImpl.getAddress();
+    
+    const PenaltyPoolProxy = await ethers.getContractFactory("PenaltyPoolProxy");
+    const penaltyPoolProxy = await PenaltyPoolProxy.deploy(
+      penaltyPoolImplAddress,
+      deployer.address,
+      "0x"
+    );
+    await penaltyPoolProxy.waitForDeployment();
+    const penaltyPoolProxyAddress = await penaltyPoolProxy.getAddress();
+    
+    // Initialize PenaltyPool (we need a valid Staking address, but we'll use a placeholder)
+    // Actually, for this test we just need to deploy Staking with invalid params, so we can use zero address temporarily
+    const penaltyPool = PenaltyPool.attach(penaltyPoolProxyAddress);
+    // We'll initialize with zero address for authorized depositor since we're testing invalid Staking deployment
+    // But PenaltyPool requires non-zero address, so let's use deployer address temporarily
+    await penaltyPool.initialize(deployer.address, deployer.address);
+    
     // Test invalid endTime < startTime
     const invalidInitData = impl.interface.encodeFunctionData("initialize", [
       parseEther("1000"),
@@ -74,6 +96,7 @@ describe("Staking - Deployment", () => {
       now + 3600, // endTime before startTime
       false,
       parseEther("30000000"), // Max total staked (30 million HSK)
+      penaltyPoolProxyAddress, // Penalty pool contract address
     ]);
 
     await expectRevert(

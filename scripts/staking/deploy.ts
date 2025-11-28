@@ -24,7 +24,30 @@ async function main() {
   console.log("Deployer address:", deployer.address);
   console.log("Account balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "HSK");
 
-  // 1. Deploy HSKStaking implementation contract
+  // 1. Deploy PenaltyPool implementation contract
+  console.log("\nDeploying PenaltyPool implementation contract...");
+  const PenaltyPool = await ethers.getContractFactory("PenaltyPool");
+  const penaltyPoolImpl = await PenaltyPool.deploy();
+  await penaltyPoolImpl.waitForDeployment();
+  const penaltyPoolImplAddress = await penaltyPoolImpl.getAddress();
+  printSuccess(`PenaltyPool implementation deployed: ${penaltyPoolImplAddress}`);
+
+  // 2. Deploy PenaltyPool proxy (we'll initialize it after Staking is deployed)
+  console.log("\nDeploying PenaltyPoolProxy...");
+  const PenaltyPoolProxy = await ethers.getContractFactory("PenaltyPoolProxy");
+  // Deploy proxy without init data - we'll initialize it after Staking is deployed
+  // Use empty bytes for init data
+  const emptyInitData = "0x";
+  const penaltyPoolProxy = await PenaltyPoolProxy.deploy(
+    penaltyPoolImplAddress,
+    deployer.address,
+    emptyInitData
+  );
+  await penaltyPoolProxy.waitForDeployment();
+  const penaltyPoolProxyAddress = await penaltyPoolProxy.getAddress();
+  printSuccess(`PenaltyPoolProxy deployed: ${penaltyPoolProxyAddress}`);
+
+  // 3. Deploy HSKStaking implementation contract
   console.log("\nDeploying HSKStaking implementation contract...");
   const HSKStaking = await ethers.getContractFactory("HSKStaking");
   const implementation = await HSKStaking.deploy();
@@ -32,7 +55,7 @@ async function main() {
   const implementationAddress = await implementation.getAddress();
   printSuccess(`HSKStaking implementation deployed: ${implementationAddress}`);
 
-  // 2. Prepare initialization parameters
+  // 4. Prepare initialization parameters
   const minStakeAmount = ethers.parseEther(STAKING_CONFIG.minStakeAmount);
   const rewardRate = STAKING_CONFIG.rewardRate;
   const whitelistMode = STAKING_CONFIG.whitelistMode;
@@ -78,17 +101,18 @@ async function main() {
   console.log(`  - Lock period: 365 days (fixed)`);
   console.log(`  - Whitelist mode: ${whitelistMode ? "Enabled" : "Disabled"}`);
 
-  // 3. Encode initialization data
+  // 5. Encode initialization data for HSKStaking
   const initData = implementation.interface.encodeFunctionData("initialize", [
     minStakeAmount,
     rewardRate,
     stakeStartTime,
     stakeEndTime,
     whitelistMode,  // false - whitelist disabled, everyone can stake
-    maxTotalStaked, // Maximum total staked amount (10 million HSK)
+    maxTotalStaked, // Maximum total staked amount (30 million HSK)
+    penaltyPoolProxyAddress, // Penalty pool contract address
   ]);
 
-  // 4. Deploy Transparent Proxy contract
+  // 6. Deploy Transparent Proxy contract
   console.log("\nDeploying StakingProxy (Transparent Proxy)...");
   const StakingProxy = await ethers.getContractFactory("StakingProxy");
   
@@ -102,25 +126,39 @@ async function main() {
   
   printSuccess(`StakingProxy deployed: ${proxyAddress}`);
 
-  // 5. Connect to HSKStaking contract through proxy for verification
+  // 7. Initialize PenaltyPool with Staking contract address as authorized depositor
+  console.log("\nInitializing PenaltyPool...");
+  const penaltyPool = PenaltyPool.attach(penaltyPoolProxyAddress);
+  const initTx = await penaltyPool.initialize(
+    deployer.address,      // Owner
+    proxyAddress            // Authorized depositor (Staking contract)
+  );
+  await initTx.wait();
+  printSuccess(`PenaltyPool initialized with Staking contract as authorized depositor`);
+  
+  // 8. Connect to HSKStaking contract through proxy for verification
   const staking = HSKStaking.attach(proxyAddress);
 
-  // 6. Verify configuration
+  // 9. Verify configuration
   printSeparator("Configuration Verification");
   const minStake = await staking.minStakeAmount();
   const startTime = await staking.stakeStartTime();
   const endTime = await staking.stakeEndTime();
   const whitelistModeCheck = await staking.onlyWhitelistCanStake();
   const rewardRateValue = await staking.rewardRate();
+  const penaltyPoolAddress = await staking.penaltyPoolContract();
 
-  console.log("Contract address:", proxyAddress);
-  console.log("Implementation address:", implementationAddress);
+  console.log("Staking contract address:", proxyAddress);
+  console.log("Staking implementation address:", implementationAddress);
+  console.log("PenaltyPool proxy address:", penaltyPoolProxyAddress);
+  console.log("PenaltyPool implementation address:", penaltyPoolImplAddress);
   console.log("Admin address:", deployer.address);
   console.log("Min stake amount:", ethers.formatEther(minStake), "HSK");
   console.log("APY:", Number(rewardRateValue) / 100, "%");
   console.log("Stake start time:", new Date(Number(startTime) * 1000).toISOString());
   console.log("Stake end time:", new Date(Number(endTime) * 1000).toISOString());
   console.log("Whitelist mode:", whitelistModeCheck ? "Enabled" : "Disabled");
+  console.log("Penalty pool contract:", penaltyPoolAddress);
   
   printSeparator("✅ Staking Product Deployment Complete");
   console.log("\nProduct configuration:");
@@ -158,8 +196,9 @@ async function main() {
   }
   
   // Save deployment information
-  console.log("\nPlease save the following address to scripts/shared/constants.ts:");
+  console.log("\nPlease save the following addresses to scripts/shared/constants.ts:");
   console.log(`staking: "${proxyAddress}",`);
+  console.log(`penaltyPool: "${penaltyPoolProxyAddress}",`);
 }
 
 main().catch((error) => {

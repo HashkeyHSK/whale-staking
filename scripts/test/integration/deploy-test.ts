@@ -1,4 +1,5 @@
 import hre from "hardhat";
+import { strict as assert } from "node:assert";
 import { printSeparator, printSuccess } from "../../shared/helpers.js";
 import { createTestFixture, advanceTime } from "../helpers/fixtures.js";
 import { expectSuccess, expectBigIntEqual, parseEther } from "../helpers/test-utils.js";
@@ -23,7 +24,7 @@ async function main() {
     const maxTotalStaked = await fixture.staking.maxTotalStaked();
     
     expectBigIntEqual(minStake, parseEther("1"), "Min stake should be 1 HSK");
-    expectBigIntEqual(rewardRate: 500), "Reward rate should be 5%");
+    assert.strictEqual(rewardRate.toString(), "500", "Reward rate should be 5%");
     expectBigIntEqual(maxTotalStaked, parseEther("30000000"), "Max total staked should be 30,000,000 HSK");
     if (whitelistMode) {
       throw new Error("Staking should have whitelist disabled");

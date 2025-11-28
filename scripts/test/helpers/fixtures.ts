@@ -47,6 +47,22 @@ export async function deployTestContracts(): Promise<{
   const [deployer] = await ethers.getSigners();
   const now = Math.floor(Date.now() / 1000);
   
+  // Deploy PenaltyPool first
+  const PenaltyPool = await ethers.getContractFactory("PenaltyPool");
+  const penaltyPoolImpl = await PenaltyPool.deploy();
+  await penaltyPoolImpl.waitForDeployment();
+  const penaltyPoolImplAddress = await penaltyPoolImpl.getAddress();
+  
+  // Deploy PenaltyPool proxy without init data
+  const PenaltyPoolProxy = await ethers.getContractFactory("PenaltyPoolProxy");
+  const penaltyPoolProxy = await PenaltyPoolProxy.deploy(
+    penaltyPoolImplAddress,
+    deployer.address,
+    "0x" // Empty init data
+  );
+  await penaltyPoolProxy.waitForDeployment();
+  const penaltyPoolProxyAddress = await penaltyPoolProxy.getAddress();
+  
   // Deploy implementation
   const HSKStaking = await ethers.getContractFactory("HSKStaking");
   const impl = await HSKStaking.deploy();
@@ -66,6 +82,7 @@ export async function deployTestContracts(): Promise<{
     now + 365 * 86400, // End in 1 year
     STAKING_CONFIG.whitelistMode, // Whitelist mode from config
     maxTotalStaked, // Max total staked (30 million HSK)
+    penaltyPoolProxyAddress, // Penalty pool contract address
   ]);
   
   // Deploy proxy
@@ -80,6 +97,14 @@ export async function deployTestContracts(): Promise<{
   await proxy.waitForDeployment();
   
   const proxyAddress = await proxy.getAddress();
+  
+  // Initialize PenaltyPool with Staking contract address
+  const penaltyPool = PenaltyPool.attach(penaltyPoolProxyAddress);
+  const penaltyPoolInitTx = await penaltyPool.initialize(
+    deployer.address,      // Owner
+    proxyAddress          // Authorized depositor (Staking contract)
+  );
+  await penaltyPoolInitTx.wait();
   
   // Connect to contract through proxy
   const staking = HSKStaking.attach(proxyAddress);
