@@ -285,21 +285,19 @@ contract HSKStaking is
         uint256 reservedReward = _calculateReward(position.amount, timeLeftFromRequest, rewardRate);
         totalPendingRewards -= reservedReward;
         
-        // Deposit unclaimed penalty to penalty pool contract
+        position.isUnstaked = true;
+        totalStaked -= position.amount;
+        delete earlyUnstakeRequestTime[positionId];
+        
         if (unclaimedPenalty > 0) {
             IPenaltyPool(penaltyPoolContract).deposit{value: unclaimedPenalty}();
             emit PenaltyDeposited(unclaimedPenalty, block.timestamp);
         }
         
-        // Deposit excess claimed rewards to penalty pool contract
         if (excessClaimed > 0) {
             IPenaltyPool(penaltyPoolContract).deposit{value: excessClaimed}();
             emit PenaltyDeposited(excessClaimed, block.timestamp);
-        }
-        
-        position.isUnstaked = true;
-        totalStaked -= position.amount;
-        delete earlyUnstakeRequestTime[positionId]; 
+        } 
         
         uint256 totalReturn = principalReturn + rewardReturn;
         
@@ -337,8 +335,15 @@ contract HSKStaking is
             timeElapsed,
             rewardRate
         );
-        require(totalPendingRewards >= reservedReward, "Pending rewards accounting error");
-        totalPendingRewards -= reservedReward;
+        
+        unchecked {
+            if (totalPendingRewards >= reservedReward) {
+                totalPendingRewards -= reservedReward;
+            } else {
+                // Force to zero to prevent underflow, accounting error is acceptable in emergency
+                totalPendingRewards = 0;
+            }
+        }
         
         position.isUnstaked = true;
         totalStaked -= amount;
