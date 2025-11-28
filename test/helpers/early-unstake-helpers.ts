@@ -10,7 +10,7 @@ import { advanceTime } from "./fixtures.js";
 export const EARLY_UNSTAKE_CONSTANTS = {
   LOCK_PERIOD: 365 * 24 * 60 * 60, // 365 days
   EARLY_UNLOCK_PERIOD: 7 * 24 * 60 * 60, // 7 days
-  EARLY_UNSTAKE_PENALTY_RATE: 5000, // 50% = 5000 basis points
+  EARLY_UNSTAKE_REWARD_RETAIN_RATE: 5000, // 50% = 5000 basis points (user retains 50% of rewards)
 } as const;
 
 /**

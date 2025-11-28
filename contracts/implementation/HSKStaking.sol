@@ -250,8 +250,8 @@ contract HSKStaking is
         uint256 totalTimeElapsed = requestTime - position.stakedAt;
         uint256 totalReward = _calculateReward(position.amount, totalTimeElapsed, rewardRate);
         
-        // Calculate allowed reward (after deducting penalty rate)
-        uint256 allowedReward = (totalReward * EARLY_UNSTAKE_PENALTY_RATE) / BASIS_POINTS;
+        // Calculate allowed reward (user retains this percentage of total reward)
+        uint256 allowedReward = (totalReward * EARLY_UNSTAKE_REWARD_RETAIN_RATE) / BASIS_POINTS;
         
         // Calculate claimed rewards
         uint256 claimed = claimedRewards[positionId];
@@ -280,9 +280,10 @@ contract HSKStaking is
             rewardPoolBalance -= totalRewardPoolNeeded;
         }
         
-        // Update pending rewards accounting
-        uint256 toDeduct = totalReward - claimed;
-        totalPendingRewards -= toDeduct;
+        uint256 lockEndTime = position.stakedAt + LOCK_PERIOD;
+        uint256 timeLeftFromRequest = lockEndTime - requestTime;
+        uint256 reservedReward = _calculateReward(position.amount, timeLeftFromRequest, rewardRate);
+        totalPendingRewards -= reservedReward;
         
         // Deposit unclaimed penalty to penalty pool contract
         if (unclaimedPenalty > 0) {

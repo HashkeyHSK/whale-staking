@@ -13,7 +13,7 @@
 - **等待期**: 申请后需要等待7天才能完成提前解除
 - **收益停止**: 申请提前解除后，收益计算停止（`completeEarlyUnstake()` 会基于申请时间计算收益）
 - **收益计算**: 收益计算到申请提前解除的时间，而不是完成提前解除的时间
-- **收益罚没**: 提前退出将丧失50%的收益（用户获得50%，50%进入罚没池），罚没比例由 `EARLY_UNSTAKE_PENALTY_RATE` 常量定义（默认5000 basis points = 50%）
+- **收益罚没**: 提前退出将丧失50%的收益（用户获得50%，50%进入罚没池），用户保留比例由 `EARLY_UNSTAKE_REWARD_RETAIN_RATE` 常量定义（默认5000 basis points = 50%）
 - **本金扣除**: 如果用户已经提前领取的收益超过应得的50%，超出部分将从本金中扣除
 
 ### 2. 罚没池分配
@@ -43,7 +43,7 @@ mapping(uint256 => uint256) public earlyUnstakeRequestTime;  // positionId => �
 
 ```solidity
 uint256 public constant EARLY_UNLOCK_PERIOD = 7 days;  // 提前解锁等待期
-uint256 public constant EARLY_UNSTAKE_PENALTY_RATE = 5000;  // 提前解除质押罚没比例（50% = 5000 basis points）
+uint256 public constant EARLY_UNSTAKE_REWARD_RETAIN_RATE = 5000;  // 提前解除质押用户保留收益比例（50% = 5000 basis points）
 ```
 
 ### 3. 接口变更 (`IStaking.sol`)
@@ -98,6 +98,7 @@ event EarlyUnstakeCompleted(
 **重要说明**:
 - 申请提前解除后，`claimReward()` 将失败（抛出 `EarlyUnstakeRequested` 错误）
 - 收益计算到申请时间，等待的7天不产生收益
+- 必须通过 `completeEarlyUnstake()` 完成提前解除才能获得收益
 
 ##### `completeEarlyUnstake(uint256 positionId)`
 
@@ -116,7 +117,7 @@ event EarlyUnstakeCompleted(
    - **直接计算时间**：不依赖 `_calculateTimeElapsed()`，在函数内部直接计算
    - 计算公式：`endTime = requestTime < lockEndTime ? requestTime : lockEndTime`
    - `timeElapsed = endTime > position.lastRewardAt ? endTime - position.lastRewardAt : 0`
-2. 计算应得收益（使用 `EARLY_UNSTAKE_PENALTY_RATE` 常量，默认50%）
+2. 计算应得收益（使用 `EARLY_UNSTAKE_REWARD_RETAIN_RATE` 常量，默认50%，用户保留50%的收益）
 3. 计算已领取收益（`claimedRewards[positionId]`）
 4. 如果已领取 > 应得，从本金扣除超出部分
 5. 计算罚没金额（总收益 - 应得收益）
@@ -190,9 +191,13 @@ event EarlyUnstakeCompleted(
 **变更**: 
 1. 记录已领取的收益总额（用于提前退出时计算）
 2. **移除自动领取罚没池份额**（改为管理员手动分配）
+3. **禁止在申请提前解除后领取奖励**
 
 **变更内容**:
 ```solidity
+// 禁止在申请提前解除后领取奖励
+require(earlyUnstakeRequestTime[positionId] == 0, "Cannot claim reward after requesting early unstake");
+
 // 记录已领取的收益总额（用于提前退出时计算）
 claimedRewards[positionId] += reward;
 
@@ -204,6 +209,7 @@ require(success, "Reward transfer failed");
 **影响**: 
 - 每次领取奖励时，累计记录到 `claimedRewards[positionId]`（用于提前退出时计算）
 - **罚没池份额由管理员在质押周期完成后手动分配**
+- **申请提前解除后，不能再调用 `claimReward()` 领取奖励**（收益计算已停止，需通过 `completeEarlyUnstake()` 完成提前解除）
 
 ##### `unstake(uint256 positionId)`
 
@@ -584,7 +590,7 @@ await staking.unstake(positionId); // 会标记 isCompletedStake[positionId] = t
   - 修改 `completeEarlyUnstake()` 函数：
     - 收益计算到申请时间（不是完成时间），在函数内部直接计算时间
     - **移除自动领取罚没池份额**（提前解除不参与分配）
-  - 新增常量 `EARLY_UNSTAKE_PENALTY_RATE`（50%罚没比例）
+  - 新增常量 `EARLY_UNSTAKE_REWARD_RETAIN_RATE`（用户保留50%收益比例）
   - 优化罚没池转移逻辑，简化代码
   - 在 `Position` 结构体中新增字段 `isCompletedStake` - 标记完整质押周期（不再使用独立的 mapping）
   - 移除存储变量 `penaltyPoolClaimed` 和 `penaltyPoolSnapshotTotalStaked`（不再需要快照机制）

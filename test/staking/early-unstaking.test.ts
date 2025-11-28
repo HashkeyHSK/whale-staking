@@ -25,7 +25,7 @@ describe("Staking - Early Unstaking Functionality", () => {
   let fixture: Awaited<ReturnType<typeof setupStakingTest>>;
   const LOCK_PERIOD = EARLY_UNSTAKE_CONSTANTS.LOCK_PERIOD;
   const EARLY_UNLOCK_PERIOD = EARLY_UNSTAKE_CONSTANTS.EARLY_UNLOCK_PERIOD;
-  const EARLY_UNSTAKE_PENALTY_RATE = EARLY_UNSTAKE_CONSTANTS.EARLY_UNSTAKE_PENALTY_RATE;
+  const EARLY_UNSTAKE_REWARD_RETAIN_RATE = EARLY_UNSTAKE_CONSTANTS.EARLY_UNSTAKE_REWARD_RETAIN_RATE;
 
   before(async () => {
     fixture = await setupStakingTest({
@@ -140,7 +140,7 @@ describe("Staking - Early Unstaking Functionality", () => {
     // Verify penalty is 50% of total reward
     if (event && event.args) {
       const totalReward = event.args.reward + event.args.penalty;
-      const expectedPenalty = (totalReward * BigInt(EARLY_UNSTAKE_PENALTY_RATE)) / BigInt(10000);
+      const expectedPenalty = (totalReward * BigInt(EARLY_UNSTAKE_REWARD_RETAIN_RATE)) / BigInt(10000);
       expectBigIntEqual(
         event.args.penalty,
         expectedPenalty,
@@ -309,7 +309,7 @@ describe("Staking - Early Unstaking Functionality", () => {
     // Verify that if claimed > 50%, excess is deducted from principal
     if (event && event.args) {
       const totalReward = event.args.reward + event.args.penalty;
-      const allowedReward = (totalReward * BigInt(EARLY_UNSTAKE_PENALTY_RATE)) / BigInt(10000);
+      const allowedReward = (totalReward * BigInt(EARLY_UNSTAKE_REWARD_RETAIN_RATE)) / BigInt(10000);
       
       if (claimedBefore > allowedReward) {
         // Excess should be deducted from principal
@@ -460,7 +460,7 @@ describe("Staking - Early Unstaking Functionality", () => {
       
       // Calculate total reward manually (simplified)
       const totalReward = (stakeAmount * BigInt(rewardRate) * BigInt(totalTimeElapsed)) / (BigInt(10000) * BigInt(365 * 24 * 60 * 60));
-      const allowedReward = (totalReward * BigInt(EARLY_UNSTAKE_PENALTY_RATE)) / BigInt(10000);
+      const allowedReward = (totalReward * BigInt(EARLY_UNSTAKE_REWARD_RETAIN_RATE)) / BigInt(10000);
 
       // Cancel the request by completing it first, then we'll test the scenario
       // Actually, let's test a different scenario: user claimed exactly allowedReward
@@ -512,8 +512,8 @@ describe("Staking - Early Unstaking Functionality", () => {
         const penalty = event.args.penalty;
         const claimed = BigInt(await fixture.staking.claimedRewards(newPositionId).toString());
         const totalRewardAtRequest = rewardReturn + penalty;
-        const excessClaimed = claimed > (totalRewardAtRequest * BigInt(EARLY_UNSTAKE_PENALTY_RATE) / BigInt(10000))
-          ? claimed - (totalRewardAtRequest * BigInt(EARLY_UNSTAKE_PENALTY_RATE) / BigInt(10000))
+        const excessClaimed = claimed > (totalRewardAtRequest * BigInt(EARLY_UNSTAKE_REWARD_RETAIN_RATE) / BigInt(10000))
+          ? claimed - (totalRewardAtRequest * BigInt(EARLY_UNSTAKE_REWARD_RETAIN_RATE) / BigInt(10000))
           : BigInt(0);
         const unclaimedPenalty = penalty - excessClaimed;
 
@@ -564,7 +564,7 @@ describe("Staking - Early Unstaking Functionality", () => {
       const totalTimeElapsed = requestTime - position.stakedAt;
       const rewardRate = await fixture.staking.rewardRate();
       const totalReward = (stakeAmount * BigInt(rewardRate) * BigInt(totalTimeElapsed)) / (BigInt(10000) * BigInt(365 * 24 * 60 * 60));
-      const allowedReward = (totalReward * BigInt(EARLY_UNSTAKE_PENALTY_RATE)) / BigInt(10000);
+      const allowedReward = (totalReward * BigInt(EARLY_UNSTAKE_REWARD_RETAIN_RATE)) / BigInt(10000);
       const penalty = totalReward - allowedReward;
       const rewardReturn = allowedReward; // User hasn't claimed anything
       const unclaimedPenalty = penalty; // User hasn't claimed anything
@@ -613,7 +613,7 @@ describe("Staking - Early Unstaking Functionality", () => {
       const totalTimeElapsed = requestTime - position.stakedAt;
       const rewardRate = await fixture.staking.rewardRate();
       const totalReward = (stakeAmount * BigInt(rewardRate) * BigInt(totalTimeElapsed)) / (BigInt(10000) * BigInt(365 * 24 * 60 * 60));
-      const allowedReward = (totalReward * BigInt(EARLY_UNSTAKE_PENALTY_RATE)) / BigInt(10000);
+      const allowedReward = (totalReward * BigInt(EARLY_UNSTAKE_REWARD_RETAIN_RATE)) / BigInt(10000);
       const penalty = totalReward - allowedReward;
       const rewardReturn = allowedReward; // User hasn't claimed anything
       const unclaimedPenalty = penalty; // User hasn't claimed anything
