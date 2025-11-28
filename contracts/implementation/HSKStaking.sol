@@ -6,6 +6,7 @@ import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "./StakingStorage.sol";
 import "../constants/StakingConstants.sol";
 import "../interfaces/IStake.sol";
+import "../interfaces/IPenaltyPool.sol";
 
 /**
  * @title HSKStaking
@@ -34,6 +35,8 @@ contract HSKStaking is
     event MaxTotalStakedUpdated(uint256 oldAmount, uint256 newAmount);
     event EmergencyModeEnabled(address indexed operator, uint256 timestamp);
     event WhitelistModeChanged(bool oldMode, bool newMode);
+    event PenaltyPoolContractUpdated(address indexed oldContract, address indexed newContract);
+    event PenaltyDeposited(uint256 penaltyAmount, uint256 timestamp);
     error AlreadyUnstaked();
     error StillLocked();
     error NoReward();
@@ -72,6 +75,7 @@ contract HSKStaking is
      * @param _stakeEndTime Timestamp when staking ends
      * @param _whitelistMode Enable whitelist mode (false for Normal Staking, true for Premium Staking)
      * @param _maxTotalStaked Maximum total staked amount (in wei, 0 means no limit)
+     * @param _penaltyPoolContract Address of the penalty pool contract
      */
     function initialize(
         uint256 _minStakeAmount,
@@ -79,14 +83,15 @@ contract HSKStaking is
         uint256 _stakeStartTime,
         uint256 _stakeEndTime,
         bool _whitelistMode,
-        uint256 _maxTotalStaked
+        uint256 _maxTotalStaked,
+        address _penaltyPoolContract
     ) external initializer {
         require(_stakeStartTime > 0, "Invalid start time");
         require(_stakeEndTime > _stakeStartTime, "End time must be after start time");
         
         __ReentrancyGuard_init();
         __Pausable_init();
-        __StakingStorage_init(msg.sender, _minStakeAmount, _rewardRate, _whitelistMode, _maxTotalStaked);
+        __StakingStorage_init(msg.sender, _minStakeAmount, _rewardRate, _whitelistMode, _maxTotalStaked, _penaltyPoolContract);
         
         stakeStartTime = _stakeStartTime;
         stakeEndTime = _stakeEndTime;
@@ -282,13 +287,17 @@ contract HSKStaking is
         
         uint256 unclaimedPenalty = penalty - excessClaimed;
         
+        // Deposit unclaimed penalty to penalty pool contract
         if (unclaimedPenalty > 0 && rewardPoolBalance >= unclaimedPenalty) {
             rewardPoolBalance -= unclaimedPenalty;
-            penaltyPoolBalance += unclaimedPenalty;
+            IPenaltyPool(penaltyPoolContract).deposit{value: unclaimedPenalty}();
+            emit PenaltyDeposited(unclaimedPenalty, block.timestamp);
         }
         
+        // Deposit excess claimed rewards to penalty pool contract
         if (excessClaimed > 0) {
-            penaltyPoolBalance += excessClaimed;
+            IPenaltyPool(penaltyPoolContract).deposit{value: excessClaimed}();
+            emit PenaltyDeposited(excessClaimed, block.timestamp);
         }
         
         position.isUnstaked = true;
@@ -379,6 +388,20 @@ contract HSKStaking is
         bool oldMode = onlyWhitelistCanStake;
         onlyWhitelistCanStake = enabled;
         emit WhitelistModeChanged(oldMode, enabled);
+    }
+
+    /**
+     * @dev Update penalty pool contract address
+     * Only owner can call this (for contract upgrades or migrations)
+     * @param newContract New penalty pool contract address
+     */
+    function setPenaltyPoolContract(address newContract) external onlyOwner whenNotEmergency {
+        require(newContract != address(0), "Invalid penalty pool address");
+        
+        address oldContract = penaltyPoolContract;
+        penaltyPoolContract = newContract;
+        
+        emit PenaltyPoolContractUpdated(oldContract, newContract);
     }
 
     // ==================== EXTERNAL ADMIN FUNCTIONS ====================
