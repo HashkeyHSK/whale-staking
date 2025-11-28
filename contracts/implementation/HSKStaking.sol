@@ -244,8 +244,11 @@ contract HSKStaking is
         // From the moment of requesting early unstake, no new rewards are generated
         uint256 lockEndTime = position.stakedAt + LOCK_PERIOD;
         uint256 endTime = requestTime < lockEndTime ? requestTime : lockEndTime;
-        uint256 timeElapsed = endTime > position.lastRewardAt ? endTime - position.lastRewardAt : 0;
-        uint256 totalReward = _calculateReward(position.amount, timeElapsed, rewardRate);
+        
+        // Calculate total reward from stakedAt to endTime (includes both claimed and unclaimed rewards)
+        // This is the complete reward earned during the staking period up to the request time
+        uint256 totalTimeElapsed = endTime > position.stakedAt ? endTime - position.stakedAt : 0;
+        uint256 totalReward = _calculateReward(position.amount, totalTimeElapsed, rewardRate);
         
         // Calculate allowed reward (after deducting penalty rate)
         uint256 allowedReward = (totalReward * EARLY_UNSTAKE_PENALTY_RATE) / BASIS_POINTS;
