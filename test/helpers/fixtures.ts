@@ -59,19 +59,9 @@ export async function deployStaking(): Promise<{
   // So msg.sender should be the admin (deployer), not the proxy!
   // Deploy PenaltyPool first
   const PenaltyPool = await ethers.getContractFactory("PenaltyPool");
-  const penaltyPoolImpl = await PenaltyPool.deploy();
-  await penaltyPoolImpl.waitForDeployment();
-  const penaltyPoolImplAddress = await penaltyPoolImpl.getAddress();
-  
-  // Deploy PenaltyPool proxy without init data
-  const PenaltyPoolProxy = await ethers.getContractFactory("PenaltyPoolProxy");
-  const penaltyPoolProxy = await PenaltyPoolProxy.deploy(
-    penaltyPoolImplAddress,
-    deployer.address,
-    "0x" // Empty init data
-  );
-  await penaltyPoolProxy.waitForDeployment();
-  const penaltyPoolProxyAddress = await penaltyPoolProxy.getAddress();
+  const penaltyPool = await PenaltyPool.deploy();
+  await penaltyPool.waitForDeployment();
+  const penaltyPoolAddress = await penaltyPool.getAddress();
   
   const minStake = ethers.parseEther(STAKING_CONFIG.minStakeAmount);
   const maxTotalStaked = ethers.parseEther(STAKING_CONFIG.maxTotalStaked);
@@ -82,7 +72,7 @@ export async function deployStaking(): Promise<{
     now + 7 * 86400, // End in 7 days
     STAKING_CONFIG.whitelistMode, // Whitelist mode from config
     maxTotalStaked, // Max total staked (30 million HSK)
-    penaltyPoolProxyAddress, // Penalty pool contract address
+    penaltyPoolAddress, // Penalty pool contract address
   ]);
   
   // Deploy proxy
@@ -117,7 +107,6 @@ export async function deployStaking(): Promise<{
   }
   
   // Initialize PenaltyPool with Staking contract address
-  const penaltyPool = PenaltyPool.attach(penaltyPoolProxyAddress);
   const penaltyPoolInitTx = await penaltyPool.initialize(
     deployer.address,      // Owner
     proxyAddress          // Authorized depositor (Staking contract)

@@ -9,11 +9,9 @@ import "../interfaces/IPenaltyPool.sol";
 /**
  * @title PenaltyPool
  * @dev Penalty pool contract for collecting early unstaking penalties
- * This contract is upgradeable and follows the transparent proxy pattern
  * Features:
  * - Receives penalties from HSKStaking contract only
  * - Owner can withdraw accumulated penalties
- * - Upgradeable for future enhancements
  */
 contract PenaltyPool is 
     IPenaltyPool,
@@ -25,16 +23,9 @@ contract PenaltyPool is
     
     uint256 public penaltyPoolBalance;
     
-    uint256[50] private __gap;
-    
     modifier onlyAuthorizedDepositor() {
         require(msg.sender == authorizedDepositor, "PenaltyPool: caller is not authorized depositor");
         _;
-    }
-    
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() {
-        _disableInitializers();
     }
     
     /**
