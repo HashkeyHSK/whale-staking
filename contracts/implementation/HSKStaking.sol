@@ -239,15 +239,11 @@ contract HSKStaking is
         require(requestTime > 0, "Early unstake not requested");
         require(block.timestamp >= requestTime + EARLY_UNLOCK_PERIOD, "Waiting period not completed");
         
-        // Calculate total reward (based on actual staking time)
-        // Important: Reward is calculated up to the early unstake request time (requestTime), not the completion time
         // From the moment of requesting early unstake, no new rewards are generated
         uint256 lockEndTime = position.stakedAt + LOCK_PERIOD;
         uint256 endTime = requestTime;
         
-        // Calculate total reward from stakedAt to endTime (includes both claimed and unclaimed rewards)
-        // This is the complete reward earned during the staking period up to the request time
-        uint256 totalTimeElapsed = endTime > position.stakedAt ? endTime - position.stakedAt : 0;
+        uint256 totalTimeElapsed = endTime - position.stakedAt;
         uint256 totalReward = _calculateReward(position.amount, totalTimeElapsed, rewardRate);
         
         // Calculate allowed reward (after deducting penalty rate)
@@ -269,7 +265,7 @@ contract HSKStaking is
             principalReturn -= excessClaimed;
         }
         
-        // Calculate reward return (allowed reward - claimed reward)
+        // Calculate eward return (allowed reward - claimed reward)
         uint256 rewardReturn = allowedReward > claimed ? allowedReward - claimed : 0;
         
         // Update reward pool and pending rewards
@@ -278,9 +274,6 @@ contract HSKStaking is
             rewardPoolBalance -= rewardReturn;
         }
         
-        // Update totalPendingRewards
-        // Calculate reward that should be reserved from stake to early unstake request time
-        // Reward is only calculated up to request time (requestTime), so need to subtract reward from requestTime to lock period end
         uint256 remainingTime = lockEndTime > requestTime ? lockEndTime - requestTime : 0;
         uint256 remainingReward = _calculateReward(position.amount, remainingTime, rewardRate);
         
@@ -293,31 +286,20 @@ contract HSKStaking is
             totalPendingRewards = 0;
         }
         
-        // Penalized rewards go to penalty pool (penalty rate defined by EARLY_UNSTAKE_PENALTY_RATE)
-        // Calculate unclaimed rewards
         uint256 unclaimedReward = totalReward - claimed;
         
-        // Penalty should be the penalized portion of total reward (totalReward - allowedReward), but can only be deducted from unclaimed rewards
-        // If unclaimed reward >= allowed reward, penalty = allowedReward
-        // If unclaimed reward < allowed reward, penalty = unclaimedReward (user has claimed more than 50%, excess already deducted from principal)
         uint256 penaltyToPool = unclaimedReward < allowedReward ? unclaimedReward : allowedReward;
         
-        // Transfer penalty from unclaimed rewards to penalty pool
-        // This needs to be deducted from rewardPoolBalance (because it was originally reserved reward for the user)
-        if (penaltyToPool > 0) {
+        if (penaltyToPool != 0) {
             // Transfer penalty amount to penalty pool (take smaller value to prevent insufficient balance)
             uint256 actualPenalty = penaltyToPool < rewardPoolBalance ? penaltyToPool : rewardPoolBalance;
             rewardPoolBalance -= actualPenalty;
             penaltyPoolBalance += actualPenalty;
         }
         
-        // Mark position as unstaked
-        // Note: Early unstake does NOT mark as completed stake (isCompletedStake remains false)
         position.isUnstaked = true;
         totalStaked -= position.amount;
         
-        // Total return amount = principal + reward return
-        // Note: Early unstake positions do not receive penalty pool distribution
         uint256 totalReturn = principalReturn + rewardReturn;
         
         emit EarlyUnstakeCompleted(
