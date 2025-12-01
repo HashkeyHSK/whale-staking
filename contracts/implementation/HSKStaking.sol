@@ -284,6 +284,10 @@ contract HSKStaking is
         uint256 timeLeftFromRequest = lockEndTime - requestTime;
         uint256 reservedReward = _calculateReward(position.amount, timeLeftFromRequest, rewardRate);
         totalPendingRewards -= reservedReward;
+        // Fix: Deduct settled rewards from totalPendingRewards to prevent accounting error
+        if (totalRewardPoolNeeded > 0) {
+            totalPendingRewards -= totalRewardPoolNeeded;
+        }
         
         position.isUnstaked = true;
         totalStaked -= position.amount;
