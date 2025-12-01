@@ -469,7 +469,12 @@ contract HSKStaking is
         returns (uint256) 
     {
         uint256 lockEndTime = position.stakedAt + LOCK_PERIOD;
-        uint256 endTime = block.timestamp < lockEndTime ? block.timestamp : lockEndTime;
+        
+        // If early unstake has been requested, stop calculating rewards at request time
+        uint256 requestTime = earlyUnstakeRequestTime[position.positionId];
+        uint256 endTime = requestTime > 0 
+            ? requestTime 
+            : (block.timestamp < lockEndTime ? block.timestamp : lockEndTime);
         
         return endTime > position.lastRewardAt ? endTime - position.lastRewardAt : 0;
     }
@@ -517,8 +522,14 @@ contract HSKStaking is
 
         // Update lastRewardAt
         uint256 lockEndTime = position.stakedAt + LOCK_PERIOD;
+        uint256 requestTime = earlyUnstakeRequestTime[positionId];
         uint256 currentTime = block.timestamp;
-        position.lastRewardAt = currentTime > lockEndTime ? lockEndTime : currentTime;
+        
+        if (requestTime > 0) {
+            position.lastRewardAt = requestTime;
+        } else {
+            position.lastRewardAt = currentTime > lockEndTime ? lockEndTime : currentTime;
+        }
     }
 
     function _calculatePendingReward(
