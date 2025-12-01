@@ -157,6 +157,8 @@ contract HSKStaking is
         
         if (position.isUnstaked) revert AlreadyUnstaked();
         if (block.timestamp < position.stakedAt + LOCK_PERIOD) revert StillLocked();
+        // Prevent unstake if early unstake has been requested - user must complete early unstake instead
+        require(earlyUnstakeRequestTime[positionId] == 0, "Early unstake requested, use completeEarlyUnstake");
 
         uint256 reward = _updateReward(positionId);
         uint256 amount = position.amount;
