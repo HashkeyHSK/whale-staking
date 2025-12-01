@@ -522,14 +522,8 @@ contract HSKStaking is
 
         // Update lastRewardAt
         uint256 lockEndTime = position.stakedAt + LOCK_PERIOD;
-        uint256 requestTime = earlyUnstakeRequestTime[positionId];
         uint256 currentTime = block.timestamp;
-        
-        if (requestTime > 0) {
-            position.lastRewardAt = requestTime;
-        } else {
-            position.lastRewardAt = currentTime > lockEndTime ? lockEndTime : currentTime;
-        }
+        position.lastRewardAt = currentTime > lockEndTime ? lockEndTime : currentTime;
     }
 
     function _calculatePendingReward(
