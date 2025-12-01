@@ -25,6 +25,7 @@ const DEFAULT_CONTRACTS = [
   "StakingStorage",
   "StakingConstants",
   "StakingProxy",
+  "PenaltyPool",
 ];
 
 interface Artifact {
