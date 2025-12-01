@@ -6,6 +6,7 @@ import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "./StakingStorage.sol";
 import "../constants/StakingConstants.sol";
 import "../interfaces/IStake.sol";
+import "../interfaces/IPenaltyPool.sol";
 
 /**
  * @title HSKStaking
@@ -34,6 +35,8 @@ contract HSKStaking is
     event MaxTotalStakedUpdated(uint256 oldAmount, uint256 newAmount);
     event EmergencyModeEnabled(address indexed operator, uint256 timestamp);
     event WhitelistModeChanged(bool oldMode, bool newMode);
+    event PenaltyPoolContractUpdated(address indexed oldContract, address indexed newContract);
+    event PenaltyDeposited(uint256 penaltyAmount, uint256 timestamp);
     error AlreadyUnstaked();
     error StillLocked();
     error NoReward();
@@ -71,6 +74,7 @@ contract HSKStaking is
      * @param _stakeEndTime Timestamp when staking ends
      * @param _whitelistMode Enable whitelist mode (false for Normal Staking, true for Premium Staking)
      * @param _maxTotalStaked Maximum total staked amount (in wei, 0 means no limit)
+     * @param _penaltyPoolContract Address of the penalty pool contract
      */
     function initialize(
         uint256 _minStakeAmount,
@@ -78,14 +82,15 @@ contract HSKStaking is
         uint256 _stakeStartTime,
         uint256 _stakeEndTime,
         bool _whitelistMode,
-        uint256 _maxTotalStaked
+        uint256 _maxTotalStaked,
+        address _penaltyPoolContract
     ) external initializer {
         require(_stakeStartTime > 0, "Invalid start time");
         require(_stakeEndTime > _stakeStartTime, "End time must be after start time");
         
         __ReentrancyGuard_init();
         __Pausable_init();
-        __StakingStorage_init(msg.sender, _minStakeAmount, _rewardRate, _whitelistMode, _maxTotalStaked);
+        __StakingStorage_init(msg.sender, _minStakeAmount, _rewardRate, _whitelistMode, _maxTotalStaked, _penaltyPoolContract);
         
         stakeStartTime = _stakeStartTime;
         stakeEndTime = _stakeEndTime;
@@ -127,7 +132,8 @@ contract HSKStaking is
             amount: amount,
             stakedAt: block.timestamp,
             lastRewardAt: block.timestamp,
-            isUnstaked: false
+            isUnstaked: false,
+            isCompletedStake: false
         });
         
         userPositions[msg.sender].push(positionId);
@@ -157,6 +163,7 @@ contract HSKStaking is
         uint256 totalPayout = amount + reward;
 
         position.isUnstaked = true;
+        position.isCompletedStake = true;  // Mark as completed full staking period
         totalStaked -= amount;
 
         emit RewardClaimed(msg.sender, positionId, reward, block.timestamp);
@@ -169,12 +176,20 @@ contract HSKStaking is
     function claimReward(
         uint256 positionId
     ) external override nonReentrant whenNotPaused whenNotEmergency validPosition(positionId) returns (uint256) {
+        Position storage position = positions[positionId];
+        
+        require(earlyUnstakeRequestTime[positionId] == 0, "Early unstake already requested");
+        
         uint256 reward = _updateReward(positionId);
         
         if (reward == 0) revert NoReward();
 
+        // Record total claimed rewards
+        claimedRewards[positionId] += reward;
+
         (bool success, ) = msg.sender.call{value: reward}("");
         require(success, "Reward transfer failed");
+        
         emit RewardClaimed(msg.sender, positionId, reward, block.timestamp);
 
         return reward;
@@ -186,8 +201,6 @@ contract HSKStaking is
         if (emergencyMode) return 0;
         
         Position memory position = positions[positionId];
-        if (position.owner != msg.sender) return 0;
-        
         return _calculatePendingReward(position);
     }
 
@@ -198,6 +211,110 @@ contract HSKStaking is
     function calculatePotentialReward(uint256 amount) external view returns (uint256) {
         return _calculateReward(amount, LOCK_PERIOD, rewardRate);
     }
+
+    /**
+     * @dev Request early unstake for a position
+     * User can request early unstake during lock period, but must wait 7 days before completing
+     * @param positionId The position ID to request early unstake for
+     */
+    function requestEarlyUnstake(uint256 positionId) external override nonReentrant whenNotPaused whenNotEmergency validPosition(positionId) {
+        Position storage position = positions[positionId];
+        
+        if (position.isUnstaked) revert AlreadyUnstaked();
+        // Must be within lock period to request early exit
+        require(block.timestamp < position.stakedAt + LOCK_PERIOD, "Lock period already ended");
+        // Cannot request twice
+        require(earlyUnstakeRequestTime[positionId] == 0, "Early unstake already requested");
+
+        earlyUnstakeRequestTime[positionId] = block.timestamp;
+        
+        emit EarlyUnstakeRequested(msg.sender, positionId, block.timestamp);
+    }
+
+    /**
+     * @dev Complete early unstake after 7-day waiting period
+     * User loses 50% of rewards, which goes to penalty pool
+     * If user has claimed more than 50% of rewards, excess is deducted from principal
+     * @param positionId The position ID to complete early unstake for
+     */
+    function completeEarlyUnstake(uint256 positionId) external override nonReentrant whenNotPaused validPosition(positionId) {
+        Position storage position = positions[positionId];
+        
+        if (position.isUnstaked) revert AlreadyUnstaked();
+        
+        uint256 requestTime = earlyUnstakeRequestTime[positionId];
+        require(requestTime > 0, "Early unstake not requested");
+        require(block.timestamp >= requestTime + EARLY_UNLOCK_PERIOD, "Waiting period not completed");
+        
+        // From the moment of requesting early unstake, no new rewards are generated
+        uint256 totalTimeElapsed = requestTime - position.stakedAt;
+        uint256 totalReward = _calculateReward(position.amount, totalTimeElapsed, rewardRate);
+        
+        // Calculate allowed reward (user retains this percentage of total reward)
+        uint256 allowedReward = (totalReward * EARLY_UNSTAKE_REWARD_RETAIN_RATE) / BASIS_POINTS;
+        
+        // Calculate claimed rewards
+        uint256 claimed = claimedRewards[positionId];
+        
+        // Calculate amount to deduct from principal (if claimed exceeds allowed)
+        uint256 excessClaimed = claimed > allowedReward ? claimed - allowedReward : 0;
+        
+        // Calculate penalty amount (goes to penalty pool)
+        uint256 penalty = totalReward - allowedReward;
+        
+        // Calculate actual return amount
+        uint256 principalReturn = position.amount;
+        if (excessClaimed > 0) {
+            require(principalReturn >= excessClaimed, "Insufficient principal to deduct");
+            principalReturn -= excessClaimed;
+        }
+        
+        uint256 rewardReturn = allowedReward > claimed ? allowedReward - claimed : 0;
+        
+        uint256 unclaimedPenalty = penalty - excessClaimed;
+        
+        // Calculate total reward pool needed and update in one go to avoid double-checking
+        uint256 totalRewardPoolNeeded = rewardReturn + unclaimedPenalty;
+        if (totalRewardPoolNeeded > 0) {
+            require(rewardPoolBalance >= totalRewardPoolNeeded, "Insufficient reward pool");
+            rewardPoolBalance -= totalRewardPoolNeeded;
+        }
+        
+        uint256 lockEndTime = position.stakedAt + LOCK_PERIOD;
+        uint256 timeLeftFromRequest = lockEndTime - requestTime;
+        uint256 reservedReward = _calculateReward(position.amount, timeLeftFromRequest, rewardRate);
+        totalPendingRewards -= reservedReward;
+        
+        position.isUnstaked = true;
+        totalStaked -= position.amount;
+        delete earlyUnstakeRequestTime[positionId];
+        
+        if (unclaimedPenalty > 0) {
+            IPenaltyPool(penaltyPoolContract).deposit{value: unclaimedPenalty}();
+            emit PenaltyDeposited(unclaimedPenalty, block.timestamp);
+        }
+        
+        if (excessClaimed > 0) {
+            IPenaltyPool(penaltyPoolContract).deposit{value: excessClaimed}();
+            emit PenaltyDeposited(excessClaimed, block.timestamp);
+        } 
+        
+        uint256 totalReturn = principalReturn + rewardReturn;
+        
+        emit EarlyUnstakeCompleted(
+            msg.sender,
+            positionId,
+            principalReturn,
+            rewardReturn,
+            penalty,
+            block.timestamp
+        );
+        emit PositionUnstaked(msg.sender, positionId, principalReturn, block.timestamp);
+        
+        (bool success, ) = msg.sender.call{value: totalReturn}("");
+        require(success, "Transfer failed");
+    }
+
 
     function emergencyWithdraw(uint256 positionId) external nonReentrant {
         require(emergencyMode, "Not in emergency mode");
@@ -218,8 +335,15 @@ contract HSKStaking is
             timeElapsed,
             rewardRate
         );
-        require(totalPendingRewards >= reservedReward, "Pending rewards accounting error");
-        totalPendingRewards -= reservedReward;
+        
+        unchecked {
+            if (totalPendingRewards >= reservedReward) {
+                totalPendingRewards -= reservedReward;
+            } else {
+                // Force to zero to prevent underflow, accounting error is acceptable in emergency
+                totalPendingRewards = 0;
+            }
+        }
         
         position.isUnstaked = true;
         totalStaked -= amount;
@@ -266,6 +390,20 @@ contract HSKStaking is
         bool oldMode = onlyWhitelistCanStake;
         onlyWhitelistCanStake = enabled;
         emit WhitelistModeChanged(oldMode, enabled);
+    }
+
+    /**
+     * @dev Update penalty pool contract address
+     * Only owner can call this (for contract upgrades or migrations)
+     * @param newContract New penalty pool contract address
+     */
+    function setPenaltyPoolContract(address newContract) external onlyOwner whenNotEmergency {
+        require(newContract != address(0), "Invalid penalty pool address");
+        
+        address oldContract = penaltyPoolContract;
+        penaltyPoolContract = newContract;
+        
+        emit PenaltyPoolContractUpdated(oldContract, newContract);
     }
 
     // ==================== EXTERNAL ADMIN FUNCTIONS ====================
@@ -326,7 +464,8 @@ contract HSKStaking is
     {
         uint256 lockEndTime = position.stakedAt + LOCK_PERIOD;
         uint256 endTime = block.timestamp < lockEndTime ? block.timestamp : lockEndTime;
-        return endTime - position.lastRewardAt;
+        
+        return endTime > position.lastRewardAt ? endTime - position.lastRewardAt : 0;
     }
 
     function _calculateReward(
@@ -370,8 +509,9 @@ contract HSKStaking is
             emit RewardPoolUpdated(rewardPoolBalance);
         }
 
-        uint256 currentTime = block.timestamp;
+        // Update lastRewardAt
         uint256 lockEndTime = position.stakedAt + LOCK_PERIOD;
+        uint256 currentTime = block.timestamp;
         position.lastRewardAt = currentTime > lockEndTime ? lockEndTime : currentTime;
     }
 

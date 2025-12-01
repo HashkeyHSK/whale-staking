@@ -1,4 +1,4 @@
-# 双层 Staking 产品方案 - 开发版本
+# 单层 Staking 产品方案 - 开发版本
 
 > **文档说明**：本文档面向开发团队，包含技术实现细节、合约接口、部署配置等开发相关信息。  
 > **运营版本**：请参考 [PRODUCT_PLANS.md](./PRODUCT_PLANS.md)
@@ -9,12 +9,12 @@
 
 ### 1.1 产品方案
 
-本方案基于 `HSKStaking` 合约，通过部署两个独立的代理合约（`NormalStakingProxy` 和 `PremiumStakingProxy`）实现两套产品：
+本方案基于 `HSKStaking` 合约，通过部署一个独立的代理合约（`StakingProxy` 和 ``）实现一套产品：
 
 | 产品 | 合约实例 | 目标用户 | 最小质押 | 年化收益 | 白名单 |
 |------|---------|---------|---------|---------|--------|
-| 普通 Staking | 独立实例 A | 普通用户 | 1 HSK | 8% | 关闭 |
-| Premium Staking | 独立实例 B | 大户/机构 | 500,000 HSK | 16% | 启用 |
+| Staking | 独立实例 A | 普通用户 | 1 HSK | 5% | 关闭 |
+|  | 独立实例 B | 大户/机构 | 500,000 HSK | 16% | 启用 |
 
 ### 1.2 技术栈
 
@@ -32,7 +32,7 @@ HSKStaking (主实现合约)
 ├── IStaking (接口定义)
 ├── StakingStorage (存储层)
 │   ├── Initializable (初始化控制)
-│   └── Ownable2StepUpgradeable (两步所有权管理)
+│   └── Ownable2StepUpgradeable (一步所有权管理)
 ├── StakingConstants (常量定义)
 ├── ReentrancyGuardUpgradeable (重入保护)
 └── PausableUpgradeable (暂停功能)
@@ -41,34 +41,34 @@ HSKStaking (主实现合约)
 #### 代理合约层
 ```
 代理合约架构
-├── NormalStakingProxy (TransparentUpgradeableProxy)
+├── StakingProxy (TransparentUpgradeableProxy)
 │   └── 指向 HSKStaking 实现
-└── PremiumStakingProxy (TransparentUpgradeableProxy)
+└──  (TransparentUpgradeableProxy)
     └── 指向 HSKStaking 实现
 ```
 
 **架构说明**：
 - 使用 Transparent Proxy 模式，由 ProxyAdmin 控制升级
-- 两个代理合约共享同一个 `HSKStaking` 实现
+- 一个代理合约共享同一个 `HSKStaking` 实现
 - 通过初始化参数配置不同的产品特性
-- 两个代理合约可独立升级
+- 一个代理合约可独立升级
 
 ---
 
 ## 二. 产品配置参数
 
-### 2.1 普通 Staking 配置
+### 2.1 Staking 配置
 
 | 参数 | 值 | 合约函数 |
 |------|-----|---------|
-| `minStakeAmount` | 1 HSK (1e18) | `setMinStakeAmount(1e18)` |
+| `minStakeAmount` | 1000 HSK (1000e18) | `setMinStakeAmount(1000e18)` |
 | `LOCK_PERIOD` | 365 天 (31,536,000 秒) | 固定常量，部署时设置 |
-| `rewardRate` | 8% (800 basis points) | 部署时通过 initialize() 设置 |
+| `rewardRate` | 5% (500 basis points) | 部署时通过 initialize() 设置 |
 | `stakeStartTime` | 部署后7天 | `setStakeStartTime(timestamp)` |
 | `stakeEndTime` | `type(uint256).max` | `setStakeEndTime(timestamp)` |
 | `onlyWhitelistCanStake` | `false` | `setWhitelistOnlyMode(false)` |
 
-### 2.2 Premium Staking 配置
+### 2.2  配置
 
 | 参数 | 值 | 合约函数 |
 |------|-----|---------|
@@ -123,25 +123,25 @@ mapping(address => bool) public whitelisted;         // 白名单mapping
 #### 方式一：分别部署（推荐用于测试）
 
 ```bash
-# 部署普通 Staking
-STAKE_START_TIME="<timestamp>" STAKE_END_TIME="<timestamp>" npx hardhat run scripts/normal/deploy.ts --network hashkeyTestnet
+# 部署Staking
+STAKE_START_TIME="<timestamp>" STAKE_END_TIME="<timestamp>" npx hardhat run scripts/staking/deploy.ts --network hashkeyTestnet
 
-# 部署 Premium Staking
-STAKE_START_TIME="<timestamp>" STAKE_END_TIME="<timestamp>" npx hardhat run scripts/premium/deploy.ts --network hashkeyTestnet
+# 部署 
+STAKE_START_TIME="<timestamp>" STAKE_END_TIME="<timestamp>" npx hardhat run /deploy.ts --network hashkeyTestnet
 ```
 
 **注意**：部署脚本需要提供 `STAKE_START_TIME` 和 `STAKE_END_TIME` 环境变量（Unix 时间戳，秒）。
 
 ### 3.2 部署后配置清单
 
-#### 普通 Staking
-- [ ] 验证 `minStakeAmount` = 1 HSK
-- [ ] 验证 `rewardRate` = 800 (8% APY)
+#### Staking
+- [ ] 验证 `minStakeAmount` = 1000 HSK
+- [ ] 验证 `rewardRate: 500 (5% APY)
 - [ ] 验证 `LOCK_PERIOD` = 365 days (固定)
 - [ ] 验证 `onlyWhitelistCanStake` = false
 - [ ] 向奖励池充值（通过 `updateRewardPool()`）
 
-#### Premium Staking
+#### 
 - [ ] 验证 `minStakeAmount` = 500,000 HSK
 - [ ] 验证 `rewardRate` = 1600 (16% APY)
 - [ ] 验证 `LOCK_PERIOD` = 365 days (固定)
@@ -153,15 +153,15 @@ STAKE_START_TIME="<timestamp>" STAKE_END_TIME="<timestamp>" npx hardhat run scri
 
 ```bash
 # 检查配置参数和合约状态
-npx hardhat run scripts/normal/query/check-status.ts --network hashkeyTestnet \
+npx hardhat run scripts/staking/query/check-status.ts --network hashkeyTestnet \
   -- --contract <CONTRACT_ADDRESS>
 
 # 检查用户质押情况
-npx hardhat run scripts/normal/query/check-stakes.ts --network hashkeyTestnet \
+npx hardhat run scripts/staking/query/check-stakes.ts --network hashkeyTestnet \
   -- --contract <CONTRACT_ADDRESS> --user <USER_ADDRESS>
 
-# 检查白名单状态（Premium Staking）
-npx hardhat run scripts/premium/query/check-whitelist.ts --network hashkeyTestnet \
+# 检查白名单状态（）
+npx hardhat run /query/check-whitelist.ts --network hashkeyTestnet \
   -- --contract <CONTRACT_ADDRESS> --user <USER_ADDRESS>
 ```
 
@@ -218,14 +218,18 @@ npx hardhat run scripts/premium/query/check-whitelist.ts --network hashkeyTestne
 - `!paused()` - 合约未暂停
 
 #### `pendingReward(uint256 positionId) view → uint256`
-查询待提取奖励。
+查询任何位置的待提取奖励。
 
 **参数**：
 - `positionId`: 质押位置 ID
 
 **返回**：待提取的奖励金额
 
-**说明**：紧急模式下返回 0
+**注意事项**：
+- **任何人都可以查询** - 无所有者限制，可以查询任何位置的待提取奖励
+- 紧急模式下返回 0
+- 如果位置已解除质押，返回 0
+- View 函数，只读查询无需 gas 费用
 
 #### 查看用户质押位置
 
@@ -276,7 +280,7 @@ getUserPositionIds(address user) view → uint256[] memory
 **事件**: 触发 `RewardPoolUpdated` 事件
 
 **重要**：
-- 奖励池需要独立管理（普通 Staking 和 Premium Staking 分别管理）
+- 奖励池需要独立管理（Staking 和  分别管理）
 
 #### `withdrawExcessRewardPool(uint256 amount)`
 提取奖励池多余资金。
@@ -338,7 +342,7 @@ getUserPositionIds(address user) view → uint256[] memory
 获取固定锁定期（365 days = 31,536,000秒）。
 
 #### `rewardRate() view → uint256`
-获取年化收益率（basis points，例如：800 = 8%, 1600 = 16%）。
+获取年化收益率（basis points，例如：500 = 5%, ）。
 
 #### `stakeStartTime() view → uint256`
 获取质押开始时间戳。
@@ -386,13 +390,13 @@ uint256 totalReward = (amount × annualRate × timeRatio) / (PRECISION × PRECIS
 
 ### 5.2 计算示例
 
-**普通 Staking（8% APY，365天锁定期）**：
+**Staking（5% APY，365天锁定期）**：
 - 质押：10,000 HSK
 - 锁定期：365 天
 - 实际质押：365 天
-- 奖励 = 10,000 × 0.08 × (365/365) = 800 HSK
+- 奖励 = 10,000 × 0.08 × (365/365) = 500 HSK
 
-**Premium Staking（16% APY，365天锁定期）**：
+**（16% APY，365天锁定期）**：
 - 质押：1,000,000 HSK
 - 锁定期：365 天
 - 实际质押：365 天
@@ -436,8 +440,8 @@ function _calculateTimeElapsed(Position memory position)
 ### 7.2 访问控制
 
 - **Owner**: 合约所有者，负责所有管理功能（包括升级、参数配置等）
-- 使用 OpenZeppelin 的 Ownable2StepUpgradeable 标准实现（两步所有权转移）
-- 支持两步所有权转移：
+- 使用 OpenZeppelin 的 Ownable2StepUpgradeable 标准实现（一步所有权转移）
+- 支持一步所有权转移：
   - 第一步：当前 owner 调用 `transferOwnership(newOwner)` 设置待转移地址
   - 第二步：新 owner 调用 `acceptOwnership()` 接受所有权
 - 支持放弃所有权（`renounceOwnership`）
@@ -489,7 +493,7 @@ function _calculateTimeElapsed(Position memory position)
 
 **升级脚本特性**：
 - ✅ 自动从 EIP-1967 存储槽读取实际的 ProxyAdmin 地址
-- ✅ 支持 ProxyAdmin 合约和 EOA 两种模式
+- ✅ 支持 ProxyAdmin 合约和 EOA 一种模式
 - ✅ 智能 Fallback：如果 `upgrade()` 失败，自动尝试 `upgradeAndCall()`
 - ✅ 升级前后自动验证状态一致性
 - ✅ 升级成功后自动打印浏览器链接
@@ -569,7 +573,7 @@ PROXY_ADMIN_ADDRESS="0x..." NEW_IMPLEMENTATION_ADDRESS="0x..." npm run upgrade:n
 ### 10.1 用户操作流程
 
 #### 质押流程
-1. 检查白名单状态（Premium Staking）
+1. 检查白名单状态（）
 2. 检查质押时间窗口（`stakeStartTime` 和 `stakeEndTime`）
 3. 检查奖励池余额是否充足（合约会自动检查）
 4. 调用 `stake()` 并发送 HSK（锁定期固定365天）
@@ -593,7 +597,7 @@ PROXY_ADMIN_ADDRESS="0x..." NEW_IMPLEMENTATION_ADDRESS="0x..." npm run upgrade:n
 - **奖励池余额**：`rewardPoolBalance()`
 - **总待发放奖励**：`totalPendingRewards()`
 - **锁定期**：`LOCK_PERIOD()` (固定365天)
-- **年化收益率**：`rewardRate()` (部署时设置，例如：800 = 8%)
+- **年化收益率**：`rewardRate: 500 = 5%)
 - **用户质押位置**：`getUserPositionIds(user)`（推荐方法，返回所有位置ID数组）
 - **位置详情**：`positions(positionId)`
 - **待提取奖励**：`pendingReward(positionId)`
@@ -602,7 +606,7 @@ PROXY_ADMIN_ADDRESS="0x..." NEW_IMPLEMENTATION_ADDRESS="0x..." npm run upgrade:n
 
 常见错误：
 - `"Amount below minimum"` - 质押金额不足（小于 minStakeAmount）
-- `NotWhitelisted` - 未在白名单中（Premium Staking）
+- `NotWhitelisted` - 未在白名单中（）
 - `StillLocked` - 锁定期未结束（365天）
 - `"Stake amount exceed"` - 奖励池余额不足（无法支付预期奖励）
 - `"Insufficient reward pool"` - 奖励池余额不足（提取奖励时）
@@ -619,12 +623,12 @@ PROXY_ADMIN_ADDRESS="0x..." NEW_IMPLEMENTATION_ADDRESS="0x..." npm run upgrade:n
 
 ### 11.1 关键指标监控
 
-#### 普通 Staking
+#### Staking
 - `totalStaked` - 总质押量
 - `rewardPoolBalance` - 奖励池余额
 - 用户数量统计（通过事件）
 
-#### Premium Staking
+#### 
 - `totalStaked` - 总质押量
 - `rewardPoolBalance` - 奖励池余额
 - 白名单用户数量
@@ -662,7 +666,7 @@ PROXY_ADMIN_ADDRESS="0x..." NEW_IMPLEMENTATION_ADDRESS="0x..." npm run upgrade:n
 - [ ] 配置参数验证通过
 - [ ] 权限设置正确（Owner）
 - [ ] 奖励池充值成功
-- [ ] 白名单用户添加成功（Premium Staking）
+- [ ] 白名单用户添加成功（）
 - [ ] 测试质押/提取流程
 
 ### 12.3 上线前准备
@@ -703,7 +707,7 @@ A: 使用 `enableEmergencyMode()` 启用。注意：当前合约版本中，紧�
 - [合约架构说明](./CONTRACT_ARCHITECTURE.md) - **合约架构详解（开发必读）**
 - [产品方案详细文档](./PRODUCT_PLANS.md) - **运营文档（推荐）**
 - [产品方案执行摘要](./PRODUCT_SUMMARY.md) - 快速了解
-- [双层产品方案文档](./DUAL_TIER_STAKING.md) - 技术部署文档
+- [单层产品方案文档](./DUAL_TIER_STAKING.md) - 技术部署文档
 - [快速开始指南](./QUICK_START_DUAL_TIER.md) - 快速部署指南
 - [技术常见问题](./TECHNICAL_FAQ.md) - 技术机制说明
 - [错误处理指南](./ERROR_HANDLING.md) - 常见错误处理

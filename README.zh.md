@@ -24,7 +24,7 @@
 - **白名单机制**：支持白名单模式，可限制只有白名单用户才能质押
 - **质押时间控制**：支持设置质押开始时间和结束时间，灵活控制质押时间窗口
 - **奖励池管理**：独立的奖励池系统，确保奖励分配的安全性
-- **固定收益率**：部署时配置固定年化收益率（8% 或 16%），清晰明确
+- **固定收益率**：部署时配置固定年化收益率（5% 或 16%），清晰明确
 
 ### 安全特性
 - **重入攻击防护**：使用 OpenZeppelin 的 ReentrancyGuard
@@ -45,8 +45,8 @@ contracts/
 │   └── StakingConstants.sol # 质押常量（锁定期、精度等）
 ├── interfaces/              # 接口定义目录
 │   └── IStake.sol          # 质押接口定义
-├── NormalStakingProxy.sol   # 普通质押代理合约（1 HSK, 8% APY）
-└── PremiumStakingProxy.sol  # 高级质押代理合约（500K HSK, 16% APY）
+├── StakingProxy.sol   # 质押代理合约（1000 HSK, 5% APY）
+└── .sol  # （500K HSK, 16% APY）
 ```
 
 ### 合约继承关系
@@ -56,24 +56,23 @@ HSKStaking (主实现合约)
 ├── IStaking (接口定义)
 ├── StakingStorage (存储层)
 │   ├── Initializable (初始化控制)
-│   └── Ownable2StepUpgradeable (两步所有权管理)
+│   └── Ownable2StepUpgradeable (一步所有权管理)
 ├── StakingConstants (常量定义)
 ├── ReentrancyGuardUpgradeable (重入保护)
 └── PausableUpgradeable (暂停功能)
 
 代理合约架构
-├── NormalStakingProxy (TransparentUpgradeableProxy)
-│   ├── 指向 HSKStaking 实现
-│   ├── 最小质押：1 HSK
-│   └── 年化收益：8% (800 basis points)
-└── PremiumStakingProxy (TransparentUpgradeableProxy)
+└── StakingProxy (TransparentUpgradeableProxy)
+    ├── 指向 HSKStaking 实现
+    ├── 最小质押：1000 HSK
+    └── 年化收益：5% (500 basis points)
     ├── 指向 HSKStaking 实现
     ├── 最小质押：500,000 HSK
     └── 年化收益：16% (1600 basis points)
 ```
 
 **架构说明**：
-- 两个代理合约共享同一个 HSKStaking 实现合约
+- 单个代理合约共享同一个 HSKStaking 实现合约
 - 通过 `initialize()` 函数的不同参数配置不同的产品特性
 - 固定锁定期 365 天由 `StakingConstants.LOCK_PERIOD` 定义
 - 年化收益率在部署时通过 `rewardRate` 参数设置（basis points: 100% = 10000）
@@ -280,7 +279,7 @@ HSKStaking 采用固定锁定期设计：
 | 参数 | 配置 | 说明 |
 |------|------|------|
 | 锁定期 | 365 天 | 固定，不可修改 |
-| 收益率 | 8% 或 16% | 部署时配置（普通/Premium） |
+| 收益率 | 5% | 部署时配置 |
 
 ### 奖励计算说明
 
@@ -289,7 +288,7 @@ HSKStaking 采用固定锁定期设计：
 - 奖励只计算到锁定期结束，即使实际质押时间更长
 
 例如：
-- 固定 365 天锁定期（8% APY）
+- 固定 365 天锁定期（5% APY）
 - 实际质押 400 天才提取
 - **重要**：超过锁定期的时间不会产生额外奖励，奖励只计算到锁定期结束
 
@@ -298,7 +297,7 @@ HSKStaking 采用固定锁定期设计：
 V2 版本简化了锁定期选择：
 - **用户友好**：无需选择锁定期，简化操作流程
 - **统一管理**：固定365天，便于运营和用户理解
-- **清晰明确**：通过不同产品（普通/Premium）提供不同收益率
+- **清晰明确**：单一产品，统一收益率
 
 ## 🔓 Unstake 机制说明
 
@@ -401,8 +400,8 @@ uint256 totalReward = (amount × annualRate × timeRatio) / (PRECISION × PRECIS
 
 ### 访问控制
 - **Owner**: 合约所有者，负责所有管理功能（包括升级、参数配置等）
-- 使用 OpenZeppelin 的 Ownable2StepUpgradeable 标准实现（两步所有权转移）
-- 支持两步所有权转移：
+- 使用 OpenZeppelin 的 Ownable2StepUpgradeable 标准实现（一步所有权转移）
+- 支持一步所有权转移：
   - 第一步：当前 owner 调用 `transferOwnership(newOwner)` 设置待转移地址
   - 第二步：新 owner 调用 `acceptOwnership()` 接受所有权
 - 支持放弃所有权（`renounceOwnership`）
@@ -415,51 +414,51 @@ uint256 totalReward = (amount × annualRate × timeRatio) / (PRECISION × PRECIS
 #### 部署到测试网
 
 ```bash
-# 部署普通 Staking（需要提供时间戳）
+# 部署Staking（需要提供时间戳）
 STAKE_START_TIME="1735689600" STAKE_END_TIME="1767225600" npm run deploy:testnet
 
-# 部署 Premium Staking
-STAKE_START_TIME="1735689600" STAKE_END_TIME="1767225600" npm run deploy:premium:testnet
+# 部署 
+STAKE_START_TIME="1735689600" STAKE_END_TIME="1767225600" :testnet
 ```
 
 #### 部署到主网
 
 ```bash
-# 部署普通 Staking
+# 部署Staking
 STAKE_START_TIME="1735689600" STAKE_END_TIME="1767225600" npm run deploy
 
-# 部署 Premium Staking
-STAKE_START_TIME="1735689600" STAKE_END_TIME="1767225600" npm run deploy:premium
+# 部署 
+STAKE_START_TIME="1735689600" STAKE_END_TIME="1767225600" 
 ```
 
 **注意**：部署时必须提供 `STAKE_START_TIME` 和 `STAKE_END_TIME` 环境变量（Unix 时间戳，秒级）。
 
-### 双层产品方案部署
+### 单池产品方案部署
 
-基于现有合约架构，可以部署两套独立的产品方案：
+基于现有合约架构，可以部署单套产品方案：
 
-#### 产品方案对比
+#### 产品方案
 
-| 特性 | 普通 Staking（委托质押） | Premium Staking（高级质押） |
-|------|----------------------|------------------------|
-| 目标用户 | 普通用户 | 大户/机构 |
-| 最小质押 | 1 HSK | 500,000 HSK |
-| 年化收益 | 8% | 16% |
-| 白名单模式 | 关闭（开放） | 启用（需授权） |
+| 特性 | Staking（委托质押） |
+|------|----------------------|
+| 目标用户 | 所有用户 |
+| 最小质押 | 1000 HSK |
+| 年化收益 | 5% |
+| 白名单模式 | 关闭（开放） |
 
 #### 部署方式
 
 **方式一：分别部署**
 
 ```bash
-# 部署普通 Staking
+# 部署Staking
 STAKE_START_TIME="1735689600" STAKE_END_TIME="1767225600" npm run deploy:testnet
 
-# 部署 Premium Staking
-STAKE_START_TIME="1735689600" STAKE_END_TIME="1767225600" npm run deploy:premium:testnet
+# 部署 
+STAKE_START_TIME="1735689600" STAKE_END_TIME="1767225600" :testnet
 ```
 
-**注意**：两个产品需要分别部署，每个产品都有独立的代理合约和配置。
+**注意**：一个产品需要分别部署，每个产品都有独立的代理合约和配置。
 
 #### 部署后配置
 
@@ -475,26 +474,14 @@ END_TIME="1767225600" npm run config:set-end-time:testnet
 
 其他配置：
 
-1. **为 Premium Staking 添加白名单用户**（Premium Staking 启用了白名单模式）
+1. **向奖励池充值**
    ```bash
-   # 批量添加白名单（最多100个地址）
-   WHITELIST_ADDRESSES="0x123...,0x456..." npm run whitelist:add-batch:premium:testnet
-   
-   # 批量移除白名单
-   WHITELIST_ADDRESSES="0x123...,0x456..." npm run whitelist:remove-batch:premium:testnet
-   ```
-
-2. **向奖励池充值**（两个产品需要独立的奖励池）
-   ```bash
-   # 普通 Staking 奖励池
+   # Staking 奖励池
    REWARD_AMOUNT="10000" npm run rewards:add:testnet
-   
-   # Premium Staking 奖励池
-   REWARD_AMOUNT="20000" npm run rewards:add:premium:testnet
    ```
 
 详细说明请参考：
-- [双层产品方案文档](./docs/DUAL_TIER_STAKING.md) - 技术部署文档
+- [单池产品方案文档](./docs/DUAL_TIER_STAKING.md) - 技术部署文档
 - [产品方案详细文档](./docs/PRODUCT_PLANS.md) - **运营文档（推荐）**
 - [产品方案执行摘要](./docs/PRODUCT_SUMMARY.md) - 快速了解
 - [技术常见问题](./docs/TECHNICAL_FAQ.md) - 技术机制说明
@@ -505,8 +492,7 @@ END_TIME="1767225600" npm run config:set-end-time:testnet
 # 使用 Foundry 验证实现合约（推荐）
 IMPLEMENTATION_ADDRESS="0x..." npm run verify:forge:testnet
 
-# 验证 Premium Staking 实现合约
-IMPLEMENTATION_ADDRESS="0x..." npm run verify:forge:premium:testnet
+# 验证  实现合约
 ```
 
 ### 升级合约
@@ -514,22 +500,22 @@ IMPLEMENTATION_ADDRESS="0x..." npm run verify:forge:premium:testnet
 升级脚本会自动检测 ProxyAdmin 类型（合约或 EOA），并使用正确的方式执行升级：
 
 ```bash
-# 升级普通质押合约（自动部署新实现，自动检测 ProxyAdmin）
-npm run upgrade:normal:testnet
+# 升级合约（自动部署新实现，自动检测 ProxyAdmin）
+npm run upgrade:testnet
 
 # 如果 ProxyAdmin 地址与当前签名者不同，可以手动指定
-PROXY_ADMIN_ADDRESS="0x..." npm run upgrade:normal:testnet
+PROXY_ADMIN_ADDRESS="0x..." npm run upgrade:testnet
 
 # 使用已部署的实现合约升级
-PROXY_ADMIN_ADDRESS="0x..." NEW_IMPLEMENTATION_ADDRESS="0x..." npm run upgrade:normal:testnet
+PROXY_ADMIN_ADDRESS="0x..." NEW_IMPLEMENTATION_ADDRESS="0x..." npm run upgrade:testnet
 
-# 升级高级质押合约
-npm run upgrade:premium:testnet
+# 升级合约
+:testnet
 ```
 
 **升级脚本特性**：
 - ✅ 自动从存储槽读取实际的 ProxyAdmin 地址
-- ✅ 支持 ProxyAdmin 合约和 EOA 两种模式
+- ✅ 支持 ProxyAdmin 合约和 EOA 一种模式
 - ✅ 自动验证升级前后状态一致性
 - ✅ 升级成功后自动打印浏览器链接
 - ✅ 提供升级后验证实现合约的命令
@@ -546,44 +532,29 @@ npm run upgrade:premium:testnet
 
 | 脚本 | 功能 | npm 命令 |
 |------|------|---------|
-| `normal/deploy.ts` | 部署普通 Staking 产品 | `npm run deploy:testnet` |
-| `premium/deploy.ts` | 部署 Premium Staking 产品 | `npm run deploy:premium:testnet` |
-| `normal/stake.ts` | 执行质押（普通 Staking） | `npm run stake:testnet` |
-| `premium/stake.ts` | 执行质押（Premium Staking） | `npm run stake:premium:testnet` |
-| `normal/unstake.ts` | 解除质押（普通 Staking） | `npm run unstake:testnet` |
-| `premium/unstake.ts` | 解除质押（Premium Staking） | `npm run unstake:premium:testnet` |
-| `normal/claim-rewards.ts` | 领取奖励（普通 Staking） | `npm run claim:testnet` |
-| `premium/claim-rewards.ts` | 领取奖励（Premium Staking） | `npm run claim:premium:testnet` |
-| `normal/upgrade.ts` | 升级合约（普通 Staking） | `npm run upgrade:normal:testnet` |
-| `premium/upgrade.ts` | 升级合约（Premium Staking） | `npm run upgrade:premium:testnet` |
-| `premium/whitelist/add-batch.ts` | 批量添加白名单 | `npm run whitelist:add-batch:premium:testnet` |
-| `premium/whitelist/remove-batch.ts` | 批量移除白名单 | `npm run whitelist:remove-batch:premium:testnet` |
-| `normal/query/check-stakes.ts` | 查询用户质押情况 | `npm run query:stakes:testnet` |
-| `premium/query/check-whitelist.ts` | 检查白名单状态 | `npm run query:check-whitelist:premium:testnet` |
-| `normal/config/set-start-time.ts` | 设置质押开始时间 | `npm run config:set-start-time:testnet` |
-| `normal/config/set-end-time.ts` | 设置质押截止时间 | `npm run config:set-end-time:testnet` |
-| `normal/config/set-min-stake.ts` | 设置最小质押金额 | `npm run config:set-min-stake:testnet` |
-| `normal/config/set-max-total-staked.ts` | 设置最大总质押量 | `npm run config:set-max-total-staked:testnet` |
-| `normal/add-rewards.ts` | 向奖励池充值（普通 Staking） | `npm run rewards:add:testnet` |
-| `premium/add-rewards.ts` | 向奖励池充值（Premium Staking） | `npm run rewards:add:premium:testnet` |
-| `normal/withdraw-excess.ts` | 提取多余奖励池资金 | `npm run withdraw-excess:testnet` |
-| `premium/withdraw-excess.ts` | 提取多余奖励池资金 | `npm run withdraw-excess:premium:testnet` |
-| `normal/emergency-withdraw.ts` | 紧急提取本金 | `npm run emergency-withdraw:testnet` |
-| `normal/config/enable-emergency.ts` | 启用紧急模式 | `npm run config:enable-emergency:testnet` |
+| `staking/deploy.ts` | 部署Staking 产品 | `npm run deploy:testnet` |
+| `staking/stake.ts` | 执行质押 | `npm run stake:testnet` |
+| `staking/unstake.ts` | 解除质押 | `npm run unstake:testnet` |
+| `staking/claim-rewards.ts` | 领取奖励 | `npm run claim:testnet` |
+| `staking/upgrade.ts` | 升级合约 | `npm run upgrade:testnet` |
+| `staking/query/check-stakes.ts` | 查询用户质押情况 | `npm run query:stakes:testnet` |
+| `staking/config/set-start-time.ts` | 设置质押开始时间 | `npm run config:set-start-time:testnet` |
+| `staking/config/set-end-time.ts` | 设置质押截止时间 | `npm run config:set-end-time:testnet` |
+| `staking/config/set-min-stake.ts` | 设置最小质押金额 | `npm run config:set-min-stake:testnet` |
+| `staking/config/set-max-total-staked.ts` | 设置最大总质押量 | `npm run config:set-max-total-staked:testnet` |
+| `staking/add-rewards.ts` | 向奖励池充值 | `npm run rewards:add:testnet` |
+| `staking/withdraw-excess.ts` | 提取多余奖励池资金 | `npm run withdraw-excess:testnet` |
+| `staking/emergency-withdraw.ts` | 紧急提取本金 | `npm run emergency-withdraw:testnet` |
+| `staking/config/enable-emergency.ts` | 启用紧急模式 | `npm run config:enable-emergency:testnet` |
 
 ### 查询脚本
 
 | 脚本 | 功能 | npm 命令 |
 |------|------|---------|
-| `normal/query/check-status.ts` | 查询合约状态 | `npm run query:status:testnet` |
-| `premium/query/check-status.ts` | 查询合约状态（Premium） | `npm run query:status:premium:testnet` |
-| `normal/query/check-stakes.ts` | 查询用户质押情况 | `npm run query:stakes:testnet` |
-| `premium/query/check-stakes.ts` | 查询用户质押情况（Premium） | `npm run query:stakes:premium:testnet` |
-| `normal/query/pending-reward.ts` | 查询待提取奖励 | `npm run query:pending-reward:testnet` |
-| `premium/query/pending-reward.ts` | 查询待提取奖励（Premium） | `npm run query:pending-reward:premium:testnet` |
-| `normal/query/position-info.ts` | 查询位置详情 | `npm run query:position-info:testnet` |
-| `premium/query/position-info.ts` | 查询位置详情（Premium） | `npm run query:position-info:premium:testnet` |
-| `premium/query/check-whitelist.ts` | 检查白名单状态 | `npm run query:check-whitelist:premium:testnet` |
+| `staking/query/check-status.ts` | 查询合约状态 | `npm run query:status:testnet` |
+| `staking/query/check-stakes.ts` | 查询用户质押情况 | `npm run query:stakes:testnet` |
+| `staking/query/pending-reward.ts` | 查询待提取奖励 | `npm run query:pending-reward:testnet` |
+| `staking/query/position-info.ts` | 查询位置详情 | `npm run query:position-info:testnet` |
 
 ## 🧪 测试
 
@@ -598,8 +569,8 @@ npm run test
 运行特定测试文件：
 
 ```bash
-npm test -- test/normal/staking.test.ts
-npm test -- test/premium/whitelist.test.ts
+npm test -- test/staking/staking.test.ts
+npm test -- /whitelist.test.ts
 ```
 
 生成测试覆盖率报告：
@@ -614,7 +585,7 @@ npm run dev:coverage
 
 ```
 test/
-├── normal/              # Normal Staking 单元测试
+├── staking/             # Staking 单元测试 单元测试
 │   ├── deployment.test.ts
 │   ├── staking.test.ts
 │   ├── rewards.test.ts
@@ -623,7 +594,6 @@ test/
 │   ├── config.test.ts
 │   ├── emergency.test.ts
 │   └── edge-cases.test.ts
-├── premium/             # Premium Staking 单元测试
 │   ├── deployment.test.ts
 │   ├── staking.test.ts
 │   ├── rewards.test.ts
@@ -634,7 +604,7 @@ test/
 │   ├── edge-cases.test.ts
 │   └── whitelist.test.ts
 ├── e2e/                 # E2E 测试
-│   ├── normal-user-journey.test.ts
+│   ├── user-journey.test.ts
 │   └── emergency-scenarios.test.ts
 ├── performance/         # 性能测试
 │   ├── gas-optimization.test.ts
@@ -674,7 +644,7 @@ test/
 
 **核心特性**：
 - **固定365天锁定期**：简化用户操作，无需选择锁定期
-- **双代理架构**：通过 `NormalStakingProxy` 和 `PremiumStakingProxy` 支持两套产品方案
+- **单代理架构**：通过 `StakingProxy` 和 `` 支持一套产品方案
 - **Transparent Proxy 模式**：升级由 ProxyAdmin 控制，安全可靠
 - **统一实现合约**：`HSKStaking.sol` 作为通用实现，通过初始化参数配置不同产品
 - **简化的 stake() 接口**：无需传入 lockPeriod 参数
@@ -683,45 +653,38 @@ test/
 **架构优势**：
 - **模块化设计**：实现、存储、常量、接口分离，清晰易维护
 - **可复用性**：同一实现合约支持多个产品实例
-- **独立升级**：两个代理合约可独立升级
+- **独立升级**：单个代理合约可独立升级
 - **灵活配置**：通过初始化参数配置不同的产品特性
 
 **版本历史**：
 - V1.0.0 (`staking.sol`): 初始版本，支持多锁定期选项
-- V2.0.0 (`HSKStaking.sol`): 当前版本，固定锁定期 + 双代理架构
+- V2.0.0 (`HSKStaking.sol`): 当前版本，固定锁定期 + 单代理架构
 
 ## ⚠️ 重要提醒
 
 1. **质押时间窗口**：合约支持设置质押开始时间和结束时间。部署时必须提供 `STAKE_START_TIME` 和 `STAKE_END_TIME` 环境变量（Unix 时间戳，秒级）。管理员可以通过 `setStakeStartTime` 和 `setStakeEndTime` 函数调整
 2. **奖励计算限制**：奖励只计算到锁定期结束，多质押的时间不会增加奖励
-3. **白名单模式**：合约支持白名单模式，可在部署时配置。双层产品方案中，普通 Staking 关闭白名单（开放），Premium Staking 启用白名单（需审核）
-4. **最小质押金额**：产品部署时可配置（普通 Staking 产品配置为 1 HSK，Premium Staking 配置为 500,000 HSK），部署后可通过 `setMinStakeAmount` 修改
-5. **最大总质押量**：产品部署时可配置（普通 Staking 产品配置为 10,000,000 HSK，Premium Staking 配置为 20,000,000 HSK），部署后可通过 `setMaxTotalStaked` 修改。设置整个产品池的上限，所有用户质押金额总和不能超过此限制
+3. **白名单模式**：合约支持白名单模式，可在部署时配置。当前产品方案中，Staking 关闭白名单（开放）
+4. **最小质押金额**：产品部署时配置为 1000 HSK，部署后可通过 `setMinStakeAmount` 修改
+5. **最大总质押量**：产品部署时配置为 30,000,000 HSK，部署后可通过 `setMaxTotalStaked` 修改。设置整个产品池的上限，所有用户质押金额总和不能超过此限制
 6. **奖励池**：确保奖励池有足够资金，否则新质押可能失败。合约会检查奖励池余额是否足够支付所有待发放奖励
 7. **奖励池提取**：管理员可以通过 `withdrawExcessRewardPool` 提取多余的奖励池资金（超过 totalPendingRewards 的部分）
 
-### 双层产品方案配置
+### 单池产品方案配置
 
-基于现有合约，可以部署两套独立的产品方案：
+基于现有合约，可以部署单套产品方案：
 
-- **普通 Staking（委托质押）**：
-  - 最小质押：1 HSK
-  - 年化收益：8%
+- **Staking（委托质押）**：
+  - 最小质押：1000 HSK
+  - 年化收益：5%
   - 锁定期：365天
   - 白名单：关闭（开放）
-  - 最大总质押量：10,000,000 HSK（池子上限）
-
-- **Premium Staking（高级质押）**：
-  - 最小质押：500,000 HSK（测试环境可能配置为 100 HSK）
-  - 年化收益：16%
-  - 锁定期：365天
-  - 白名单：启用（需审核）
-  - 最大总质押量：20,000,000 HSK（池子上限）
+  - 最大总质押量：30,000,000 HSK（池子上限）
 
 详细产品方案请参考：
 - [产品方案详细文档](./docs/PRODUCT_PLANS.md) - **运营文档（推荐）**
 - [产品方案执行摘要](./docs/PRODUCT_SUMMARY.md) - 快速了解
-- [双层产品方案文档](./docs/DUAL_TIER_STAKING.md) - 技术部署文档
+- [单池产品方案文档](./docs/DUAL_TIER_STAKING.md) - 技术部署文档
 - [产品开发文档](./docs/PRODUCT_PLANS_DEV.md) - 开发团队文档
 
 ## 📄 许可证
@@ -745,7 +708,7 @@ MIT License
 - [产品方案执行摘要](./docs/PRODUCT_SUMMARY.md) - 快速了解产品方案
 
 ### 部署和开发
-- [双层产品方案文档](./docs/DUAL_TIER_STAKING.md) - 技术部署文档
+- [单池产品方案文档](./docs/DUAL_TIER_STAKING.md) - 技术部署文档
 - [产品开发文档](./docs/PRODUCT_PLANS_DEV.md) - 开发团队文档
 - [快速开始指南](./docs/QUICK_START_DUAL_TIER.md) - 快速部署指南
 

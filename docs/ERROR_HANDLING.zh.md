@@ -15,18 +15,16 @@ Error: Insufficient stake amount
 - 质押金额小于最小质押金额要求
 
 **解决方法**：
-- 检查最小质押金额要求：
-  - 普通 Staking：1 HSK
-  - Premium Staking：500,000 HSK
+- 检查最小质押金额要求：1000 HSK
 - 确保发送的金额 >= 最小质押金额
 
 **示例**：
 ```typescript
 // ❌ 错误：质押金额不足
-await staking.stake({ value: ethers.parseEther("0.5") });
+await staking.stake({ value: ethers.parseEther("500") });
 
 // ✅ 正确：满足最小质押金额
-await staking.stake({ value: ethers.parseEther("1") });
+await staking.stake({ value: ethers.parseEther("1000") });
 ```
 
 **说明**: V2版本使用固定365天锁定期，stake() 函数无需传入 lockPeriod 参数。
@@ -46,7 +44,7 @@ Error: Not whitelisted
 
 **解决方法**：
 - 检查白名单模式状态：`await staking.onlyWhitelistCanStake()`
-- 如果是 Premium Staking，需要联系管理员添加到白名单
+- 如果是 ，需要联系管理员添加到白名单
 - 使用脚本检查白名单状态：
   ```bash
   npx hardhat run scripts/checkWhitelist.ts --network <network> \
@@ -363,7 +361,7 @@ console.log(`锁定期: ${LOCK_PERIOD / 86400} 天`); // 365天
 
 // 查询年化收益率
 const rewardRate = await staking.rewardRate();
-console.log(`年化收益率: ${rewardRate / 100}%`); // 800 = 8%, 1600 = 16%
+console.log(`年化收益率: ${rewardRate: 500 = 5%, 
 
 // 查询质押时间窗口
 const stakeStartTime = await staking.stakeStartTime();

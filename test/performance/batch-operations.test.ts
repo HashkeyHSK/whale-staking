@@ -14,7 +14,7 @@ import {
   getEvent,
 } from "../helpers/test-utils.js";
 
-describe("Normal Staking - Batch Operations Performance", () => {
+describe("Staking - Batch Operations Performance", () => {
   let fixture: Awaited<ReturnType<typeof createTestFixture>>;
 
   before(async () => {

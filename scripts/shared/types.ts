@@ -1,14 +1,6 @@
 import { ethers } from "ethers";
 
 /**
- * Staking product type
- */
-export enum StakingType {
-  NORMAL = "normal",
-  PREMIUM = "premium",
-}
-
-/**
  * Staking position information (corresponds to contract Position struct)
  * Note:
  * - Lock period is fixed at 365 days (LOCK_PERIOD constant), not stored in Position
@@ -34,7 +26,7 @@ export interface ContractStatus {
   totalPendingRewards: bigint;
   rewardPoolBalance: bigint;
   minStakeAmount: bigint;
-  rewardRate: bigint;               // basis points (800 = 8%, 1600 = 16%)
+  rewardRate: bigint;               // basis points (500 = 5%)
     stakeStartTime: bigint;
     stakeEndTime: bigint;
     nextPositionId: bigint;
@@ -44,9 +36,8 @@ export interface ContractStatus {
  * Deployment configuration
  */
 export interface DeployConfig {
-  minStakeAmount: string;       // HSK amount (string format, e.g. "1" or "500000")
-  rewardRate: number;            // APY (basis points, e.g. 800 = 8%)
-  stakingType: StakingType;
+  minStakeAmount: string;       // HSK amount (string format, e.g. "1000")
+  rewardRate: number;            // APY (basis points, e.g. 500 = 5%)
   stakeStartOffset?: number;     // Stake start time offset (seconds, default 7 days)
   stakeEndOffset?: number;       // Stake end time offset (seconds, default 1 year)
 }

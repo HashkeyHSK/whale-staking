@@ -82,7 +82,7 @@ scripts/
 │   ├── helpers.ts            # 辅助函数
 │   └── utils.ts              # 工具函数
 │
-├── normal/                    # 普通质押
+├── staking/                   # 质押操作
 │   ├── deploy.ts             # 部署合约
 │   ├── upgrade.ts            # 升级合约
 │   ├── stake.ts              # 质押操作
@@ -106,8 +106,6 @@ scripts/
 │       ├── check-status.ts   # 查询合约状态
 │       ├── check-stakes.ts   # 查询质押信息
 │       └── pending-reward.ts # 查询待领取奖励
-│
-├── premium/                   # 高级质押（✅ 已完成）
 │   ├── deploy.ts             # 部署合约
 │   ├── upgrade.ts            # 升级合约
 │   ├── stake.ts              # 质押操作（需白名单）
@@ -165,11 +163,10 @@ scripts/
 
 ```bash
 # 合约地址
-export NORMAL_STAKING_ADDRESS="0x..."
-export PREMIUM_STAKING_ADDRESS="0x..."
+export STAKING_ADDRESS="0x..."
 
 # 操作相关
-export STAKE_AMOUNT="1"           # 质押金额
+export STAKE_AMOUNT="100"         # 质押金额（最低：1 HSK）
 export REWARD_AMOUNT="100"        # 奖励金额
 export POSITION_ID="1"              # Position ID
 export USER_ADDRESS="0x..."         # 查询指定用户
@@ -186,7 +183,7 @@ export STAKE_END_TIME="1767225600"    # 质押结束时间（Unix 时间戳，�
 # 配置相关
 export START_TIME="1735689600"      # 开始时间（Unix 时间戳，秒级，用于修改配置）
 export END_TIME="1735689600"        # 结束时间（Unix 时间戳，秒级，用于修改配置）
-export NEW_MIN_STAKE="1"            # 新的最小质押金额
+export NEW_MIN_STAKE="1"          # 新的最小质押金额
 export NEW_MAX_TOTAL_STAKED="10000000"  # 新的最大总质押量（HSK，0 表示无限制）
 
 # 高级操作
@@ -197,9 +194,6 @@ export CONFIRM_EMERGENCY="YES_I_UNDERSTAND"  # 确认启用紧急模式
 export PROXY_ADMIN_ADDRESS="0x..."  # ProxyAdmin 地址（升级时必需，通常是部署者地址）
 export NEW_IMPLEMENTATION_ADDRESS="0x..."  # 新实现合约地址（可选，不提供则自动部署）
 
-# 白名单相关（Premium Staking）
-export WHITELIST_ADDRESSES="0x123...,0x456..."  # 白名单地址列表（逗号分隔，最多100个）
-export ENABLE="true"  # 启用/禁用白名单模式（"true" 或 "false"）
 ```
 
 ### 合约地址配置
@@ -208,8 +202,7 @@ export ENABLE="true"  # 启用/禁用白名单模式（"true" 或 "false"）
 
 ```typescript
 export const TESTNET_ADDRESSES: ContractAddresses = {
-  normalStaking: "0x...",  // 填写部署的地址
-  premiumStaking: "",
+  staking: "0x...",  // 填写部署的地址
 };
 ```
 
@@ -225,8 +218,7 @@ export const TESTNET_ADDRESSES: ContractAddresses = {
 - `npm run verify:forge:testnet` - 验证实现合约（测试网，使用 Foundry）
 
 ### 合约升级
-- `npm run upgrade:normal:testnet` - 升级普通质押合约（测试网）
-- `npm run upgrade:premium:testnet` - 升级高级质押合约（测试网）
+- `npm run upgrade:testnet` - 升级质押合约（测试网）
 
 ### 开发工具
 - `npm run dev:compile` - 编译合约（通过脚本）
@@ -244,21 +236,10 @@ export const TESTNET_ADDRESSES: ContractAddresses = {
 - `npm run tools:generate-types` - 生成 TypeScript 类型
 - `npm run tools:compare-contracts` - 对比合约差异
 
-### 质押操作（Normal Staking）
+### 质押操作
 - `npm run stake:testnet` - 质押
 - `npm run unstake:testnet` - 解除质押
 - `npm run claim:testnet` - 领取奖励
-
-### 质押操作（Premium Staking）
-- `npm run stake:premium:testnet` - 质押（需白名单）
-- `npm run unstake:premium:testnet` - 解除质押
-- `npm run claim:premium:testnet` - 领取奖励
-
-### 白名单管理（Premium Staking）
-- `npm run whitelist:add-batch:premium:testnet` - 批量添加白名单
-- `npm run whitelist:remove-batch:premium:testnet` - 批量移除白名单
-- `npm run whitelist:check-user:premium:testnet` - 查询用户白名单状态
-- `npm run whitelist:toggle-mode:premium:testnet` - 切换白名单模式
 
 ### 奖励管理
 - `npm run rewards:add:testnet` - 添加奖励
@@ -271,19 +252,16 @@ export const TESTNET_ADDRESSES: ContractAddresses = {
 - `npm run config:set-end-time:testnet` - 设置结束时间
 - `npm run config:set-min-stake:testnet` - 设置最小质押金额
 - `npm run config:set-max-total-staked:testnet` - 设置最大总质押量
-- `npm run config:set-max-total-staked:premium:testnet` - 设置最大总质押量（Premium）
 - `npm run config:enable-emergency:testnet` - 启用紧急模式（⚠️ 不可逆）
 
 ### 所有权转移（两步流程）
 合约使用 OpenZeppelin 的 `Ownable2StepUpgradeable` 标准以增强安全性。
 
 **第一步：发起转移**（当前 owner 执行）：
-- `NEW_OWNER_ADDRESS="0x..." npm run config:transfer-ownership:normal:testnet` - 普通质押
-- `NEW_OWNER_ADDRESS="0x..." npm run config:transfer-ownership:premium:testnet` - 高级质押
+- `NEW_OWNER_ADDRESS="0x..." npm run config:transfer-ownership:testnet`
 
 **第二步：接受所有权**（新 owner 执行）：
-- `npm run config:accept-ownership:normal:testnet` - 普通质押
-- `npm run config:accept-ownership:premium:testnet` - 高级质押
+- `npm run config:accept-ownership:testnet`
 
 **重要注意事项**：
 - 第一步执行后，所有权不会立即转移
@@ -291,22 +269,13 @@ export const TESTNET_ADDRESSES: ContractAddresses = {
 - 当前 owner 可以通过向不同地址发起新的转移来取消待处理的转移
 - 新 owner 必须使用在第一步中设置为 `NEW_OWNER_ADDRESS` 的账户
 
-### 状态查询（Normal Staking）
+### 状态查询
 - `npm run query:status:testnet` - 查询合约状态
 - `npm run query:stakes:testnet` - 查询质押信息
 - `npm run query:pending-reward:testnet` - 查询待领取奖励
   - 不提供 `POSITION_ID` 时，会查询用户所有位置的待领取奖励
   - 提供 `POSITION_ID` 时，只查询指定位置的待领取奖励
   - 可通过 `USER_ADDRESS` 环境变量指定查询的用户地址
-
-### 状态查询（Premium Staking）
-- `npm run query:status:premium:testnet` - 查询合约状态
-- `npm run query:stakes:premium:testnet` - 查询质押信息
-- `npm run query:pending-reward:premium:testnet` - 查询待领取奖励
-  - 不提供 `POSITION_ID` 时，会查询用户所有位置的待领取奖励
-  - 提供 `POSITION_ID` 时，只查询指定位置的待领取奖励
-  - 可通过 `USER_ADDRESS` 环境变量指定查询的用户地址
-- `npm run query:check-whitelist:premium:testnet` - 查询白名单配置
 
 ### 紧急操作
 - `npm run emergency-withdraw:testnet` - 紧急提取本金（仅紧急模式）
@@ -315,35 +284,29 @@ export const TESTNET_ADDRESSES: ContractAddresses = {
 
 1. **锁定期**: 固定 365 天
 2. **奖励率**: 
-   - Normal Staking: 8% APY (800 basis points)
-   - Premium Staking: 16% APY (1600 basis points)
+   - Staking: 5% APY (500 basis points)
 3. **最小质押**: 
-   - Normal Staking: 1 HSK（可通过 owner 修改）
-   - Premium Staking: 500,000 HSK（可通过 owner 修改）
+   - Staking: 1 HSK（可通过 owner 修改）
 4. **最大总质押量**: 
-   - Normal Staking: 10,000,000 HSK（可通过 owner 修改，0 表示无限制）
-   - Premium Staking: 20,000,000 HSK（可通过 owner 修改，0 表示无限制）
+   - Staking: 30,000,000 HSK（可通过 owner 修改，0 表示无限制）
 5. **白名单**: 
-   - Normal Staking: 关闭（所有用户可质押）
-   - Premium Staking: 启用（仅白名单用户可质押）
+   - Staking: 关闭（所有用户可质押）
 6. **测试优先**: 先在测试网验证
 
 ## 📊 脚本统计
 
 **当前已实现**: 59 个脚本文件
-- ✅ Normal Staking: 15 个脚本
-- ✅ Premium Staking: 24 个脚本（包含白名单管理）
+- ✅ Staking: 所有操作、配置和查询脚本
 - ✅ 开发脚本: 4 个脚本
 - ✅ 测试脚本: 5 个脚本
 - ✅ 工具脚本: 3 个脚本
 - ✅ 共享模块: 4 个文件
 
-**Normal Staking 脚本包含**：
+**Staking 脚本包含**：
 - 基础操作脚本：9 个（deploy, upgrade, stake, unstake, claim-rewards, add-rewards, emergency-withdraw, withdraw-excess, verify-forge）
 - 配置管理脚本：7 个（pause, unpause, set-start-time, set-end-time, set-min-stake, set-max-total-staked, enable-emergency）
 - 查询脚本：4 个（check-status, check-stakes, pending-reward, position-info）
 
-**Premium Staking 脚本包含**：
 - 基础操作脚本：9 个（deploy, upgrade, stake, unstake, claim-rewards, add-rewards, emergency-withdraw, withdraw-excess, verify-forge）
 - 白名单管理脚本：4 个（add-batch, remove-batch, check-user, toggle-mode）
 - 配置管理脚本：7 个（pause, unpause, set-start-time, set-end-time, set-min-stake, set-max-total-staked, enable-emergency）
@@ -405,11 +368,8 @@ npm run withdraw-excess:testnet
 **Q: 如何设置最大总质押量？**
 最大总质押量是整个产品池的上限，所有用户质押金额总和不能超过此限制：
 ```bash
-# 设置 Normal Staking 最大总质押量为 15,000,000 HSK
+# 设置 Staking 最大总质押量为 15,000,000 HSK
 NEW_MAX_TOTAL_STAKED="15000000" npm run config:set-max-total-staked:testnet
-
-# 设置 Premium Staking 最大总质押量为 25,000,000 HSK
-NEW_MAX_TOTAL_STAKED="25000000" npm run config:set-max-total-staked:premium:testnet
 
 # 移除限制（设置为 0）
 NEW_MAX_TOTAL_STAKED="0" npm run config:set-max-total-staked:testnet
@@ -423,18 +383,15 @@ NEW_MAX_TOTAL_STAKED="0" npm run config:set-max-total-staked:testnet
 **Q: 如何升级合约？**
 升级脚本会自动检测 ProxyAdmin 类型并使用正确的方式执行升级：
 ```bash
-# 升级普通质押合约（自动部署新实现）
+# 升级 Staking 合约（自动部署新实现）
 # 脚本会自动从存储槽读取 ProxyAdmin 地址，无需手动指定
-npm run upgrade:normal:testnet
+npm run upgrade:testnet
 
 # 如果 ProxyAdmin 地址与当前签名者不同，可以手动指定
-PROXY_ADMIN_ADDRESS="0x..." npm run upgrade:normal:testnet
+PROXY_ADMIN_ADDRESS="0x..." npm run upgrade:testnet
 
 # 使用已部署的实现合约升级
-PROXY_ADMIN_ADDRESS="0x..." NEW_IMPLEMENTATION_ADDRESS="0x..." npm run upgrade:normal:testnet
-
-# 升级高级质押合约
-npm run upgrade:premium:testnet
+PROXY_ADMIN_ADDRESS="0x..." NEW_IMPLEMENTATION_ADDRESS="0x..." npm run upgrade:testnet
 ```
 
 **升级脚本特性**：
@@ -491,58 +448,18 @@ npm run tools:generate-types
 npm run tools:compare-contracts HSKStaking
 ```
 
-**Q: 如何使用 Premium Staking 白名单功能？**
-```bash
-# 添加用户到白名单（批量，最多100个）
-WHITELIST_ADDRESSES="0x123...,0x456..." npm run whitelist:add-batch:premium:testnet
-
-# 从白名单移除用户
-WHITELIST_ADDRESSES="0x123...,0x456..." npm run whitelist:remove-batch:premium:testnet
-
-# 查询用户白名单状态
-USER_ADDRESS="0x123..." npm run whitelist:check-user:premium:testnet
-
-# 切换白名单模式（启用/禁用）
-ENABLE="true" npm run whitelist:toggle-mode:premium:testnet
-
-# 查询白名单配置和用户状态
-USER_ADDRESS="0x123...,0x456..." npm run query:check-whitelist:premium:testnet
-```
-
-**Q: Premium Staking 质押时提示不在白名单中？**
-```bash
-# 1. 检查用户是否在白名单中
-USER_ADDRESS="0x..." npm run whitelist:check-user:premium:testnet
-
-# 2. 如果不在，联系管理员添加到白名单
-# 管理员执行：
-WHITELIST_ADDRESSES="0x..." npm run whitelist:add-batch:premium:testnet
-
-# 3. 确认白名单模式已启用
-npm run query:status:premium:testnet
-```
 
 ## 🎯 合约配置
 
-### Normal Staking
+### Staking 配置
 
 | 配置项 | 值 | 说明 |
 |-------|---|------|
 | 最小质押 | 1 HSK | 可通过 owner 修改 |
-| 最大总质押量 | 10,000,000 HSK | 可通过 owner 修改（0 表示无限制） |
-| 年化收益 | 8% | 固定在初始化时设置 |
+| 最大总质押量 | 30,000,000 HSK | 可通过 owner 修改（0 表示无限制） |
+| 年化收益 | 5% | 固定在初始化时设置 |
 | 锁定期 | 365 天 | 合约常量，不可修改 |
 | 白名单 | 关闭 | 所有用户可质押 |
-
-### Premium Staking
-
-| 配置项 | 值 | 说明 |
-|-------|---|------|
-| 最小质押 | 500,000 HSK | 可通过 owner 修改 |
-| 最大总质押量 | 20,000,000 HSK | 可通过 owner 修改（0 表示无限制） |
-| 年化收益 | 16% | 固定在初始化时设置 |
-| 锁定期 | 365 天 | 合约常量，不可修改 |
-| 白名单 | 启用 | 仅白名单用户可质押 |
 
 ## 🔐 管理员操作
 

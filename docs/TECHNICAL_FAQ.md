@@ -14,23 +14,23 @@ This document is for quickly answering common user questions.
 - Unrelated to block production speed, only related to time
 - Can claim accumulated rewards at any time, precise to the second
 
-**Example**: Staking 10,000 HSK, 8% annual yield, can claim approximately 65.75 HSK rewards on day 30 (rewards accumulated over 2,592,000 seconds).
+**Example**: Staking 10,000 HSK, 5% annual yield, can claim approximately 65.75 HSK rewards on day 30 (rewards accumulated over 2,592,000 seconds).
 
 ---
 
-### Q2: What does annual yield rate mean? Does 8% APY for 365 days mean getting 8% returns after 365 days?
+### Q2: What does annual yield rate mean? Does 5% APY for 365 days mean getting 5% returns after 365 days?
 
 **A:** Yes. Annual yield rate is the yield rate calculated on an annual basis.
 
-- **8% APY** means: If staking for full 365 days, returns are 8%
+- **5% APY** means: If staking for full 365 days, returns are 5%
 - Actual returns = Principal × Annual rate × (Actual staking seconds / Seconds in 365 days)
 - If staking time is less than 365 days, returns are calculated proportionally (precise to the second)
 
-**Example 1**: Staking 10,000 HSK, 8% APY, staking for 365 days:
-- Returns = 10,000 × 8% × (365/365) = 800 HSK
+**Example 1**: Staking 10,000 HSK, 5% APY, staking for 365 days:
+- Returns = 10,000 × 5% × (365/365) = 500 HSK
 
-**Example 2**: Staking 10,000 HSK, 8% APY, staking for 365 days, but claiming rewards on day 100:
-- Rewards claimable on day 100 = 10,000 × 8% × (100/365) ≈ 219.18 HSK
+**Example 2**: Staking 10,000 HSK, 5% APY, staking for 365 days, but claiming rewards on day 100:
+- Rewards claimable on day 100 = 10,000 × 5% × (100/365) ≈ 219.18 HSK
 - Principal continues to be locked, continues to generate rewards
 - Note: V2 version does not support unstaking during lock period
 
@@ -54,8 +54,8 @@ This document is for quickly answering common user questions.
 - Time beyond lock period does not generate additional rewards
 - Recommend claiming promptly after lock period ends
 
-**Example**: Choose 365-day lock period, 8% APY, actually staked for 400 days:
-- Rewards still calculated based on 365 days = 10,000 × 8% = 800 HSK
+**Example**: Choose 365-day lock period, 5% APY, actually staked for 400 days:
+- Rewards still calculated based on 365 days = 10,000 × 5% = 500 HSK
 - Extra 35 days do not generate additional rewards
 
 ---
@@ -102,8 +102,7 @@ This document is for quickly answering common user questions.
 ### Q8: What is the minimum staking amount?
 
 **A:** 
-- **Normal Staking**: Starting from 1 HSK
-- **Premium Staking**: Starting from 500,000 HSK
+- **Staking**: Starting from 1 HSK
 
 ---
 
@@ -116,9 +115,9 @@ This document is for quickly answering common user questions.
 - After reaching limit, new users cannot stake, need to wait for users to unstake
 
 **Example**:
-- Normal Staking maximum total staked: 10,000,000 HSK
+- Staking maximum total staked: 30,000,000 HSK
 - If 9,000,000 HSK already staked, new users can stake at most 1,000,000 HSK
-- Premium Staking maximum total staked: 20,000,000 HSK
+-  maximum total staked: 30,000,000 HSK
 
 **Admin Function**:
 - Admin can adjust maximum total staked via `setMaxTotalStaked()` function
@@ -136,12 +135,12 @@ This document is for quickly answering common user questions.
 
 ---
 
-### Q11: Why does Premium Staking require whitelist?
+### Q11: Why does  require whitelist?
 
-**A:** Premium Staking targets whales and institutions, requires approval.
+**A:**  targets whales and institutions, requires approval.
 
 - Need admin to add your address to whitelist
-- Only whitelisted users can participate in Premium Staking
+- Only whitelisted users can participate in 
 - Please contact admin to apply for whitelist
 
 ---
@@ -150,10 +149,18 @@ This document is for quickly answering common user questions.
 
 ### Q12: Can I unstake during lock period?
 
-**A:** Cannot unstake during lock period, can only claim rewards.
+**A:** Cannot unstake normally during lock period, but can request early unstake with penalty.
 
-- **During lock period (within 365 days)**: Can only claim rewards, principal continues to be locked
+- **During lock period (within 365 days)**: 
+  - Can claim rewards
+  - Can request early unstake (incurs 50% penalty)
+  - Cannot unstake normally
 - **After lock period ends (after 365 days)**: Can unstake, withdraw principal + all rewards
+
+**Early Unstake Process**:
+1. Request early unstake during lock period
+2. Wait 7 days
+3. Complete early unstake (receive 50% of rewards, 50% goes to penalty pool)
 
 ---
 
@@ -161,8 +168,8 @@ This document is for quickly answering common user questions.
 
 **A:** HSKStaking uses fixed 365-day lock period.
 
-- Normal Staking: 365 days (fixed, approximately 31,536,000 seconds)
-- Premium Staking: 365 days (fixed, approximately 31,536,000 seconds)
+- Staking: 365 days (fixed, approximately 31,536,000 seconds)
+- : 365 days (fixed, approximately 31,536,000 seconds)
 - V2 version simplified lock period selection, all staking unified to 365 days
 - Lock period is contract constant `LOCK_PERIOD`, cannot be modified after deployment
 
@@ -196,6 +203,10 @@ This document is for quickly answering common user questions.
 - **Can only withdraw principal, giving up all rewards**
 - For emergency situations, not recommended for regular use
 
+**Difference from Early Unstake**:
+- **Early Unstake**: User-initiated, 50% penalty, 7-day waiting period, can be used anytime during lock period
+- **Emergency Withdrawal**: Admin-enabled, 100% penalty (no rewards), no waiting period, only in emergency mode
+
 ---
 
 ## IV. Return Calculation
@@ -212,21 +223,20 @@ Returns = Principal × Annual rate × (Actual staking days / 365 days)
 
 **Example**:
 - Principal: 10,000 HSK
-- Annual rate: 8%
+- Annual rate: 5%
 - Lock period: 365 days
 - Actual staking: 365 days
-- Returns = 10,000 × 8% × (365/365) = 800 HSK
+- Returns = 10,000 × 5% × (365/365) = 500 HSK
 
 ---
 
-### Q18: What's the difference in returns between Normal Staking and Premium Staking?
+### Q18: What's the difference in returns between Staking and ?
 
 **A:** 
 
 | Product | Annual Yield Rate | Minimum Stake | Participation Method |
 |---------|-------------------|---------------|---------------------|
-| Normal Staking | 8% | 1 HSK | Open (no approval required) |
-| Premium Staking | 16% | 500,000 HSK | Whitelist (requires approval) |
+| Staking | 5% | 1 HSK | Open (no approval required) |
 
 ---
 
@@ -240,58 +250,63 @@ Returns = Principal × Annual rate × (Actual staking days / 365 days)
 
 ---
 
-## V. Product Selection
+## V. Early Unstake and Penalty Pool
 
-### Q19: Should I choose Normal Staking or Premium Staking?
+### Q19: What happens to the penalty from early unstake?
 
-**A:** 
+**A:** Penalties go to a penalty pool, which is distributed to users who complete the full staking period.
 
-**Choose Normal Staking if:**
-- Staking amount < 500,000 HSK
-- Want to participate anytime, no approval needed
-- Accept 8% annual returns
-
-**Choose Premium Staking if:**
-- Staking amount ≥ 500,000 HSK
-- Have obtained whitelist qualification
-- Want to earn 16% annual returns
+- Penalty pool accumulates penalties from early unstakes
+- After staking period ends (`stakeEndTime`), admin distributes penalty pool
+- Distribution is proportional based on staked amounts
+- Only users who completed full staking period (via `unstake()`) are eligible
 
 ---
 
-### Q20: Can I participate in both products simultaneously?
+### Q20: Can I claim rewards after requesting early unstake?
 
-**A:** Yes. Both products are completely independent.
+**A:** No. Once early unstake is requested, reward calculation stops at request time.
 
-- Can stake in both products simultaneously
-- Each product calculates rewards independently
-- Do not affect each other
+- Rewards are calculated up to request time only
+- Cannot claim additional rewards after request
+- Must complete early unstake to receive 50% of calculated rewards
+
+---
+
+### Q21: What if I already claimed more than 50% of rewards before requesting early unstake?
+
+**A:** Excess claimed rewards are deducted from principal.
+
+- If claimed rewards > 50% of total calculated rewards, excess is deducted from principal
+- User receives: principal - excess + remaining 50% rewards
+- Example: If claimed 60% and total is 100, user receives principal - 10% + 40% = principal + 30%
 
 ---
 
 ## VI. Technical Questions
 
-### Q21: How do I query my staking information?
+### Q22: How do I query my staking information?
 
 **A:** Query through contract functions.
 
-- Use `userPositions(address, uint256)` to query user's Nth staking position ID (need to iterate through indices)
+- Use `getUserPositionIds(address)` to get all staking position IDs for a user (recommended)
 - Use `positions(positionId)` to query specified position's detailed information
-- Use `pendingReward(positionId)` to query pending rewards
+- Use `pendingReward(positionId)` to query pending rewards (can be called by anyone, no owner restriction)
 - Can query through frontend interface or calling contract functions
-- **Note**: `userPositions` is a public mapping, returns positionId, need to query details through `positions`
+- **Note**: `pendingReward` can be called by anyone - no need to be the position owner
 
 ---
 
-### Q22: Do I need to pay Gas fees for staking?
+### Q23: Do I need to pay Gas fees for staking?
 
 **A:** Yes. All on-chain operations require Gas fees.
 
-- Staking, claiming rewards, unstaking all require Gas fees
+- Staking, claiming rewards, unstaking, early unstake all require Gas fees
 - Gas fees are determined by the network, not charged by the product
 
 ---
 
-### Q23: Can the contract be upgraded? Will it affect my staking?
+### Q24: Can the contract be upgraded? Will it affect my staking?
 
 **A:** Contract uses upgradeable proxy pattern (Transparent Proxy).
 
@@ -316,7 +331,7 @@ Returns = Principal × Annual rate × (Actual staking days / 365 days)
 
 ## VII. Other Questions
 
-### Q24: What is Whale DID?
+### Q25: What is Whale DID?
 
 **A:** Whale DID is a special identity identifier for users staking more than 50,000 HSK.
 
@@ -326,7 +341,7 @@ Returns = Principal × Annual rate × (Actual staking days / 365 days)
 
 ---
 
-### Q25: How do I contact customer service if I encounter problems?
+### Q26: How do I contact customer service if I encounter problems?
 
 **A:** Please contact official customer service or admin.
 
@@ -336,7 +351,7 @@ Returns = Principal × Annual rate × (Actual staking days / 365 days)
 
 ---
 
-### Q26: Are there risks in staking?
+### Q27: Are there risks in staking?
 
 **A:** Staking involves certain risks.
 
@@ -351,15 +366,16 @@ Recommend participating cautiously based on your own risk tolerance.
 
 ## VIII. Quick Reference
 
-### Product Comparison Table
+### Contract Features
 
-| Item | Normal Staking | Premium Staking |
-|------|---------------|----------------|
-| **Annual Yield Rate** | 8% (800 basis points) | 16% (1600 basis points) |
-| **Minimum Stake** | 1 HSK | 500,000 HSK |
-| **Lock Period** | 365 days (fixed, LOCK_PERIOD constant) | 365 days (fixed, LOCK_PERIOD constant) |
-| **Participation Method** | Open (whitelist disabled) | Whitelist (enabled) |
-| **Maximum Total Staked** | 10,000,000 HSK (pool limit) | 20,000,000 HSK (pool limit) |
+| Feature | Description |
+|------|---------------|
+| **Lock Period** | 365 days (fixed, LOCK_PERIOD constant) |
+| **Early Unstake** | Supported with 50% penalty and 7-day waiting period |
+| **Reward Calculation** | Per-second, linear accumulation |
+| **Whitelist** | Optional, configurable at deployment |
+| **Emergency Mode** | Supported |
+| **Penalty Pool** | Distributed to users who complete full staking period |
 
 ### Important Reminders
 
@@ -378,13 +394,13 @@ Recommend participating cautiously based on your own risk tolerance.
 - [Contract Architecture](./CONTRACT_ARCHITECTURE.md) - **Detailed contract architecture (required reading for developers)**
 - [Product Plan Documentation](./PRODUCT_PLANS.md) - **Operations documentation (recommended)**
 - [Product Summary](./PRODUCT_SUMMARY.md) - Quick overview
-- [Dual-Tier Product Documentation](./DUAL_TIER_STAKING.md) - Technical deployment documentation
+- [Single-Tier Product Documentation](./DUAL_TIER_STAKING.md) - Technical deployment documentation
 - [Product Development Documentation](./PRODUCT_PLANS_DEV.md) - Development team documentation
 - [Quick Start Guide](./QUICK_START_DUAL_TIER.md) - Quick deployment guide
 - [Error Handling Guide](./ERROR_HANDLING.md) - Common error handling
 
 ---
 
-**Document Version**: 1.0.0  
+**Document Version**: 2.0.0  
 **Maintainer**: HashKey Technical Team
 

@@ -71,14 +71,14 @@ async function getUserPendingRewards(
       const position = await stakingContract.positions(positionId);
       
       // Query pending rewards
-      // Note: pendingReward requires msg.sender to match position.owner
-      // So must use signer to call
+      // Note: pendingReward can be called by anyone (no owner restriction)
+      // Can use provider (read-only) or signer
       let pendingReward = BigInt(0);
       
-      if (signer && !position.isUnstaked) {
+      if (!position.isUnstaked) {
         try {
-          const stakingWithSigner = stakingContract.connect(signer);
-          pendingReward = await stakingWithSigner.pendingReward(positionId);
+          // Can use provider for read-only queries (no signer needed)
+          pendingReward = await stakingContract.pendingReward(positionId);
         } catch (error) {
           console.error(`Failed to query reward for position ${positionId}:`, error);
         }
@@ -101,16 +101,18 @@ async function getUserPendingRewards(
 // Usage example
 async function example() {
   const provider = new ethers.JsonRpcProvider("YOUR_RPC_URL");
+  // Note: signer is optional - pendingReward can be called by anyone
   const signer = new ethers.Wallet("YOUR_PRIVATE_KEY", provider);
   const userAddress = await signer.getAddress();
   
   const stakingAddress = "0x..."; // Staking contract address
   
+  // Can pass provider only (no signer needed for pendingReward queries)
   const rewards = await getUserPendingRewards(
     stakingAddress,
     userAddress,
-    provider,
-    signer
+    provider
+    // signer is optional - pendingReward can be called by anyone
   );
   
   console.log(`Found ${rewards.length} positions:`);
@@ -125,10 +127,11 @@ async function example() {
 
 ### Important Notes
 
-1. **`pendingReward` function requires `msg.sender` to match `position.owner`**
-   - Even though this is a view function, it checks the caller's address
-   - If addresses don't match, function returns 0 (does not revert)
-   - **Must use signer to call `pendingReward`**, cannot use provider only
+1. **`pendingReward` function can be called by anyone**
+   - No owner restriction - anyone can query pending rewards for any position
+   - Can use provider (read-only) or signer - no signer required
+   - Returns 0 if position is unstaked or contract is in emergency mode
+   - View function, no gas cost for read-only queries
 
 2. **Get User Staking IDs**
    - Use `getUserPositionIds(userAddress)` to directly get all positionIds
@@ -168,6 +171,7 @@ export function useUserStakingPositions(stakingAddress: string) {
   }, [address, stakingAddress]);
   
   // Batch query all positions' pending rewards
+  // Note: pendingReward can be called by anyone, no signer needed
   const { data: rewards, isLoading } = useContractReads({
     contracts: positionIds.map((positionId) => ({
       address: stakingAddress as `0x${string}`,
@@ -186,6 +190,93 @@ export function useUserStakingPositions(stakingAddress: string) {
 }
 ```
 
+### Early Unstake Integration
+
+#### Request Early Unstake
+
+```typescript
+async function requestEarlyUnstake(
+  stakingContract: ethers.Contract,
+  positionId: bigint,
+  signer: ethers.Signer
+): Promise<void> {
+  try {
+    const tx = await stakingContract.connect(signer).requestEarlyUnstake(positionId);
+    await tx.wait();
+    console.log(`Early unstake requested for position ${positionId}`);
+  } catch (error) {
+    console.error("Failed to request early unstake:", error);
+    throw error;
+  }
+}
+```
+
+#### Complete Early Unstake
+
+```typescript
+async function completeEarlyUnstake(
+  stakingContract: ethers.Contract,
+  positionId: bigint,
+  signer: ethers.Signer
+): Promise<void> {
+  try {
+    // Check if waiting period has passed
+    const requestTime = await stakingContract.earlyUnstakeRequestTime(positionId);
+    const EARLY_UNLOCK_PERIOD = 7 * 24 * 60 * 60; // 7 days
+    const currentTime = Math.floor(Date.now() / 1000);
+    
+    if (currentTime < requestTime + EARLY_UNLOCK_PERIOD) {
+      throw new Error("Waiting period not completed");
+    }
+    
+    const tx = await stakingContract.connect(signer).completeEarlyUnstake(positionId);
+    await tx.wait();
+    console.log(`Early unstake completed for position ${positionId}`);
+  } catch (error) {
+    console.error("Failed to complete early unstake:", error);
+    throw error;
+  }
+}
+```
+
+#### Check Early Unstake Status
+
+```typescript
+async function getEarlyUnstakeStatus(
+  stakingContract: ethers.Contract,
+  positionId: bigint
+): Promise<{
+  requested: boolean;
+  requestTime: number | null;
+  canComplete: boolean;
+  remainingTime: number | null;
+}> {
+  const requestTime = await stakingContract.earlyUnstakeRequestTime(positionId);
+  const EARLY_UNLOCK_PERIOD = 7 * 24 * 60 * 60; // 7 days
+  const currentTime = Math.floor(Date.now() / 1000);
+  
+  if (requestTime === 0) {
+    return {
+      requested: false,
+      requestTime: null,
+      canComplete: false,
+      remainingTime: null,
+    };
+  }
+  
+  const unlockTime = requestTime + EARLY_UNLOCK_PERIOD;
+  const canComplete = currentTime >= unlockTime;
+  const remainingTime = canComplete ? 0 : unlockTime - currentTime;
+  
+  return {
+    requested: true,
+    requestTime: Number(requestTime),
+    canComplete,
+    remainingTime: remainingTime > 0 ? remainingTime : null,
+  };
+}
+```
+
 ### Contract Interface Reference
 
 ```solidity
@@ -198,8 +289,20 @@ function calculatePotentialReward(uint256 amount) external view returns (uint256
 // Query position details
 function positions(uint256 positionId) external view returns (Position memory);
 
-// Query pending rewards (requires msg.sender == position.owner)
+// Query pending rewards (returns 0 if emergency mode or position unstaked)
 function pendingReward(uint256 positionId) external view returns (uint256);
+
+// Request early unstake
+function requestEarlyUnstake(uint256 positionId) external;
+
+// Complete early unstake (after 7-day waiting period)
+function completeEarlyUnstake(uint256 positionId) external;
+
+// Query early unstake request time (0 means not requested)
+function earlyUnstakeRequestTime(uint256 positionId) external view returns (uint256);
+
+// Query claimed rewards for a position
+function claimedRewards(uint256 positionId) external view returns (uint256);
 
 // Get next position ID
 function nextPositionId() external view returns (uint256);
@@ -235,9 +338,19 @@ console.log(`Staking 100 HSK, can get approximately ${reward} HSK rewards after 
 
 Backend scripts have implemented similar functionality, can refer to:
 - `scripts/shared/helpers.ts` - `getUserPositionIds` function
-- `scripts/normal/query/pending-reward.ts` - Complete implementation for querying pending rewards
+- `scripts/staking/query/pending-reward.ts` - Complete implementation for querying pending rewards
 
 ---
 
-**Document Version**: 1.0.0  
+### Important Notes for Early Unstake
+
+1. **Reward Calculation**: Once early unstake is requested, rewards stop accumulating and are calculated based on request time, not completion time
+2. **Waiting Period**: Must wait 7 days after request before completing early unstake
+3. **Penalty**: 50% of calculated rewards are forfeited (goes to penalty pool)
+4. **Excess Claims**: If user claimed more than 50% of rewards before requesting early unstake, excess is deducted from principal
+5. **Penalty Pool**: Penalties are distributed to users who complete full staking period (via `unstake()`)
+
+---
+
+**Document Version**: 2.0.0  
 **Maintainer**: HashKey Technical Team

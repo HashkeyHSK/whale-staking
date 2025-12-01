@@ -20,11 +20,13 @@ A decentralized staking contract based on HashKey Layer2 network, supporting fix
 
 ### Core Features
 - **Fixed Lock Period**: Fixed 365-day lock period, simplifying user choices and unified management
+- **Early Unstake**: Supports early unstake with 50% penalty and 7-day waiting period
+- **Penalty Pool**: Penalties from early unstake are distributed to users who complete full staking period
 - **Upgradeable Proxy**: Uses Transparent Proxy pattern, supporting contract upgrades
 - **Whitelist Mechanism**: Supports whitelist mode, can restrict staking to whitelisted users only
 - **Staking Time Control**: Supports setting staking start and end times, flexible control of staking time windows
 - **Reward Pool Management**: Independent reward pool system ensuring security of reward distribution
-- **Fixed Yield Rate**: Fixed annual yield rate (8% or 16%) configured at deployment, clear and explicit
+- **Configurable Yield Rate**: Annual yield rate configured at deployment (in basis points), flexible and explicit
 
 ### Security Features
 - **Reentrancy Attack Protection**: Uses OpenZeppelin's ReentrancyGuard
@@ -45,8 +47,7 @@ contracts/
 │   └── StakingConstants.sol # Staking constants (lock period, precision, etc.)
 ├── interfaces/              # Interface definition directory
 │   └── IStake.sol          # Staking interface definition
-├── NormalStakingProxy.sol   # Normal staking proxy contract (1 HSK, 8% APY)
-└── PremiumStakingProxy.sol  # Premium staking proxy contract (500K HSK, 16% APY)
+└── StakingProxy.sol          # Staking proxy contract
 ```
 
 ### Contract Inheritance
@@ -62,21 +63,19 @@ HSKStaking (Main Implementation Contract)
 └── PausableUpgradeable (Pause Functionality)
 
 Proxy Contract Architecture
-├── NormalStakingProxy (TransparentUpgradeableProxy)
-│   ├── Points to HSKStaking implementation
-│   ├── Minimum stake: 1 HSK
-│   └── Annual yield: 8% (800 basis points)
-└── PremiumStakingProxy (TransparentUpgradeableProxy)
+└── StakingProxy (TransparentUpgradeableProxy)
     ├── Points to HSKStaking implementation
-    ├── Minimum stake: 500,000 HSK
-    └── Annual yield: 16% (1600 basis points)
+    ├── Minimum stake: 1 HSK
+    ├── Annual yield: 5% (500 basis points)
+    └── Max total staked: 30,000,000 HSK
 ```
 
 **Architecture Notes**:
-- Both proxy contracts share the same HSKStaking implementation contract
-- Different product features are configured through different parameters in the `initialize()` function
+- Single staking pool with unified configuration
+- Product features are configured through parameters in the `initialize()` function
 - Fixed lock period of 365 days is defined by `StakingConstants.LOCK_PERIOD`
 - Annual yield rate is set at deployment through the `rewardRate` parameter (basis points: 100% = 10000)
+- Maximum total staked amount is 30,000,000 HSK
 
 ## 🚀 Quick Start
 
@@ -156,13 +155,15 @@ Claim rewards (without unstaking)
 - **Reentrancy Protection**: Uses `nonReentrant` modifier to prevent reentrancy attacks
 
 #### `pendingReward(uint256 positionId) view → uint256 reward`
-Query pending rewards
+Query pending rewards for any position
 - **Parameters**: `positionId` - Staking position ID
 - **Returns**: `reward` - Pending reward amount
 - **Notes**: 
+  - **Anyone can query** - No owner restriction, can query any position's pending reward
   - Returns 0 in emergency mode
-  - Can only query own staking positions
+  - Returns 0 if position is unstaked
   - Rewards accumulate continuously per second, precise to the second
+  - View function, no gas cost for read-only queries
 
 #### `getUserPositionIds(address user) view → uint256[] memory`
 Get all staking position IDs for a user
@@ -179,6 +180,45 @@ Calculate potential reward for a specified amount
 - **Notes**: 
   - Used to preview rewards before staking
   - Calculated based on current reward rate
+
+#### `requestEarlyUnstake(uint256 positionId)`
+Request early unstake for a position
+- **Parameters**: `positionId` - Staking position ID
+- **Requirements**: 
+  - Must be position owner (checked via `validPosition` modifier)
+  - Position not unstaked (`!position.isUnstaked`)
+  - Must be within lock period (`block.timestamp < position.stakedAt + LOCK_PERIOD`)
+  - Early unstake not already requested (`earlyUnstakeRequestTime[positionId] == 0`)
+  - Contract not paused (`whenNotPaused`)
+- **Errors**:
+  - `"Early unstake already requested"` - If position already has an early unstake request
+  - `"Lock period already ended"` - If lock period has ended (should use normal `unstake()`)
+  - `AlreadyUnstaked()` - If position is already unstaked
+- **Effects**: 
+  - Records request time (`earlyUnstakeRequestTime[positionId] = block.timestamp`)
+  - Reward calculation stops at request time
+- **Events**: Emits `EarlyUnstakeRequested` event
+- **Reentrancy Protection**: Uses `nonReentrant` modifier
+
+#### `completeEarlyUnstake(uint256 positionId)`
+Complete early unstake after 7-day waiting period
+- **Parameters**: `positionId` - Staking position ID
+- **Requirements**: 
+  - Must be position owner (checked via `validPosition` modifier)
+  - Position not unstaked (`!position.isUnstaked`)
+  - Early unstake requested (`earlyUnstakeRequestTime[positionId] > 0`)
+  - Waiting period completed (`block.timestamp >= requestTime + 7 days`)
+  - Contract not paused (`whenNotPaused`)
+- **Errors**:
+  - `AlreadyUnstaked()` - If position is already unstaked (cannot complete twice)
+  - `"Early unstake not requested"` - If no early unstake request exists
+  - `"Waiting period not completed"` - If 7-day waiting period has not passed
+- **Withdrawal Amount**: 
+  - Principal (may be reduced if excess rewards claimed)
+  - 50% of calculated rewards (based on request time)
+  - 50% penalty goes to penalty pool
+- **Reentrancy Protection**: Uses `nonReentrant` modifier
+- **Events**: Emits `EarlyUnstakeCompleted` and `PositionUnstaked` events
 
 ### Admin Functions
 
@@ -280,7 +320,7 @@ HSKStaking uses a fixed lock period design:
 | Parameter | Configuration | Notes |
 |-----------|---------------|-------|
 | Lock Period | 365 days | Fixed, cannot be modified |
-| Yield Rate | 8% or 16% | Configured at deployment (Normal/Premium) |
+| Yield Rate | 5% | Configured at deployment |
 
 ### Reward Calculation Notes
 
@@ -289,7 +329,7 @@ HSKStaking uses a fixed lock period design:
 - Rewards are only calculated up to the end of the lock period, even if actual staking time is longer
 
 Example:
-- Fixed 365-day lock period (8% APY)
+- Fixed 365-day lock period (5% APY)
 - Actually staked for 400 days before withdrawal
 - **Important**: Time beyond the lock period does not generate additional rewards, rewards are only calculated up to the end of the lock period
 
@@ -298,11 +338,11 @@ Example:
 V2 version simplified lock period selection:
 - **User-Friendly**: No need to choose lock period, simplifies operation flow
 - **Unified Management**: Fixed 365 days, easy for operations and user understanding
-- **Clear and Explicit**: Different yields provided through different products (Normal/Premium)
+- **Clear and Explicit**: Fixed yield rate of 5% APY
 
 ## 🔓 Unstake Mechanism
 
-### Normal Unstake
+### Unstake (Normal)
 
 **Time Restrictions**:
 - Must wait for lock period to fully end (365 days)
@@ -311,6 +351,7 @@ V2 version simplified lock period selection:
 **Withdrawal Amount**:
 - ✅ Principal + all accrued rewards
 - Rewards calculated based on actual staking time (but not exceeding lock period)
+- Position marked as `isCompletedStake = true` (eligible for penalty pool distribution)
 
 **Example**:
 ```
@@ -320,6 +361,58 @@ Unlock time: 2027-11-01 00:00:00
 
 Can withdraw: After 2027-11-01 00:00:00
 Withdrawal amount: Principal + rewards within 365 days
+```
+
+### Early Unstake
+
+**Process**:
+1. **Request**: User calls `requestEarlyUnstake(positionId)` during lock period
+2. **Waiting Period**: Must wait 7 days after request
+3. **Complete**: After 7 days, call `completeEarlyUnstake(positionId)`
+
+**Penalty**:
+- User receives 50% of calculated rewards (based on request time)
+- 50% penalty goes to penalty pool
+- If user claimed more than 50% before request, excess is deducted from principal
+- Rewards calculated up to request time, not completion time
+
+**Example**:
+```
+Staking time: Day 0
+Request early unstake: Day 60
+Complete early unstake: Day 67 (after 7-day waiting period)
+
+Rewards calculated: Up to Day 60 only
+User receives: 50% of calculated rewards
+Penalty pool: 50% of calculated rewards
+```
+
+**Important Notes**:
+- Reward calculation stops at request time
+- Waiting period (7 days) does not generate additional rewards
+- Early unstake positions are NOT eligible for penalty pool distribution
+
+### Penalty Pool Distribution
+
+**Mechanism**:
+- Penalties from early unstake accumulate in penalty pool
+- After staking period ends (`stakeEndTime`), admin distributes penalty pool
+- Only users who completed full staking period (via `unstake()`) are eligible
+- Distribution is proportional based on staked amounts
+
+**Example**:
+```
+Penalty pool: 1000 HSK
+Completed positions:
+  - Position 1: 1000 HSK
+  - Position 2: 2000 HSK
+  - Position 3: 2000 HSK
+Total: 5000 HSK
+
+Distribution:
+  - Position 1: 1000 * 1000 / 5000 = 200 HSK
+  - Position 2: 1000 * 2000 / 5000 = 400 HSK
+  - Position 3: 1000 * 2000 / 5000 = 400 HSK
 ```
 
 ### Emergency Withdrawal
@@ -339,16 +432,19 @@ Withdrawal amount: Principal + rewards within 365 days
 
 ### Summary Comparison
 
-| Withdrawal Method | Time Restrictions | Withdrawable Amount | Use Case |
-|------------------|-------------------|---------------------|----------|
-| Normal unstake | Lock period ended (365 days) | Principal + rewards | Normal situations |
-| Emergency withdrawal | No restrictions (requires emergency mode) | Principal only | Emergency situations |
+| Withdrawal Method | Time Restrictions | Withdrawable Amount | Penalty | Use Case |
+|------------------|-------------------|---------------------|---------|----------|
+| Unstake | Lock period ended (365 days) | Principal + rewards | None | Standard situations |
+| Early unstake | 7-day waiting period after request | Principal + 50% rewards | 50% penalty | Need early exit |
+| Emergency withdrawal | No restrictions (requires emergency mode) | Principal only | 100% penalty (no rewards) | Emergency situations |
 
 ### Important Notes
 
-1. **Strict Locking**: Must wait for the full 365-day lock period, early withdrawal not supported
-2. **Rewards can be claimed during lock period**: Although unstaking is not allowed, accumulated rewards can be claimed at any time
-3. **Emergency Mode**: Emergency withdrawal function can only be used after admin enables emergency mode
+1. **Normal Unstake**: Must wait for the full 365-day lock period, receives full rewards
+2. **Early Unstake**: Can request during lock period, incurs 50% penalty, eligible for penalty pool distribution
+3. **Rewards can be claimed during lock period**: Although unstaking is not allowed, accumulated rewards can be claimed at any time
+4. **Penalty Pool**: Distributed to users who complete full staking period, proportional to staked amounts
+5. **Emergency Mode**: Emergency withdrawal function can only be used after admin enables emergency mode
 
 ## 💰 Reward Calculation
 
@@ -410,56 +506,33 @@ uint256 totalReward = (amount × annualRate × timeRatio) / (PRECISION × PRECIS
 
 ## 📝 Deployment Guide
 
-### Standard Deployment (Single Product)
+### Deployment
 
 #### Deploy to Testnet
 
 ```bash
-# Deploy Normal Staking (requires timestamps)
+# Deploy Staking contract (requires timestamps)
 STAKE_START_TIME="1735689600" STAKE_END_TIME="1767225600" npm run deploy:testnet
-
-# Deploy Premium Staking
-STAKE_START_TIME="1735689600" STAKE_END_TIME="1767225600" npm run deploy:premium:testnet
 ```
 
 #### Deploy to Mainnet
 
 ```bash
-# Deploy Normal Staking
+# Deploy Staking contract
 STAKE_START_TIME="1735689600" STAKE_END_TIME="1767225600" npm run deploy
-
-# Deploy Premium Staking
-STAKE_START_TIME="1735689600" STAKE_END_TIME="1767225600" npm run deploy:premium
 ```
 
 **Note**: Must provide `STAKE_START_TIME` and `STAKE_END_TIME` environment variables at deployment (Unix timestamp, in seconds).
 
-### Dual-Tier Product Deployment
+#### Product Configuration
 
-Based on the existing contract architecture, two independent product schemes can be deployed:
-
-#### Product Comparison
-
-| Feature | Normal Staking (Delegated Staking) | Premium Staking (Premium Staking) |
-|---------|-----------------------------------|-----------------------------------|
-| Target Users | General users | Whales/Institutions |
-| Minimum Stake | 1 HSK | 500,000 HSK |
-| Annual Yield | 8% | 16% |
-| Whitelist Mode | Disabled (Open) | Enabled (Requires Authorization) |
-
-#### Deployment Method
-
-**Method 1: Deploy Separately**
-
-```bash
-# Deploy Normal Staking
-STAKE_START_TIME="1735689600" STAKE_END_TIME="1767225600" npm run deploy:testnet
-
-# Deploy Premium Staking
-STAKE_START_TIME="1735689600" STAKE_END_TIME="1767225600" npm run deploy:premium:testnet
-```
-
-**Note**: Both products need to be deployed separately, each product has its own proxy contract and configuration.
+| Feature | Staking |
+|---------|---------|
+| Target Users | All users |
+| Minimum Stake | 1 HSK |
+| Annual Yield | 5% |
+| Max Total Staked | 30,000,000 HSK |
+| Whitelist Mode | Disabled (Open) |
 
 #### Post-Deployment Configuration
 
@@ -475,26 +548,14 @@ END_TIME="1767225600" npm run config:set-end-time:testnet
 
 Other configurations:
 
-1. **Add whitelist users for Premium Staking** (Premium Staking has whitelist mode enabled)
-   ```bash
-   # Batch add whitelist (max 100 addresses)
-   WHITELIST_ADDRESSES="0x123...,0x456..." npm run whitelist:add-batch:premium:testnet
-   
-   # Batch remove whitelist
-   WHITELIST_ADDRESSES="0x123...,0x456..." npm run whitelist:remove-batch:premium:testnet
-   ```
 
-2. **Deposit to reward pools** (both products need independent reward pools)
+2. **Deposit to reward pool**
    ```bash
-   # Normal Staking reward pool
+   # Staking reward pool
    REWARD_AMOUNT="10000" npm run rewards:add:testnet
-   
-   # Premium Staking reward pool
-   REWARD_AMOUNT="20000" npm run rewards:add:premium:testnet
    ```
 
 For detailed information, please refer to:
-- [Dual-Tier Product Documentation](./docs/DUAL_TIER_STAKING.md) - Technical deployment documentation
 - [Product Plan Documentation](./docs/PRODUCT_PLANS.md) - **Operations documentation (recommended)**
 - [Product Summary](./docs/PRODUCT_SUMMARY.md) - Quick overview
 - [Technical FAQ](./docs/TECHNICAL_FAQ.md) - Technical mechanism explanations
@@ -505,8 +566,8 @@ For detailed information, please refer to:
 # Verify implementation contract using Foundry (recommended)
 IMPLEMENTATION_ADDRESS="0x..." npm run verify:forge:testnet
 
-# Verify Premium Staking implementation contract
-IMPLEMENTATION_ADDRESS="0x..." npm run verify:forge:premium:testnet
+# Verify Staking implementation contract
+
 ```
 
 ### Upgrade Contracts
@@ -514,17 +575,16 @@ IMPLEMENTATION_ADDRESS="0x..." npm run verify:forge:premium:testnet
 Upgrade scripts automatically detect ProxyAdmin type (contract or EOA) and use the correct method to execute upgrades:
 
 ```bash
-# Upgrade Normal Staking contract (auto-deploy new implementation, auto-detect ProxyAdmin)
-npm run upgrade:normal:testnet
+# Upgrade Staking contract (auto-deploy new implementation, auto-detect ProxyAdmin)
+npm run upgrade:testnet
 
 # If ProxyAdmin address differs from current signer, can manually specify
-PROXY_ADMIN_ADDRESS="0x..." npm run upgrade:normal:testnet
+PROXY_ADMIN_ADDRESS="0x..." npm run upgrade:testnet
 
 # Use already deployed implementation contract for upgrade
-PROXY_ADMIN_ADDRESS="0x..." NEW_IMPLEMENTATION_ADDRESS="0x..." npm run upgrade:normal:testnet
+PROXY_ADMIN_ADDRESS="0x..." NEW_IMPLEMENTATION_ADDRESS="0x..." npm run upgrade:testnet
 
-# Upgrade Premium Staking contract
-npm run upgrade:premium:testnet
+
 ```
 
 **Upgrade Script Features**:
@@ -546,44 +606,36 @@ npm run upgrade:premium:testnet
 
 | Script | Function | npm Command |
 |--------|----------|-------------|
-| `normal/deploy.ts` | Deploy Normal Staking product | `npm run deploy:testnet` |
-| `premium/deploy.ts` | Deploy Premium Staking product | `npm run deploy:premium:testnet` |
-| `normal/stake.ts` | Execute staking (Normal Staking) | `npm run stake:testnet` |
-| `premium/stake.ts` | Execute staking (Premium Staking) | `npm run stake:premium:testnet` |
-| `normal/unstake.ts` | Unstake (Normal Staking) | `npm run unstake:testnet` |
-| `premium/unstake.ts` | Unstake (Premium Staking) | `npm run unstake:premium:testnet` |
-| `normal/claim-rewards.ts` | Claim rewards (Normal Staking) | `npm run claim:testnet` |
-| `premium/claim-rewards.ts` | Claim rewards (Premium Staking) | `npm run claim:premium:testnet` |
-| `normal/upgrade.ts` | Upgrade contract (Normal Staking) | `npm run upgrade:normal:testnet` |
-| `premium/upgrade.ts` | Upgrade contract (Premium Staking) | `npm run upgrade:premium:testnet` |
-| `premium/whitelist/add-batch.ts` | Batch add whitelist | `npm run whitelist:add-batch:premium:testnet` |
-| `premium/whitelist/remove-batch.ts` | Batch remove whitelist | `npm run whitelist:remove-batch:premium:testnet` |
-| `normal/query/check-stakes.ts` | Query user staking status | `npm run query:stakes:testnet` |
-| `premium/query/check-whitelist.ts` | Check whitelist status | `npm run query:check-whitelist:premium:testnet` |
-| `normal/config/set-start-time.ts` | Set staking start time | `npm run config:set-start-time:testnet` |
-| `normal/config/set-end-time.ts` | Set staking end time | `npm run config:set-end-time:testnet` |
-| `normal/config/set-min-stake.ts` | Set minimum staking amount | `npm run config:set-min-stake:testnet` |
-| `normal/config/set-max-total-staked.ts` | Set maximum total staked | `npm run config:set-max-total-staked:testnet` |
-| `normal/add-rewards.ts` | Deposit to reward pool (Normal Staking) | `npm run rewards:add:testnet` |
-| `premium/add-rewards.ts` | Deposit to reward pool (Premium Staking) | `npm run rewards:add:premium:testnet` |
-| `normal/withdraw-excess.ts` | Withdraw excess reward pool funds | `npm run withdraw-excess:testnet` |
-| `premium/withdraw-excess.ts` | Withdraw excess reward pool funds | `npm run withdraw-excess:premium:testnet` |
-| `normal/emergency-withdraw.ts` | Emergency withdraw principal | `npm run emergency-withdraw:testnet` |
-| `normal/config/enable-emergency.ts` | Enable emergency mode | `npm run config:enable-emergency:testnet` |
+| `staking/deploy.ts` | Deploy Staking product | `npm run deploy:testnet` |
+| `` |  | `` |
+| `staking/stake.ts` | Execute staking | `npm run stake:testnet` |
+| `stake.ts` |  | `` |
+| `staking/unstake.ts` | Unstake | `npm run unstake:testnet` |
+| `staking/claim-rewards.ts` | Claim rewards | `npm run claim:testnet` |
+| `staking/request-early-unstake.ts` | Request early unstake | `npm run request-early-unstake:testnet` |
+| `staking/complete-early-unstake.ts` | Complete early unstake | `npm run complete-early-unstake:testnet` |
+| `staking/query/check-stakes.ts` | Query user staking status | `npm run query:stakes:testnet` |
+| `staking/config/set-start-time.ts` | Set staking start time | `npm run config:set-start-time:testnet` |
+| `staking/config/set-end-time.ts` | Set staking end time | `npm run config:set-end-time:testnet` |
+| `staking/config/set-min-stake.ts` | Set minimum staking amount | `npm run config:set-min-stake:testnet` |
+| `staking/config/set-max-total-staked.ts` | Set maximum total staked | `npm run config:set-max-total-staked:testnet` |
+| `staking/add-rewards.ts` | Deposit to reward pool | `npm run rewards:add:testnet` |
+| `staking/withdraw-excess.ts` | Withdraw excess reward pool funds | `npm run withdraw-excess:testnet` |
+| `staking/emergency-withdraw.ts` | Emergency withdraw principal | `npm run emergency-withdraw:testnet` |
+| `staking/config/enable-emergency.ts` | Enable emergency mode | `npm run config:enable-emergency:testnet` |
 
 ### Query Scripts
 
 | Script | Function | npm Command |
 |--------|----------|-------------|
-| `normal/query/check-status.ts` | Query contract status | `npm run query:status:testnet` |
-| `premium/query/check-status.ts` | Query contract status (Premium) | `npm run query:status:premium:testnet` |
-| `normal/query/check-stakes.ts` | Query user staking status | `npm run query:stakes:testnet` |
-| `premium/query/check-stakes.ts` | Query user staking status (Premium) | `npm run query:stakes:premium:testnet` |
-| `normal/query/pending-reward.ts` | Query pending rewards | `npm run query:pending-reward:testnet` |
-| `premium/query/pending-reward.ts` | Query pending rewards (Premium) | `npm run query:pending-reward:premium:testnet` |
-| `normal/query/position-info.ts` | Query position details | `npm run query:position-info:testnet` |
-| `premium/query/position-info.ts` | Query position details (Premium) | `npm run query:position-info:premium:testnet` |
-| `premium/query/check-whitelist.ts` | Check whitelist status | `npm run query:check-whitelist:premium:testnet` |
+| `staking/query/check-status.ts` | Query contract status | `npm run query:status:testnet` |
+| `check-status.ts` |  | `` |
+| `staking/query/check-stakes.ts` | Query user staking status | `npm run query:stakes:testnet` |
+| `check-stakes.ts` |  | `` |
+| `staking/query/pending-reward.ts` | Query pending rewards (for own positions) | `npm run query:pending-reward:testnet` |
+| `staking/query/pending-reward-any-user.ts` | Query pending rewards for any user/position | `npm run query:pending-reward-any-user:testnet` |
+| `staking/query/position-info.ts` | Query position details | `npm run query:position-info:testnet` |
+| `check-whitelist.ts` | Check whitelist status | `` |
 
 ## 🧪 Testing
 
@@ -598,8 +650,8 @@ npm run test
 Run specific test file:
 
 ```bash
-npm test -- test/normal/staking.test.ts
-npm test -- test/premium/whitelist.test.ts
+npm test -- test/staking/staking.test.ts
+npm test -- test/whitelist.test.ts
 ```
 
 Generate test coverage report:
@@ -614,7 +666,7 @@ npm run dev:coverage
 
 ```
 test/
-├── normal/              # Normal Staking unit tests
+├── staking/             # Staking unit tests
 │   ├── deployment.test.ts
 │   ├── staking.test.ts
 │   ├── rewards.test.ts
@@ -623,7 +675,6 @@ test/
 │   ├── config.test.ts
 │   ├── emergency.test.ts
 │   └── edge-cases.test.ts
-├── premium/             # Premium Staking unit tests
 │   ├── deployment.test.ts
 │   ├── staking.test.ts
 │   ├── rewards.test.ts
@@ -634,7 +685,7 @@ test/
 │   ├── edge-cases.test.ts
 │   └── whitelist.test.ts
 ├── e2e/                 # E2E tests
-│   ├── normal-user-journey.test.ts
+│   ├── user-journey.test.ts
 │   └── emergency-scenarios.test.ts
 ├── performance/         # Performance tests
 │   ├── gas-optimization.test.ts
@@ -670,11 +721,13 @@ For detailed testing guide, please refer to: [Testing Guide](./docs/TESTING_GUID
 
 ## 🔍 Contract Version
 
-### Current Version: HSKStaking V2.0.0
+### Current Version: HSKStaking V2.1.0
 
 **Core Features**:
 - **Fixed 365-day lock period**: Simplifies user operations, no need to choose lock period
-- **Dual proxy architecture**: Supports two product schemes through `NormalStakingProxy` and `PremiumStakingProxy`
+- **Early unstake mechanism**: Supports early unstake with 50% penalty and 7-day waiting period
+- **Penalty pool**: Penalties from early unstake distributed to users who complete full staking period
+- **Single proxy architecture**: Single staking pool with unified configuration through `StakingProxy`
 - **Transparent Proxy pattern**: Upgrades controlled by ProxyAdmin, secure and reliable
 - **Unified implementation contract**: `HSKStaking.sol` as common implementation, configured with different products through initialization parameters
 - **Simplified stake() interface**: No need to pass lockPeriod parameter
@@ -683,45 +736,38 @@ For detailed testing guide, please refer to: [Testing Guide](./docs/TESTING_GUID
 **Architecture Advantages**:
 - **Modular design**: Implementation, storage, constants, interfaces separated, clear and maintainable
 - **Reusability**: Same implementation contract supports multiple product instances
-- **Independent upgrades**: Two proxy contracts can be upgraded independently
+- **Independent upgrades**: Proxy contracts can be upgraded independently
 - **Flexible configuration**: Different product features configured through initialization parameters
 
 **Version History**:
 - V1.0.0 (`staking.sol`): Initial version, supported multiple lock period options
-- V2.0.0 (`HSKStaking.sol`): Current version, fixed lock period + dual proxy architecture
+- V2.0.0 (`HSKStaking.sol`): Fixed lock period + single proxy architecture
+- V2.1.0 (`HSKStaking.sol`): Added early unstake mechanism with penalty pool distribution
 
 ## ⚠️ Important Reminders
 
 1. **Staking Time Window**: Contract supports setting staking start and end times. Must provide `STAKE_START_TIME` and `STAKE_END_TIME` environment variables at deployment (Unix timestamp, in seconds). Admin can adjust via `setStakeStartTime` and `setStakeEndTime` functions
 2. **Reward Calculation Limit**: Rewards are only calculated up to the end of lock period, extra staking time does not increase rewards
-3. **Whitelist Mode**: Contract supports whitelist mode, can be configured at deployment. In dual-tier product scheme, Normal Staking has whitelist disabled (open), Premium Staking has whitelist enabled (requires approval)
-4. **Minimum Staking Amount**: Can be configured at product deployment (Normal Staking configured as 1 HSK, Premium Staking configured as 500,000 HSK), can be modified after deployment via `setMinStakeAmount`
-5. **Maximum Total Staked**: Can be configured at product deployment (Normal Staking configured as 10,000,000 HSK, Premium Staking configured as 20,000,000 HSK), can be modified after deployment via `setMaxTotalStaked`. Sets the upper limit for the entire product pool, total staking amount of all users cannot exceed this limit
+3. **Whitelist Mode**: Contract supports whitelist mode, can be configured at deployment. Current configuration has whitelist disabled (open to all users)
+4. **Minimum Staking Amount**: Configured as 1 HSK at deployment, can be modified after deployment via `setMinStakeAmount`
+5. **Maximum Total Staked**: Configured as 30,000,000 HSK at deployment, can be modified after deployment via `setMaxTotalStaked`. Sets the upper limit for the entire staking pool, total staking amount of all users cannot exceed this limit
 6. **Reward Pool**: Ensure reward pool has sufficient funds, otherwise new staking may fail. Contract checks if reward pool balance is sufficient to pay all pending rewards
 7. **Reward Pool Withdrawal**: Admin can withdraw excess reward pool funds via `withdrawExcessRewardPool` (amount exceeding totalPendingRewards)
+8. **Early Unstake**: Users can request early unstake during lock period, but must wait 7 days and incur 50% penalty. Penalties go to penalty pool, distributed to users who complete full staking period
+9. **Penalty Pool Distribution**: Admin distributes penalty pool after staking period ends (`stakeEndTime`), only to users who completed full staking period (via `unstake()`)
 
-### Dual-Tier Product Configuration
+### Product Configuration
 
-Based on existing contracts, two independent product schemes can be deployed:
-
-- **Normal Staking (Delegated Staking)**:
+- **Staking**:
   - Minimum stake: 1 HSK
-  - Annual yield: 8%
+  - Annual yield: 5%
   - Lock period: 365 days
   - Whitelist: Disabled (Open)
-  - Maximum total staked: 10,000,000 HSK (pool limit)
-
-- **Premium Staking (Premium Staking)**:
-  - Minimum stake: 500,000 HSK (may be configured as 100 HSK in test environment)
-  - Annual yield: 16%
-  - Lock period: 365 days
-  - Whitelist: Enabled (Requires Approval)
-  - Maximum total staked: 20,000,000 HSK (pool limit)
+  - Maximum total staked: 30,000,000 HSK (pool limit)
 
 For detailed product plans, please refer to:
 - [Product Plan Documentation](./docs/PRODUCT_PLANS.md) - **Operations documentation (recommended)**
 - [Product Summary](./docs/PRODUCT_SUMMARY.md) - Quick overview
-- [Dual-Tier Product Documentation](./docs/DUAL_TIER_STAKING.md) - Technical deployment documentation
 - [Product Development Documentation](./docs/PRODUCT_PLANS_DEV.md) - Development team documentation
 
 ## 📄 License
@@ -744,15 +790,14 @@ MIT License
 - [Product Summary](./docs/PRODUCT_SUMMARY.md) - Quick product overview
 
 ### Deployment and Development
-- [Dual-Tier Product Documentation](./docs/DUAL_TIER_STAKING.md) - Technical deployment documentation
 - [Product Development Documentation](./docs/PRODUCT_PLANS_DEV.md) - Development team documentation
-- [Quick Start Guide](./docs/QUICK_START_DUAL_TIER.md) - Quick deployment guide
 
 ### Reference Documentation
 - [Technical FAQ](./docs/TECHNICAL_FAQ.md) - Technical mechanism explanations
 - [Error Handling Guide](./docs/ERROR_HANDLING.md) - Common error handling
+- [Early Unstake Changelog](./docs/EARLY_UNSTAKE_CHANGELOG.md) - Early unstake feature details
 
 ---
 
-**Document Version**: 1.0.0  
+**Document Version**: 2.0.0  
 **Maintainer**: HashKey Technical Team

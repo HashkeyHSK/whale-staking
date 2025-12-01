@@ -20,20 +20,20 @@ async function main() {
     await fundAccount(fixture.user2, parseEther("1000"));
     printSuccess("✅ Test environment setup complete");
     
-    console.log("\n2. Testing Normal Staking...");
+    console.log("\n2. Testing Staking...");
     
-    // Test normal staking
+    // Test staking
     const stakeAmount = parseEther("10");
-    const tx1 = await fixture.normalStaking.connect(fixture.user1).stake({
+    const tx1 = await fixture.staking.connect(fixture.user1).stake({
       value: stakeAmount,
     });
     await expectSuccess(tx1.wait());
-    printSuccess("✅ Normal staking successful");
+    printSuccess("✅ Staking successful");
     
     // Verify position created
-    const nextId = await fixture.normalStaking.nextPositionId();
+    const nextId = await fixture.staking.nextPositionId();
     const positionId = nextId - BigInt(1);
-    const position = await fixture.normalStaking.positions(positionId);
+    const position = await fixture.staking.positions(positionId);
     expectBigIntEqual(position.amount, stakeAmount, "Position amount should match");
     printSuccess("✅ Position created correctly");
     
@@ -41,7 +41,7 @@ async function main() {
     console.log("\n3. Testing reward accumulation...");
     await advanceTime(30 * 24 * 60 * 60); // 30 days
     
-    const pendingReward = await fixture.normalStaking.pendingReward(positionId);
+    const pendingReward = await fixture.staking.pendingReward(positionId);
     if (pendingReward <= BigInt(0)) {
       throw new Error("Pending reward should be greater than 0 after 30 days");
     }
@@ -50,7 +50,7 @@ async function main() {
     
     // Test claiming rewards
     console.log("\n4. Testing claim rewards...");
-    const tx2 = await fixture.normalStaking.connect(fixture.user1).claimReward(positionId);
+    const tx2 = await fixture.staking.connect(fixture.user1).claimReward(positionId);
     await expectSuccess(tx2.wait());
     printSuccess("✅ Rewards claimed successfully");
     
@@ -58,12 +58,12 @@ async function main() {
     console.log("\n5. Testing unstaking...");
     await advanceTime(335 * 24 * 60 * 60); // Remaining days to reach 365 days total
     
-    const tx3 = await fixture.normalStaking.connect(fixture.user1).unstake(positionId);
+    const tx3 = await fixture.staking.connect(fixture.user1).unstake(positionId);
     await expectSuccess(tx3.wait());
     printSuccess("✅ Unstaking successful");
     
     // Verify position is unstaked
-    const updatedPosition = await fixture.normalStaking.positions(positionId);
+    const updatedPosition = await fixture.staking.positions(positionId);
     if (!updatedPosition.isUnstaked) {
       throw new Error("Position should be marked as unstaked");
     }

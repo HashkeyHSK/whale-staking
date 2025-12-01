@@ -9,6 +9,7 @@ interface IStaking {
         uint256 stakedAt;        // Timestamp when staked
         uint256 lastRewardAt;    // Last reward claim timestamp
         bool isUnstaked;         // Whether position is unstaked
+        bool isCompletedStake;   // Whether position completed full staking period (via unstake)
     }
 
     function stake() external payable returns (uint256 positionId);
@@ -22,6 +23,10 @@ interface IStaking {
     function getUserPositionIds(address user) external view returns (uint256[] memory);
 
     function calculatePotentialReward(uint256 amount) external view returns (uint256);
+
+    function requestEarlyUnstake(uint256 positionId) external;
+
+    function completeEarlyUnstake(uint256 positionId) external;
 
     event PositionCreated(
         address indexed user,
@@ -53,6 +58,21 @@ interface IStaking {
         address indexed user,
         uint256 indexed positionId,
         uint256 amount,
+        uint256 timestamp
+    );
+
+    event EarlyUnstakeRequested(
+        address indexed user,
+        uint256 indexed positionId,
+        uint256 timestamp
+    );
+
+    event EarlyUnstakeCompleted(
+        address indexed user,
+        uint256 indexed positionId,
+        uint256 principal,
+        uint256 reward,
+        uint256 penalty,
         uint256 timestamp
     );
 }

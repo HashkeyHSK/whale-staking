@@ -8,7 +8,7 @@ import {
 import { getEthers } from "../helpers/test-utils.js";
 import { parseEther } from "../helpers/test-utils.js";
 
-describe("Normal Staking - Gas Optimization", () => {
+describe("Staking - Gas Optimization", () => {
   let fixture: Awaited<ReturnType<typeof createTestFixture>>;
 
   before(async () => {
