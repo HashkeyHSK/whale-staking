@@ -203,7 +203,7 @@ contract HSKStaking is
         if (emergencyMode) return 0;
         
         Position memory position = positions[positionId];
-        return _calculatePendingReward(position);
+        return _calculatePendingReward(position, positionId);
     }
 
     function getUserPositionIds(address user) external view returns (uint256[] memory) {
@@ -463,13 +463,22 @@ contract HSKStaking is
 
     // ==================== INTERNAL FUNCTIONS ====================
 
-    function _calculateTimeElapsed(Position memory position) 
+    function _calculateTimeElapsed(Position memory position, uint256 positionId) 
         internal 
         view 
         returns (uint256) 
     {
         uint256 lockEndTime = position.stakedAt + LOCK_PERIOD;
-        uint256 endTime = block.timestamp < lockEndTime ? block.timestamp : lockEndTime;
+        
+        // If early unstake has been requested, stop calculating rewards at request time
+        uint256 requestTime = earlyUnstakeRequestTime[positionId];
+        uint256 endTime;
+        if (requestTime > 0) {
+            // Rewards stop accumulating from the moment of early unstake request
+            endTime = requestTime < lockEndTime ? requestTime : lockEndTime;
+        } else {
+            endTime = block.timestamp < lockEndTime ? block.timestamp : lockEndTime;
+        }
         
         return endTime > position.lastRewardAt ? endTime - position.lastRewardAt : 0;
     }
@@ -499,7 +508,7 @@ contract HSKStaking is
         Position storage position = positions[positionId];
         if (position.isUnstaked) return 0;
 
-        uint256 timeElapsed = _calculateTimeElapsed(position);
+        uint256 timeElapsed = _calculateTimeElapsed(position, positionId);
 
         reward = _calculateReward(
             position.amount, 
@@ -517,16 +526,24 @@ contract HSKStaking is
 
         // Update lastRewardAt
         uint256 lockEndTime = position.stakedAt + LOCK_PERIOD;
+        uint256 requestTime = earlyUnstakeRequestTime[positionId];
         uint256 currentTime = block.timestamp;
-        position.lastRewardAt = currentTime > lockEndTime ? lockEndTime : currentTime;
+        
+        if (requestTime > 0) {
+            // Stop at request time if early unstake was requested
+            position.lastRewardAt = requestTime < lockEndTime ? requestTime : lockEndTime;
+        } else {
+            position.lastRewardAt = currentTime > lockEndTime ? lockEndTime : currentTime;
+        }
     }
 
     function _calculatePendingReward(
-        Position memory position
+        Position memory position,
+        uint256 positionId
     ) internal view returns (uint256) {
         if (position.isUnstaked) return 0;
         
-        uint256 timeElapsed = _calculateTimeElapsed(position);
+        uint256 timeElapsed = _calculateTimeElapsed(position, positionId);
 
         return _calculateReward(
             position.amount,

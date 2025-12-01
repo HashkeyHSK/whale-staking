@@ -35,6 +35,8 @@
     "verify:impl:testnet": "hardhat run scripts/staking/verify-implementation.ts --network hashkeyTestnet",
     "verify:forge": "hardhat run scripts/staking/verify-forge.ts --network hashkeyMainnet",
     "verify:forge:testnet": "hardhat run scripts/staking/verify-forge.ts --network hashkeyTestnet",
+    "verify:penalty-pool": "hardhat run scripts/staking/verify-penalty-pool.ts --network hashkeyMainnet",
+    "verify:penalty-pool:testnet": "hardhat run scripts/staking/verify-penalty-pool.ts --network hashkeyTestnet",
     "// === Staking Operations ===": "",
     "stake": "hardhat run scripts/staking/stake.ts --network hashkeyMainnet",
     "stake:testnet": "hardhat run scripts/staking/stake.ts --network hashkeyTestnet",
