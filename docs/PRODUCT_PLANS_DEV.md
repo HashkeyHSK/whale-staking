@@ -9,12 +9,11 @@
 
 ### 1.1 Product Plan
 
-This plan is based on the `HSKStaking` contract, implementing two products by deploying two independent proxy contracts (`StakingProxy` and ``):
+This plan is based on the `HSKStaking` contract, implementing a single staking pool:
 
-| Product | Contract Instance | Target Users | Minimum Stake | Annual Yield | Whitelist |
-|---------|------------------|--------------|---------------|--------------|-----------|
-| Staking | Independent Instance A | General users | 1 HSK | 5% | Disabled |
-|  | Independent Instance B | Whales/Institutions | 500,000 HSK | 16% | Enabled |
+| Product | Contract Instance | Target Users | Minimum Stake | Base Annual Yield | Total Expected APY | Whitelist |
+|---------|------------------|--------------|---------------|-------------------|-------------------|-----------|
+| HSK Staking | Single Instance | All users | 1 HSK | 5% | Up to 8% | Disabled by default |
 
 ### 1.2 Technology Stack
 
@@ -41,43 +40,31 @@ HSKStaking (Main Implementation Contract)
 #### Proxy Contract Layer
 ```
 Proxy Contract Architecture
-├── StakingProxy (TransparentUpgradeableProxy)
-│   └── Points to HSKStaking Implementation
-└──  (TransparentUpgradeableProxy)
+└── StakingProxy (TransparentUpgradeableProxy)
     └── Points to HSKStaking Implementation
 ```
 
 **Architecture Notes**:
 - Uses Transparent Proxy pattern, upgrades controlled by ProxyAdmin
-- Both proxy contracts share the same `HSKStaking` implementation
-- Different product characteristics configured through initialization parameters
-- Both proxy contracts can be upgraded independently
+- Single proxy contract uses `HSKStaking` implementation
+- Product characteristics configured through initialization parameters
+- Proxy contract can be upgraded independently
 
 ---
 
 ## II. Product Configuration Parameters
 
-### 2.1 Staking Configuration
+### 2.1 Product Configuration
 
 | Parameter | Value | Contract Function |
 |-----------|-------|-------------------|
-| `minStakeAmount` | 1000 HSK (1000e18) | `setMinStakeAmount(1000e18)` |
+| `minStakeAmount` | 1 HSK (1e18) | `setMinStakeAmount(1e18)` |
 | `LOCK_PERIOD` | 365 days (31,536,000 seconds) | Fixed constant, set at deployment |
 | `rewardRate` | 5% (500 basis points) | Set via initialize() at deployment |
 | `stakeStartTime` | 7 days after deployment | `setStakeStartTime(timestamp)` |
-| `stakeEndTime` | `type(uint256).max` | `setStakeEndTime(timestamp)` |
-| `onlyWhitelistCanStake` | `false` | `setWhitelistOnlyMode(false)` |
-
-### 2.2  Configuration
-
-| Parameter | Value | Contract Function |
-|-----------|-------|-------------------|
-| `minStakeAmount` | 500,000 HSK (5e23) | `setMinStakeAmount(500000e18)` |
-| `LOCK_PERIOD` | 365 days (31,536,000 seconds) | Fixed constant, set at deployment |
-| `rewardRate` | 16% (1600 basis points) | Set via initialize() at deployment |
-| `stakeStartTime` | 7 days after deployment | `setStakeStartTime(timestamp)` |
-| `stakeEndTime` | `type(uint256).max` | `setStakeEndTime(timestamp)` |
-| `onlyWhitelistCanStake` | `true` | `setWhitelistOnlyMode(true)` |
+| `stakeEndTime` | Approximately 7 days after start | `setStakeEndTime(timestamp)` |
+| `onlyWhitelistCanStake` | `false` (default) | `setWhitelistOnlyMode(false)` |
+| `maxTotalStaked` | 30,000,000 HSK (30M * 10^18) | Set via initialize() at deployment |
 
 ### 2.3 Key Data Structures
 
@@ -141,12 +128,12 @@ STAKE_START_TIME="<timestamp>" STAKE_END_TIME="<timestamp>" npx hardhat run /dep
 - [ ] Verify `onlyWhitelistCanStake` = false
 - [ ] Deposit to reward pool (via `updateRewardPool()`)
 
-#### 
-- [ ] Verify `minStakeAmount` = 500,000 HSK
-- [ ] Verify `rewardRate` = 1600 (16% APY)
+#### Product Configuration Verification
+- [ ] Verify `minStakeAmount` = 1 HSK
+- [ ] Verify `rewardRate` = 500 (5% APY)
 - [ ] Verify `LOCK_PERIOD` = 365 days (fixed)
-- [ ] Verify `onlyWhitelistCanStake` = true
-- [ ] Add whitelist users (via `updateWhitelistBatch()`)
+- [ ] Verify `onlyWhitelistCanStake` = false (disabled by default)
+- [ ] Verify `maxTotalStaked` = 30,000,000 HSK
 - [ ] Deposit to reward pool (via `updateRewardPool()`)
 
 ### 3.3 Deployment Verification Scripts
@@ -396,7 +383,7 @@ uint256 totalReward = (amount × annualRate × timeRatio) / (PRECISION × PRECIS
 - Actual staking: 365 days
 - Reward = 10,000 × 0.08 × (365/365) = 500 HSK
 
-** (16% APY, 365-day lock period)**:
+** (5% APY, 365-day lock period)**:
 - Stake: 1,000,000 HSK
 - Lock period: 365 days
 - Actual staking: 365 days

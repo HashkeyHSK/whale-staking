@@ -2,7 +2,7 @@
 
 ## 📋 目标
 
-为 Whale Staking 项目编写完整的测试用例，覆盖 Staking 和  的所有功能，确保合约的安全性和正确性。
+为 HSK Staking 项目编写完整的测试用例，覆盖单一质押池的所有功能，确保合约的安全性和正确性。
 
 ## ⚠️ 重要说明 - 合约架构
 
@@ -13,10 +13,10 @@
    - `StakingStorage.sol` - 存储层（继承 Initializable、Ownable2StepUpgradeable）
    - `StakingConstants.sol` - 常量定义合约（LOCK_PERIOD = 365 days）
    - `IStake.sol` - 接口定义
-   - `StakingProxy.sol` / `.sol` - 代理合约（Transparent Proxy）
+   - `StakingProxy.sol` - 代理合约（Transparent Proxy）
 
 2. **代理模式**: Transparent Proxy（使用 OpenZeppelin 的 `TransparentUpgradeableProxy`）
-   - 可独立升级 Normal 和 Premium 质押池
+   - 单一代理合约用于质押池
    - ProxyAdmin 用于管理代理合约升级
 
 3. **原生代币**: HSK 是链的原生代币（native token），类似于 ETH，不是 ERC20 代币
@@ -26,8 +26,8 @@
 4. **锁定期**: 固定 365 天（`LOCK_PERIOD = 365 days`），在合约常量中定义，不可动态修改
 
 5. **奖励率**: 在合约级别配置（`rewardRate` 状态变量），所有 position 共享同一个奖励率
-   - Staking: 500 basis points (5% APY)
-   - : 1600 basis points (16% APY)
+   - HSK Staking: 500 basis points (5% 基础 APY)
+   - 总预期年化：Up to 8%（前端展示，包含忠诚度补贴 1%-3%）
    - `BASIS_POINTS = 10000` (100% = 10000)
 
 6. **Position 结构**: 
@@ -40,8 +40,8 @@
    - ⚠️ **注意**: Position 中不包含 `lockPeriod` 和 `rewardRate`，这些是合约级别的配置
 
 7. **白名单模式**:
-   - Staking: 白名单模式关闭（`onlyWhitelistCanStake = false`）
-   - : 白名单模式启用（`onlyWhitelistCanStake = true`）
+   - HSK Staking: 白名单模式默认禁用（`onlyWhitelistCanStake = false`）
+   - 管理员可以按需启用白名单模式
 
 ### 关键合约函数
 
@@ -111,11 +111,11 @@
 
 **参数说明**：
 - `_minStakeAmount`: 最小质押金额（wei 单位）
-  - Staking: 1 HSK = `1e18` wei
-  - : 500,000 HSK = `500000e18` wei
+  - HSK Staking: 1 HSK = `1e18` wei
 - `_rewardRate`: 年化收益率（basis points）
-  - Staking: 500 (5% APY)
-  - : 1600 (16% APY)
+  - HSK Staking: 500 (5% 基础 APY)
+- `_maxTotalStaked`: 最大总质押量
+  - HSK Staking: 30,000,000 HSK = `30000000e18` wei
 - `_stakeStartTime`: 质押开始时间（Unix 时间戳）
 - `_stakeEndTime`: 质押结束时间（Unix 时间戳）
 - `_whitelistMode`: 白名单模式
@@ -128,7 +128,7 @@
 
 ```
 test/
-├── normal/                      # Staking 单元测试（✅ 已完成）
+├── staking/                     # HSK Staking 单元测试（✅ 已完成）
 │   ├── deployment.test.ts       # 部署测试
 │   ├── staking.test.ts          # 质押功能测试
 │   ├── rewards.test.ts          # 奖励功能测试
@@ -138,7 +138,7 @@ test/
 │   ├── emergency.test.ts        # 紧急提取功能测试
 │   └── edge-cases.test.ts       # 边界条件和错误处理测试
 ├── e2e/                         # E2E 测试（✅ 已完成）
-│   ├── normal-user-journey.test.ts      # Staking E2E 测试
+│   ├── normal-user-journey.test.ts      # HSK Staking E2E 测试
 │   └── emergency-scenarios.test.ts      # 紧急场景测试
 ├── performance/                 # 性能测试（✅ 已完成）
 │   ├── gas-optimization.test.ts         # Gas 优化测试
@@ -323,8 +323,8 @@ scripts/test/                    # 集成测试脚本（✅ 已完成）
 | 测试用例 | 状态 | 说明 |
 |---------|------|------|
 | 应该正确部署  合约 | ⏳ 待实现 | 验证合约部署成功 |
-| 应该正确初始化合约参数 | ⏳ 待实现 | 验证 minStakeAmount = 500,000 HSK, rewardRate = 16% |
-| 应该正确设置白名单模式为启用 | ⏳ 待实现 | 验证 onlyWhitelistCanStake = true |
+| 应该正确初始化合约参数 | ⏳ 待实现 | 验证 minStakeAmount = 1 HSK, rewardRate = 5% |
+| 应该正确设置白名单模式（默认禁用） | ⏳ 待实现 | 验证 onlyWhitelistCanStake = false（默认） |
 | 应该正确设置质押时间窗口 | ⏳ 待实现 | 验证 stakeStartTime 和 stakeEndTime |
 | 应该正确初始化状态变量 | ⏳ 待实现 | 验证 totalStaked = 0, nextPositionId = 0 |
 | 应该拒绝无效的初始化参数 | ⏳ 待实现 | 测试 endTime < startTime 等情况 |
@@ -353,7 +353,7 @@ scripts/test/                    # 集成测试脚本（✅ 已完成）
 |---------|------|------|
 | 白名单用户应该能够成功质押 | ⏳ 待实现 | 验证白名单用户质押成功 |
 | 应该拒绝非白名单用户的质押 | ⏳ 待实现 | 测试非白名单用户质押失败 |
-| 应该拒绝低于最小金额的质押 | ⏳ 待实现 | 测试质押金额 < 500,000 HSK |
+| 应该拒绝低于最小金额的质押 | ⏳ 待实现 | 测试质押金额 < 1 HSK |
 | 应该拒绝质押时间窗口外的质押 | ⏳ 待实现 | 测试在 startTime 之前和 endTime 之后 |
 | 应该正确创建 Position | ⏳ 待实现 | 验证 position 的所有字段正确 |
 | 应该正确更新 totalStaked | ⏳ 待实现 | 验证 totalStaked 增加 |
@@ -366,7 +366,7 @@ scripts/test/                    # 集成测试脚本（✅ 已完成）
 
 | 测试用例 | 状态 | 说明 |
 |---------|------|------|
-| 应该正确计算待领取奖励（16% APY） | ⏳ 待实现 | 验证 pendingReward 计算正确 |
+| 应该正确计算待领取奖励（5% APY） | ⏳ 待实现 | 验证 pendingReward 计算正确 |
 | 应该按时间累积奖励 | ⏳ 待实现 | 测试时间推进后奖励增加 |
 | 应该正确领取奖励 | ⏳ 待实现 | 验证 claimReward 成功 |
 | 应该正确更新 lastRewardAt 时间戳 | ⏳ 待实现 | 验证领取后时间戳更新 |
@@ -415,15 +415,15 @@ scripts/test/                    # 集成测试脚本（✅ 已完成）
 
 | 测试文件 | 状态 | 说明 |
 |---------|------|------|
-| `scripts/test/integration/deploy-test.ts` | ✅ 已完成 | 部署集成测试（Normal + Premium） |
-| `scripts/test/integration/stake-test.ts` | ✅ 已完成 | 质押操作集成测试（Staking） |
-| `scripts/test/integration/whitelist-test.ts` | ✅ 已完成 | 白名单功能集成测试（） |
+| `scripts/test/integration/deploy-test.ts` | ✅ 已完成 | 部署集成测试 |
+| `scripts/test/integration/stake-test.ts` | ✅ 已完成 | 质押操作集成测试 |
+| `scripts/test/integration/whitelist-test.ts` | ✅ 已完成 | 白名单功能集成测试（如启用） |
 
 ---
 
 ### E2E 测试（✅ 已完成）
 
-#### 1. Staking E2E 测试 (`test/e2e/normal-user-journey.test.ts`) ✅
+#### 1. HSK Staking E2E 测试 (`test/e2e/normal-user-journey.test.ts`) ✅
 
 | 测试用例 | 状态 | 说明 |
 |---------|------|------|
@@ -431,13 +431,13 @@ scripts/test/                    # 集成测试脚本（✅ 已完成）
 | 多用户并发场景 | ✅ 已完成 | 测试多个用户同时操作（使用事件验证和容错处理） |
 | 长时间运行场景 | ✅ 已完成 | 测试长时间运行后的状态（使用事件验证和容错处理） |
 
-#### 2.  E2E 测试 (`test/e2e/premium-user-journey.test.ts`)
+#### 2. 提前解除质押 E2E 测试 (`test/e2e/early-unstake-journey.test.ts`)
 
 | 测试用例 | 状态 | 说明 |
 |---------|------|------|
-| 完整用户旅程：部署 -> 添加白名单 -> 质押 -> 领取奖励 -> 解除质押 | ⏳ 待实现 | 测试完整的用户流程 |
-| 白名单管理流程 | ⏳ 待实现 | 测试白名单添加、移除、切换模式 |
-| 多白名单用户并发场景 | ⏳ 待实现 | 测试多个白名单用户同时操作 |
+| 完整提前解除质押旅程：申请 -> 等待 -> 完成 | ⏳ 待实现 | 测试完整的提前解除质押流程 |
+| 罚金计算验证 | ⏳ 待实现 | 测试 50% 罚金计算 |
+| 等待期强制执行 | ⏳ 待实现 | 测试 7 天等待期 |
 
 #### 3. 紧急场景测试 (`test/e2e/emergency-scenarios.test.ts`) ✅
 
@@ -504,7 +504,7 @@ scripts/test/                    # 集成测试脚本（✅ 已完成）
 
 ```
 test/
-├── normal/                      # Staking 单元测试
+├── staking/                     # HSK Staking 单元测试
 │   ├── deployment.test.ts
 │   ├── staking.test.ts
 │   ├── rewards.test.ts
@@ -513,17 +513,14 @@ test/
 │   ├── config.test.ts
 │   ├── emergency.test.ts
 │   └── edge-cases.test.ts
-├── premium/                     #  单元测试
-│   ├── deployment.test.ts
-│   ├── whitelist.test.ts
-│   ├── staking.test.ts
-│   ├── rewards.test.ts
-│   ├── unstaking.test.ts
-│   ├── config.test.ts
-│   └── emergency.test.ts
+├── early-unstake/               # 提前解除质押单元测试
+│   ├── request.test.ts
+│   ├── complete.test.ts
+│   ├── penalty.test.ts
+│   └── waiting-period.test.ts
 ├── e2e/                         # E2E 测试
 │   ├── normal-user-journey.test.ts
-│   ├── premium-user-journey.test.ts
+│   ├── early-unstake-journey.test.ts
 │   └── emergency-scenarios.test.ts
 ├── performance/                 # 性能测试
 │   ├── gas-optimization.test.ts
@@ -600,7 +597,7 @@ test/
    - 测试白名单模式关闭后的质押
 
 4. **奖励功能测试** (`/rewards.test.ts`)
-   - 测试 16% APY 的奖励计算
+   - 测试 5% 基础 APY 的奖励计算
    - 测试奖励累积和领取
 
 5. **解除质押功能测试** (`/unstaking.test.ts`)
@@ -616,13 +613,13 @@ test/
 
 ### 第四步：实现 E2E 测试（⏳ 待实现）
 
-1. **Staking E2E 测试** (`test/e2e/normal-user-journey.test.ts`)
+1. **HSK Staking E2E 测试** (`test/e2e/normal-user-journey.test.ts`)
    - 完整用户旅程测试
    - 多用户并发场景
 
-2. ** E2E 测试** (`test/e2e/premium-user-journey.test.ts`)
-   - 完整用户旅程测试（包含白名单管理）
-   - 白名单管理流程
+2. **提前解除质押 E2E 测试** (`test/e2e/early-unstake-journey.test.ts`)
+   - 完整提前解除质押旅程测试
+   - 罚金计算和等待期测试
 
 3. **紧急场景测试** (`test/e2e/emergency-scenarios.test.ts`)
    - 紧急模式流程
@@ -689,7 +686,7 @@ mkdir -p test/helpers
 ### 步骤 5：实现 E2E 测试
 
 1. `test/e2e/normal-user-journey.test.ts`
-2. `test/e2e/premium-user-journey.test.ts`
+2. `test/e2e/early-unstake-journey.test.ts`
 3. `test/e2e/emergency-scenarios.test.ts`
 
 ### 步骤 6：实现性能测试
@@ -706,8 +703,8 @@ mkdir -p test/helpers
 {
   "scripts": {
     "test": "hardhat test",
-    "test:normal": "hardhat test test/staking",
-    "test:premium": "hardhat test ",
+    "test:staking": "hardhat test test/staking",
+    "test:early-unstake": "hardhat test test/early-unstake/",
     "test:e2e": "hardhat test test/e2e",
     "test:performance": "hardhat test test/performance",
     "test:coverage": "hardhat coverage"

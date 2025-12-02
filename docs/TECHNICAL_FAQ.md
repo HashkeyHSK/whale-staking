@@ -25,6 +25,7 @@ This document is for quickly answering common user questions.
 - **5% APY** means: If staking for full 365 days, returns are 5%
 - Actual returns = Principal × Annual rate × (Actual staking seconds / Seconds in 365 days)
 - If staking time is less than 365 days, returns are calculated proportionally (precise to the second)
+- **Note**: APY (annual yield rate) is not in the contract, configured by admin
 
 **Example 1**: Staking 10,000 HSK, 5% APY, staking for 365 days:
 - Returns = 10,000 × 5% × (365/365) = 500 HSK
@@ -32,7 +33,6 @@ This document is for quickly answering common user questions.
 **Example 2**: Staking 10,000 HSK, 5% APY, staking for 365 days, but claiming rewards on day 100:
 - Rewards claimable on day 100 = 10,000 × 5% × (100/365) ≈ 219.18 HSK
 - Principal continues to be locked, continues to generate rewards
-- Note: V2 version does not support unstaking during lock period
 
 ---
 
@@ -78,14 +78,20 @@ This document is for quickly answering common user questions.
 
 - Admin can set staking start time (`stakeStartTime`) and end time (`stakeEndTime`)
 - Users can only stake during `stakeStartTime <= current time < stakeEndTime`
+- **Staking window is expected to be approximately 7 days**
 - Deployment script defaults start time to 7 days after deployment
 - Admin can adjust this time window at any time
 
+**Important Notes**:
+- Staking window is expected to be approximately 7 days, but lock period is 365 days
+- After staking within the window, can request early unstake (with penalty)
+- After staking window ends, cannot stake new positions, but existing stakes are not affected, can still claim rewards and unstake normally
+
 **Example**:
-- Start time: 2026-11-08 00:00:00
-- End time: 2027-11-08 00:00:00
-- Can only stake new positions within this year
-- Existing stakes are not affected, can still claim rewards and unstake normally
+- Staking window: 2026-11-08 00:00:00 to 2026-11-15 00:00:00 (7 days)
+- Users can only stake new positions within 7 days
+- After staking, lock period is 365 days, can request early unstake (with penalty)
+- After staking window ends, cannot stake new positions, but existing stakes continue to run
 
 ---
 
@@ -101,8 +107,10 @@ This document is for quickly answering common user questions.
 
 ### Q8: What is the minimum staking amount?
 
-**A:** 
-- **Staking**: Starting from 1 HSK
+**A:** Minimum staking amount is **1 HSK**.
+
+- Each stake must be ≥ 1 HSK
+- Can stake multiple times, each stake creates a new staking position
 
 ---
 
@@ -111,13 +119,13 @@ This document is for quickly answering common user questions.
 **A:** No, it's not a per-transaction limit, it's the upper limit for the entire product pool.
 
 - It's the upper limit for the sum of all users' staking amounts
+- **Maximum total staked: 30,000,000 HSK (30 million HSK)**
 - Can stake any amount per transaction (as long as it doesn't exceed pool limit)
 - After reaching limit, new users cannot stake, need to wait for users to unstake
 
 **Example**:
-- Staking maximum total staked: 30,000,000 HSK
-- If 9,000,000 HSK already staked, new users can stake at most 1,000,000 HSK
--  maximum total staked: 30,000,000 HSK
+- If 25,000,000 HSK already staked, new users can stake at most 5,000,000 HSK
+- If 30,000,000 HSK already staked, new users cannot stake, need to wait for other users to unstake
 
 **Admin Function**:
 - Admin can adjust maximum total staked via `setMaxTotalStaked()` function
@@ -135,13 +143,13 @@ This document is for quickly answering common user questions.
 
 ---
 
-### Q11: Why does  require whitelist?
+### Q11: Do I need whitelist?
 
-**A:**  targets whales and institutions, requires approval.
+**A:** **Whitelist is disabled by default**.
 
-- Need admin to add your address to whitelist
-- Only whitelisted users can participate in 
-- Please contact admin to apply for whitelist
+- Product is open by default, all users can participate in staking
+- Admin can enable whitelist mode via `setWhitelistOnlyMode()` function if needed
+- If whitelist mode is enabled, admin needs to add your address to whitelist to participate
 
 ---
 
@@ -149,18 +157,23 @@ This document is for quickly answering common user questions.
 
 ### Q12: Can I unstake during lock period?
 
-**A:** Cannot unstake normally during lock period, but can request early unstake with penalty.
+**A:** There are two ways to unstake during lock period:
 
-- **During lock period (within 365 days)**: 
-  - Can claim rewards
-  - Can request early unstake (incurs 50% penalty)
-  - Cannot unstake normally
-- **After lock period ends (after 365 days)**: Can unstake, withdraw principal + all rewards
+1. **Normal Unstake**: After lock period ends (after 365 days), can unstake and withdraw principal + all rewards
+2. **Early Unstake**: During lock period, can request early unstake, but need to:
+   - Wait 7-day waiting period
+   - Pay 50% of rewards as penalty
+   - Stop generating new rewards from request time
+
+**During lock period (within 365 days)**:
+- ✅ Can claim rewards (principal continues to be locked)
+- ✅ Can request early unstake (incurs penalty)
+- ❌ Cannot unstake immediately (need to wait for waiting period)
 
 **Early Unstake Process**:
-1. Request early unstake during lock period
-2. Wait 7 days
-3. Complete early unstake (receive 50% of rewards, 50% goes to penalty pool)
+1. Call `requestEarlyUnstake(positionId)` to request early unstake
+2. Wait 7-day waiting period
+3. Call `completeEarlyUnstake(positionId)` to complete unstake
 
 ---
 
@@ -168,9 +181,7 @@ This document is for quickly answering common user questions.
 
 **A:** HSKStaking uses fixed 365-day lock period.
 
-- Staking: 365 days (fixed, approximately 31,536,000 seconds)
-- : 365 days (fixed, approximately 31,536,000 seconds)
-- V2 version simplified lock period selection, all staking unified to 365 days
+- Lock period: 365 days (fixed, approximately 31,536,000 seconds)
 - Lock period is contract constant `LOCK_PERIOD`, cannot be modified after deployment
 
 ---
@@ -203,9 +214,112 @@ This document is for quickly answering common user questions.
 - **Can only withdraw principal, giving up all rewards**
 - For emergency situations, not recommended for regular use
 
-**Difference from Early Unstake**:
-- **Early Unstake**: User-initiated, 50% penalty, 7-day waiting period, can be used anytime during lock period
-- **Emergency Withdrawal**: Admin-enabled, 100% penalty (no rewards), no waiting period, only in emergency mode
+---
+
+### Q16-1: Can I request early unstake during lock period?
+
+**A:** Yes, but need to pay penalty.
+
+- **Early Unstake**: Can request early unstake during lock period
+- **Waiting Period**: Need to wait 7 days after request before completing
+- **Penalty**: Early unstake requires paying 50% of rewards as penalty
+- **Reward Stop**: From the moment of requesting early unstake, no new rewards are generated
+
+**Process**:
+1. Call `requestEarlyUnstake(positionId)` to request early unstake
+2. Wait 7-day waiting period
+3. Call `completeEarlyUnstake(positionId)` to complete unstake
+
+**Important Note**:
+- **Phase 2 will not support early unstake due to real-time rewards**
+- Current version supports early unstake functionality
+- If future version changes to real-time reward mode, early unstake will not be supported
+
+---
+
+### Q16-2: How is the penalty calculated for early unstake?
+
+**A:** Penalty = Total rewards × 50%
+
+**Calculation Rules**:
+- **Total Rewards**: Only calculated up to request time (`requestTime`)
+- **User Retains**: 50% of total rewards (`EARLY_UNSTAKE_REWARD_RETAIN_RATE = 5000`)
+- **Penalty**: 50% of total rewards, goes to penalty pool
+- **During Waiting Period**: No new rewards generated, reward calculation stopped at request time
+
+**Example**:
+- Staking: 10,000 HSK, 5% APY
+- Request early unstake on day 60, total rewards = 10,000 × 5% × (60/365) ≈ 82.19 HSK
+- User retains: 82.19 × 50% = 41.10 HSK
+- Penalty: 82.19 × 50% = 41.10 HSK (goes to penalty pool)
+- Complete unstake on day 67 (after 7-day waiting period), rewards still calculated based on day 60
+
+**Special Case**:
+- If claimed rewards exceed allowed 50%, excess is deducted from principal
+- Example: Total rewards 100 HSK, allowed to retain 50 HSK, but claimed 60 HSK
+  - Excess: 60 - 50 = 10 HSK
+  - Deducted from principal: 10 HSK, final principal returned = 10,000 - 10 = 9,990 HSK
+
+**Penalty Pool Distribution Mechanism**:
+- All penalties from early unstake (50% of rewards) go to penalty pool
+- **Distribution Time**: After staking activity ends, when all stakes have matured
+- **Distribution Method**: Off-chain calculation, one-time distribution
+- **Distribution Rule**: Proportional distribution based on users' stake amounts in total staking
+- **Distribution Condition**: Only users who completed full staking period (365 days) are eligible
+
+---
+
+### Q16-3: Will rewards continue to generate during waiting period?
+
+**A:** No. From the moment of requesting early unstake, reward calculation stops.
+
+- **At Request Time**: Reward calculation stops at request time (`requestTime`)
+- **During Waiting Period**: No new rewards generated
+- **At Completion Time**: Still calculated based on request time rewards, will not increase
+
+**Query Rewards**:
+- When using `pendingReward(positionId)` to query, if early unstake has been requested, will show rewards at request time
+- Rewards queried during waiting period will not increase
+
+---
+
+### Q16-4: How to query penalty for early unstake?
+
+**A:** Backend can calculate through the following methods:
+
+1. **Query if Requested**: `earlyUnstakeRequestTime[positionId]`
+2. **Get Position Info**: `positions(positionId)`
+3. **Calculate Total Rewards**: Rewards from `stakedAt` to `requestTime`
+4. **Calculate Penalty**: Total rewards × 50%
+
+**Calculation Formula**:
+```
+Total Rewards = Principal × Annual Rate × (requestTime - stakedAt) / 365 days
+Penalty = Total Rewards × 50%
+User Retains = Total Rewards × 50%
+```
+
+**Note**: Contract does not provide direct query function, need to get through `EarlyUnstakeCompleted` event, or backend calculates itself.
+
+---
+
+### Q16-5: When is penalty pool reward distributed?
+
+**A:** Penalty pool reward is distributed **after staking activity ends, when all stakes have matured**.
+
+- **Distribution Time**: After staking activity ends, when all stakes have matured
+- **Distribution Method**: Off-chain calculation, one-time distribution
+- **Distribution Rule**: Proportional distribution based on users' stake amounts in total staking
+- **Distribution Condition**: Only users who completed full staking period (365 days) are eligible
+- **Early Unstake Users**: Cannot receive penalty pool distribution
+
+**Example**:
+- Penalty pool total: 100,000 HSK
+- User A staked: 1,000,000 HSK (completed full 365 days)
+- User B staked: 500,000 HSK (completed full 365 days)
+- Total completed staking: 10,000,000 HSK
+- User A distribution: 100,000 × (1,000,000 / 10,000,000) = 10,000 HSK
+- User B distribution: 100,000 × (500,000 / 10,000,000) = 5,000 HSK
 
 ---
 
@@ -221,26 +335,47 @@ Returns = Principal × Annual rate × (Actual staking days / 365 days)
 
 **Limitation**: If actual staking days > lock period, calculate based on lock period.
 
-**Example**:
+**Normal Case Example**:
 - Principal: 10,000 HSK
 - Annual rate: 5%
 - Lock period: 365 days
 - Actual staking: 365 days
 - Returns = 10,000 × 5% × (365/365) = 500 HSK
 
+**Early Unstake Example**:
+- Principal: 10,000 HSK
+- Annual rate: 5%
+- Request early unstake on day 60
+- Total rewards = 10,000 × 5% × (60/365) ≈ 82.19 HSK
+- User retains = 82.19 × 50% = 41.10 HSK
+- Penalty = 82.19 × 50% = 41.10 HSK
+- **Note**: Days 60-67 (waiting period) do not generate rewards
+
 ---
 
-### Q18: What's the difference in returns between Staking and ?
+### Q18: What is the annual yield rate?
 
-**A:** 
+**A:** Base annual yield rate is **5%**.
 
-| Product | Annual Yield Rate | Minimum Stake | Participation Method |
-|---------|-------------------|---------------|---------------------|
-| Staking | 5% | 1 HSK | Open (no approval required) |
+- **Base APY**: 5% (contract real-time settlement)
+- **Total Expected APY**: Up to 8% (frontend display, includes loyalty bonus)
+  - Base returns: 5%
+  - Loyalty bonus: +1% ~ +3% (off-chain distribution, not in contract)
+
+**Distribution Mechanism**:
+- Base APY (5%) is settled by contract in real-time
+- Additional bonus (1%-3%) is distributed off-chain, not in contract
+- **Distribution Time**: After staking activity ends, when all stakes have matured
+- **Distribution Method**: Off-chain calculation, one-time distribution
+- **Distribution Rule**: Proportional distribution based on users' stake amounts in total staking
+- **Distribution Condition**: Only users who completed full staking period (365 days) are eligible
+- **Early Unstake Users**: Cannot receive loyalty bonus distribution
+
+**Note**:
 
 ---
 
-### Q18: Are rewards distributed daily or monthly?
+### Q18-1: Are rewards distributed daily or monthly?
 
 **A:** Rewards accumulate linearly, calculated per second.
 
@@ -248,52 +383,125 @@ Returns = Principal × Annual rate × (Actual staking days / 365 days)
 - Rewards continuously accumulate, can be claimed at any time, precise to the second
 - When claiming, calculates all rewards from last claim to now (precise to the second)
 
----
-
-## V. Early Unstake and Penalty Pool
-
-### Q19: What happens to the penalty from early unstake?
-
-**A:** Penalties go to a penalty pool, which is distributed to users who complete the full staking period.
-
-- Penalty pool accumulates penalties from early unstakes
-- After staking period ends (`stakeEndTime`), admin distributes penalty pool
-- Distribution is proportional based on staked amounts
-- Only users who completed full staking period (via `unstake()`) are eligible
+**Special Case - Early Unstake**:
+- If early unstake has been requested, no new rewards generated from request time
+- Reward calculation stops at request time, no increase during waiting period
 
 ---
 
-### Q20: Can I claim rewards after requesting early unstake?
+## V. Campaign Rules and Additional Bonus
 
-**A:** No. Once early unstake is requested, reward calculation stops at request time.
+### Q19: Campaign Rules Explanation
 
-- Rewards are calculated up to request time only
-- Cannot claim additional rewards after request
-- Must complete early unstake to receive 50% of calculated rewards
+**A:** Campaign rules are as follows:
+
+**1. Return Composition**
+- User final returns = Base APY (5%) + Additional Bonus APY (1%-3%)
+- Base APY is settled by smart contract in real-time
+- Additional bonus is one-time distribution, will be settled after staking period ends
+
+**2. Bonus Eligibility**
+- This bonus is only for returning users who participate in staking again
+
+**3. Bonus Tiers**
+Calculate additional bonus rate based on actual staking duration:
+- ≥ 1 month and < 6 months: +1% APY
+- ≥ 6 months and < 12 months: +2% APY
+- 12 months (full 365 days): +3% APY
+
+**4. Special Settlement Mechanism**
+- **Early Redemption Mechanism**: If you set staking period to 12 months (original bonus 3%), but actually redeem at month 4, system will downgrade to "3-month standard" settlement, i.e., only distribute 1% additional bonus
+- **Multiple Stakes Calculation**: If you have multiple staking orders simultaneously, additional bonus will be calculated uniformly based on the longest staking period you actually hold
+
+**5. Distribution Mechanism**
+- Additional bonus is distributed off-chain, not in contract
+- **Distribution Time**: After staking activity ends, when all stakes have matured
+- **Distribution Method**: Off-chain calculation, one-time distribution
+- **Distribution Rule**: Proportional distribution based on users' stake amounts in total staking
+- **Distribution Condition**: Only users who completed full staking period (365 days) are eligible
+- **Early Unstake Users**: Cannot receive loyalty bonus distribution
+
+**6. Important Notes**
+- Loyalty bonus is distributed off-chain, not in contract
+- Bonus amount will be calculated and distributed uniformly after staking activity ends
 
 ---
 
-### Q21: What if I already claimed more than 50% of rewards before requesting early unstake?
+### Q19-1: What is the total expected annual yield rate?
 
-**A:** Excess claimed rewards are deducted from principal.
+**A:** Total expected annual yield rate: **Up to 8%**
 
-- If claimed rewards > 50% of total calculated rewards, excess is deducted from principal
-- User receives: principal - excess + remaining 50% rewards
-- Example: If claimed 60% and total is 100, user receives principal - 10% + 40% = principal + 30%
+**Return Composition**:
+- **Base Returns (Base)**: 5% (settled by smart contract in real-time)
+- **Loyalty Bonus (Loyalty Bonus)**: +1% ~ +3% (off-chain distribution, not in contract)
+
+**Loyalty Bonus Tiers**:
+- ≥ 1 month and < 6 months: +1% APY
+- ≥ 6 months and < 12 months: +2% APY
+- 12 months (full 365 days): +3% APY
+
+**Note**:
+- Base APY (5%) is settled by smart contract in real-time
+- Additional bonus (1%-3%) is distributed off-chain, not in contract
+- Bonus amount will be calculated and distributed uniformly after staking activity ends
+
+---
+
+### Q19-2: How is loyalty bonus calculated?
+
+**A:** Loyalty bonus calculates additional bonus rate based on actual staking duration.
+
+**Bonus Tiers**:
+- ≥ 1 month and < 6 months: +1% APY
+- ≥ 6 months and < 12 months: +2% APY
+- 12 months (full 365 days): +3% APY
+
+**Special Settlement Mechanism**:
+- **Early Redemption Mechanism**: If you set staking period to 12 months (original bonus 3%), but actually redeem at month 4, system will downgrade to "3-month standard" settlement, i.e., only distribute 1% additional bonus
+- **Multiple Stakes Calculation**: If you have multiple staking orders simultaneously, additional bonus will be calculated uniformly based on the longest staking period you actually hold
+
+**Bonus Eligibility**:
+- This bonus is only for returning users who participate in staking again
+- Need to complete full staking period to receive corresponding tier bonus
+
+**Distribution Mechanism**:
+- **Distribution Time**: After staking activity ends, when all stakes have matured
+- **Distribution Method**: Off-chain calculation, one-time distribution
+- **Distribution Rule**: Proportional distribution based on users' stake amounts in total staking
+- **Distribution Condition**: Only users who completed full staking period (365 days) are eligible
+- **Early Unstake Users**: Cannot receive loyalty bonus distribution
+
+---
+
+### Q20: Can I stake multiple times?
+
+**A:** Yes. Each stake creates a new staking position.
+
+- Can hold multiple staking positions simultaneously
+- Each staking position calculates rewards independently
+- Each position can claim rewards and unstake independently
+- Multiple stakes' loyalty bonus calculated uniformly based on longest staking period tier
 
 ---
 
 ## VI. Technical Questions
 
-### Q22: How do I query my staking information?
+### Q21: How do I query my staking information?
 
 **A:** Query through contract functions.
 
 - Use `getUserPositionIds(address)` to get all staking position IDs for a user (recommended)
 - Use `positions(positionId)` to query specified position's detailed information
 - Use `pendingReward(positionId)` to query pending rewards (can be called by anyone, no owner restriction)
+- Use `earlyUnstakeRequestTime(positionId)` to query if early unstake has been requested
+- Use `claimedRewards(positionId)` to query total claimed rewards
 - Can query through frontend interface or calling contract functions
 - **Note**: `pendingReward` can be called by anyone - no need to be the position owner
+
+**Early Unstake Status Query**:
+- If `earlyUnstakeRequestTime[positionId] > 0`, indicates early unstake has been requested
+- Can calculate remaining waiting period: `requestTime + 7 days - current time`
+- Penalty can be calculated by backend: Total rewards (to request time) × 50%
 
 ---
 
@@ -306,42 +514,9 @@ Returns = Principal × Annual rate × (Actual staking days / 365 days)
 
 ---
 
-### Q24: Can the contract be upgraded? Will it affect my staking?
-
-**A:** Contract uses upgradeable proxy pattern (Transparent Proxy).
-
-**Upgrade Mechanism**:
-- Contract can be upgraded, but existing stakes are not affected
-- All staking data will be completely preserved (totalStaked, positions, rewards, etc.)
-- Upgrade only updates implementation logic, does not change storage layout
-- Upgrade is executed by admin, users need no action
-
-**Upgrade Script Features**:
-- ✅ Auto-detect ProxyAdmin type (contract or EOA)
-- ✅ Auto-read actual ProxyAdmin address from storage slot
-- ✅ Smart Fallback mechanism (if one method fails, automatically try another)
-- ✅ Auto-verify state consistency before and after upgrade
-- ✅ Auto-print browser link after successful upgrade
-
-**View Upgrade Transaction**:
-- Upgrade transaction will appear on ProxyAdmin contract page, not Proxy page
-- Script will print transaction hash and browser link after successful upgrade
-
----
-
 ## VII. Other Questions
 
-### Q25: What is Whale DID?
-
-**A:** Whale DID is a special identity identifier for users staking more than 50,000 HSK.
-
-- Users staking more than 50,000 HSK can mint Whale DID
-- This is an off-chain function, unrelated to staking contract
-- Please consult operations team for specific rules
-
----
-
-### Q26: How do I contact customer service if I encounter problems?
+### Q23: If I encounter problems, how do I contact customer service?
 
 **A:** Please contact official customer service or admin.
 
@@ -351,7 +526,7 @@ Returns = Principal × Annual rate × (Actual staking days / 365 days)
 
 ---
 
-### Q27: Are there risks in staking?
+### Q24: Are there risks in staking?
 
 **A:** Staking involves certain risks.
 
@@ -366,25 +541,30 @@ Recommend participating cautiously based on your own risk tolerance.
 
 ## VIII. Quick Reference
 
-### Contract Features
+### Product Information Table
 
-| Feature | Description |
-|------|---------------|
+| Item | Description |
+|------|-------------|
+| **Annual Yield Rate** | Base 5% (contract real-time settlement) + Loyalty Bonus 1%-3% (off-chain distribution) |
+| **Total Expected APY** | Up to 8% (frontend display) |
+| **Minimum Stake** | 1 HSK |
 | **Lock Period** | 365 days (fixed, LOCK_PERIOD constant) |
-| **Early Unstake** | Supported with 50% penalty and 7-day waiting period |
-| **Reward Calculation** | Per-second, linear accumulation |
-| **Whitelist** | Optional, configurable at deployment |
-| **Emergency Mode** | Supported |
-| **Penalty Pool** | Distributed to users who complete full staking period |
+| **Participation Method** | Open (whitelist disabled by default) |
+| **Maximum Total Staked** | 30,000,000 HSK (30 million HSK) |
+| **Staking Window** | Approximately 7 days |
+| **Early Unstake** | Supported (7-day waiting period, 50% penalty) |
 
 ### Important Reminders
 
-1. **Staking Time Window**: Can only stake within the time window set by admin, deployment script defaults start time to 7 days after deployment
-2. **Annual Yield Rate**: Calculated on an annual basis, not total returns after lock period ends
+1. **Staking Time Window**: Staking window is expected to be approximately 7 days, can only stake within the time window set by admin
+2. **Annual Yield Rate**: Base APY 5% is settled by contract in real-time, additional bonus 1%-3% is distributed off-chain (not in contract)
 3. **Reward Cap**: Rewards are only calculated up to the end of lock period, extra time does not increase
-4. **Lock Period Restrictions**: Cannot unstake during lock period, can only claim rewards
-5. **Reward Pool**: Rewards are deposited by admin, if balance is insufficient may not be able to claim
-6. **Emergency Mode**: In emergency mode, can only withdraw principal, giving up rewards
+4. **Lock Period Restrictions**: Can request early unstake during lock period, but need to pay 50% penalty and wait 7-day waiting period
+5. **Early Unstake**: From request time, no new rewards generated, rewards do not increase during waiting period
+6. **Penalty Pool Distribution**: After staking activity ends, when all stakes have matured, off-chain calculation, proportional distribution to full staking users
+7. **Reward Pool**: Rewards are deposited by admin, if balance is insufficient may not be able to claim
+8. **Emergency Mode**: In emergency mode, can only withdraw principal, giving up rewards
+9. **Loyalty Bonus**: Distributed off-chain, calculated and distributed uniformly after staking activity ends
 
 ---
 

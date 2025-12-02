@@ -9,12 +9,11 @@
 
 ### 1.1 产品方案
 
-本方案基于 `HSKStaking` 合约，通过部署一个独立的代理合约（`StakingProxy` 和 ``）实现一套产品：
+本方案基于 `HSKStaking` 合约，实现单一质押池：
 
-| 产品 | 合约实例 | 目标用户 | 最小质押 | 年化收益 | 白名单 |
-|------|---------|---------|---------|---------|--------|
-| Staking | 独立实例 A | 普通用户 | 1 HSK | 5% | 关闭 |
-|  | 独立实例 B | 大户/机构 | 500,000 HSK | 16% | 启用 |
+| 产品 | 合约实例 | 目标用户 | 最小质押 | 基础年化收益 | 总预期年化 | 白名单 |
+|------|---------|---------|---------|------------|-----------|--------|
+| HSK Staking | 单一实例 | 所有用户 | 1 HSK | 5% | Up to 8% | 默认禁用 |
 
 ### 1.2 技术栈
 
@@ -41,43 +40,31 @@ HSKStaking (主实现合约)
 #### 代理合约层
 ```
 代理合约架构
-├── StakingProxy (TransparentUpgradeableProxy)
-│   └── 指向 HSKStaking 实现
-└──  (TransparentUpgradeableProxy)
+└── StakingProxy (TransparentUpgradeableProxy)
     └── 指向 HSKStaking 实现
 ```
 
 **架构说明**：
 - 使用 Transparent Proxy 模式，由 ProxyAdmin 控制升级
-- 一个代理合约共享同一个 `HSKStaking` 实现
-- 通过初始化参数配置不同的产品特性
-- 一个代理合约可独立升级
+- 单一代理合约使用 `HSKStaking` 实现
+- 通过初始化参数配置产品特性
+- 代理合约可独立升级
 
 ---
 
 ## 二. 产品配置参数
 
-### 2.1 Staking 配置
+### 2.1 产品配置
 
 | 参数 | 值 | 合约函数 |
 |------|-----|---------|
-| `minStakeAmount` | 1000 HSK (1000e18) | `setMinStakeAmount(1000e18)` |
+| `minStakeAmount` | 1 HSK (1e18) | `setMinStakeAmount(1e18)` |
 | `LOCK_PERIOD` | 365 天 (31,536,000 秒) | 固定常量，部署时设置 |
 | `rewardRate` | 5% (500 basis points) | 部署时通过 initialize() 设置 |
 | `stakeStartTime` | 部署后7天 | `setStakeStartTime(timestamp)` |
-| `stakeEndTime` | `type(uint256).max` | `setStakeEndTime(timestamp)` |
-| `onlyWhitelistCanStake` | `false` | `setWhitelistOnlyMode(false)` |
-
-### 2.2  配置
-
-| 参数 | 值 | 合约函数 |
-|------|-----|---------|
-| `minStakeAmount` | 500,000 HSK (5e23) | `setMinStakeAmount(500000e18)` |
-| `LOCK_PERIOD` | 365 天 (31,536,000 秒) | 固定常量，部署时设置 |
-| `rewardRate` | 16% (1600 basis points) | 部署时通过 initialize() 设置 |
-| `stakeStartTime` | 部署后7天 | `setStakeStartTime(timestamp)` |
-| `stakeEndTime` | `type(uint256).max` | `setStakeEndTime(timestamp)` |
-| `onlyWhitelistCanStake` | `true` | `setWhitelistOnlyMode(true)` |
+| `stakeEndTime` | 开始时间后约7天 | `setStakeEndTime(timestamp)` |
+| `onlyWhitelistCanStake` | `false`（默认） | `setWhitelistOnlyMode(false)` |
+| `maxTotalStaked` | 30,000,000 HSK (30M * 10^18) | 部署时通过 initialize() 设置 |
 
 ### 2.3 关键数据结构
 
@@ -141,12 +128,12 @@ STAKE_START_TIME="<timestamp>" STAKE_END_TIME="<timestamp>" npx hardhat run /dep
 - [ ] 验证 `onlyWhitelistCanStake` = false
 - [ ] 向奖励池充值（通过 `updateRewardPool()`）
 
-#### 
-- [ ] 验证 `minStakeAmount` = 500,000 HSK
-- [ ] 验证 `rewardRate` = 1600 (16% APY)
+#### 产品配置验证
+- [ ] 验证 `minStakeAmount` = 1 HSK
+- [ ] 验证 `rewardRate` = 500 (5% APY)
 - [ ] 验证 `LOCK_PERIOD` = 365 days (固定)
-- [ ] 验证 `onlyWhitelistCanStake` = true
-- [ ] 添加白名单用户（通过 `updateWhitelistBatch()`）
+- [ ] 验证 `onlyWhitelistCanStake` = false（默认禁用）
+- [ ] 验证 `maxTotalStaked` = 30,000,000 HSK
 - [ ] 向奖励池充值（通过 `updateRewardPool()`）
 
 ### 3.3 部署验证脚本
@@ -390,17 +377,11 @@ uint256 totalReward = (amount × annualRate × timeRatio) / (PRECISION × PRECIS
 
 ### 5.2 计算示例
 
-**Staking（5% APY，365天锁定期）**：
+**HSK Staking（5% APY，365天锁定期）**：
 - 质押：10,000 HSK
 - 锁定期：365 天
 - 实际质押：365 天
-- 奖励 = 10,000 × 0.08 × (365/365) = 500 HSK
-
-**（16% APY，365天锁定期）**：
-- 质押：1,000,000 HSK
-- 锁定期：365 天
-- 实际质押：365 天
-- 奖励 = 1,000,000 × 0.16 × (365/365) = 160,000 HSK
+- 奖励 = 10,000 × 0.05 × (365/365) = 500 HSK
 
 ### 5.3 奖励上限规则
 

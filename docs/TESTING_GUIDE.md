@@ -2,7 +2,7 @@
 
 ## 📋 Objective
 
-Write complete test cases for the Whale Staking project, covering all functionality of Staking and , ensuring contract security and correctness.
+Write complete test cases for the HSK Staking project, covering all functionality of the single staking pool, ensuring contract security and correctness.
 
 ## ⚠️ Important Notes - Contract Architecture
 
@@ -13,10 +13,10 @@ Write complete test cases for the Whale Staking project, covering all functional
    - `StakingStorage.sol` - Storage layer (inherits Initializable, Ownable2StepUpgradeable)
    - `StakingConstants.sol` - Constant definitions contract (LOCK_PERIOD = 365 days)
    - `IStake.sol` - Interface definition
-   - `StakingProxy.sol` / `.sol` - Proxy contracts (Transparent Proxy)
+   - `StakingProxy.sol` - Proxy contract (Transparent Proxy)
 
 2. **Proxy Pattern**: Transparent Proxy (using OpenZeppelin's `TransparentUpgradeableProxy`)
-   - Can independently upgrade Normal and Premium staking pools
+   - Single proxy contract for the staking pool
    - ProxyAdmin used to manage proxy contract upgrades
 
 3. **Native Token**: HSK is the chain's native token (native token), similar to ETH, not an ERC20 token
@@ -26,8 +26,8 @@ Write complete test cases for the Whale Staking project, covering all functional
 4. **Lock Period**: Fixed 365 days (`LOCK_PERIOD = 365 days`), defined in contract constants, cannot be dynamically modified
 
 5. **Reward Rate**: Configured at contract level (`rewardRate` state variable), all positions share the same reward rate
-   - Staking: 500 basis points (5% APY)
-   - : 1600 basis points (16% APY)
+   - HSK Staking: 500 basis points (5% base APY)
+   - Total Expected APY: Up to 8% (frontend display, includes loyalty bonus 1%-3%)
    - `BASIS_POINTS = 10000` (100% = 10000)
 
 6. **Position Structure**: 
@@ -40,8 +40,8 @@ Write complete test cases for the Whale Staking project, covering all functional
    - ⚠️ **Note**: Position does not contain `lockPeriod` and `rewardRate`, these are contract-level configurations
 
 7. **Whitelist Mode**:
-   - Staking: Whitelist mode disabled (`onlyWhitelistCanStake = false`)
-   - : Whitelist mode enabled (`onlyWhitelistCanStake = true`)
+   - HSK Staking: Whitelist mode disabled by default (`onlyWhitelistCanStake = false`)
+   - Admin can enable whitelist mode if needed
 
 ### Key Contract Functions
 
@@ -111,11 +111,11 @@ Write complete test cases for the Whale Staking project, covering all functional
 
 **Parameter Description**:
 - `_minStakeAmount`: Minimum staking amount (wei unit)
-  - Staking: 1 HSK = `1e18` wei
-  - : 500,000 HSK = `500000e18` wei
+  - HSK Staking: 1 HSK = `1e18` wei
 - `_rewardRate`: Annual yield rate (basis points)
-  - Staking: 500 (5% APY)
-  - : 1600 (16% APY)
+  - HSK Staking: 500 (5% base APY)
+- `_maxTotalStaked`: Maximum total staked amount
+  - HSK Staking: 30,000,000 HSK = `30000000e18` wei
 - `_stakeStartTime`: Staking start time (Unix timestamp)
 - `_stakeEndTime`: Staking end time (Unix timestamp)
 - `_whitelistMode`: Whitelist mode
@@ -128,7 +128,7 @@ Write complete test cases for the Whale Staking project, covering all functional
 
 ```
 test/
-├── normal/                      # Staking unit tests (✅ Completed)
+├── staking/                     # HSK Staking unit tests (✅ Completed)
 │   ├── deployment.test.ts       # Deployment tests
 │   ├── staking.test.ts          # Staking functionality tests
 │   ├── rewards.test.ts           # Reward functionality tests
@@ -138,7 +138,7 @@ test/
 │   ├── emergency.test.ts        # Emergency withdrawal functionality tests
 │   └── edge-cases.test.ts      # Boundary conditions and error handling tests
 ├── e2e/                         # E2E tests (✅ Completed)
-│   ├── normal-user-journey.test.ts      # Staking E2E tests
+│   ├── normal-user-journey.test.ts      # HSK Staking E2E tests
 │   └── emergency-scenarios.test.ts      # Emergency scenario tests
 ├── performance/                 # Performance tests (✅ Completed)
 │   ├── gas-optimization.test.ts         # Gas optimization tests
@@ -322,8 +322,8 @@ scripts/test/                    # Integration test scripts (✅ Completed)
 | Test Case | Status | Description |
 |-----------|--------|-------------|
 | Should correctly deploy  contract | ⏳ Pending | Verify contract deployment success |
-| Should correctly initialize contract parameters | ⏳ Pending | Verify minStakeAmount = 500,000 HSK, rewardRate = 16% |
-| Should correctly set whitelist mode to enabled | ⏳ Pending | Verify onlyWhitelistCanStake = true |
+| Should correctly initialize contract parameters | ⏳ Pending | Verify minStakeAmount = 1 HSK, rewardRate = 5% |
+| Should correctly set whitelist mode (default disabled) | ⏳ Pending | Verify onlyWhitelistCanStake = false by default |
 | Should correctly set staking time window | ⏳ Pending | Verify stakeStartTime and stakeEndTime |
 | Should correctly initialize state variables | ⏳ Pending | Verify totalStaked = 0, nextPositionId = 0 |
 | Should reject invalid initialization parameters | ⏳ Pending | Test endTime < startTime, etc. |
@@ -352,7 +352,7 @@ scripts/test/                    # Integration test scripts (✅ Completed)
 |-----------|--------|-------------|
 | Whitelisted users should be able to stake successfully | ⏳ Pending | Verify whitelisted user staking succeeds |
 | Should reject non-whitelisted user staking | ⏳ Pending | Test non-whitelisted user staking fails |
-| Should reject stakes below minimum amount | ⏳ Pending | Test staking amount < 500,000 HSK |
+| Should reject stakes below minimum amount | ⏳ Pending | Test staking amount < 1 HSK |
 | Should reject stakes outside time window | ⏳ Pending | Test before startTime and after endTime |
 | Should correctly create Position | ⏳ Pending | Verify all position fields are correct |
 | Should correctly update totalStaked | ⏳ Pending | Verify totalStaked increases |
@@ -365,7 +365,7 @@ scripts/test/                    # Integration test scripts (✅ Completed)
 
 | Test Case | Status | Description |
 |-----------|--------|-------------|
-| Should correctly calculate pending rewards (16% APY) | ⏳ Pending | Verify pendingReward calculation is correct |
+| Should correctly calculate pending rewards (5% APY) | ⏳ Pending | Verify pendingReward calculation is correct |
 | Should accumulate rewards over time | ⏳ Pending | Test rewards increase after time advances |
 | Should correctly claim rewards | ⏳ Pending | Verify claimReward succeeds |
 | Should correctly update lastRewardAt timestamp | ⏳ Pending | Verify timestamp updates after claiming |
@@ -414,15 +414,15 @@ scripts/test/                    # Integration test scripts (✅ Completed)
 
 | Test File | Status | Description |
 |-----------|--------|-------------|
-| `scripts/test/integration/deploy-test.ts` | ✅ Completed | Deployment integration tests (Normal + Premium) |
-| `scripts/test/integration/stake-test.ts` | ✅ Completed | Staking operation integration tests (Staking) |
-| `scripts/test/integration/whitelist-test.ts` | ✅ Completed | Whitelist functionality integration tests () |
+| `scripts/test/integration/deploy-test.ts` | ✅ Completed | Deployment integration tests |
+| `scripts/test/integration/stake-test.ts` | ✅ Completed | Staking operation integration tests |
+| `scripts/test/integration/whitelist-test.ts` | ✅ Completed | Whitelist functionality integration tests (if enabled) |
 
 ---
 
 ### E2E Tests (✅ Completed)
 
-#### 1. Staking E2E Tests (`test/e2e/normal-user-journey.test.ts`) ✅
+#### 1. HSK Staking E2E Tests (`test/e2e/normal-user-journey.test.ts`) ✅
 
 | Test Case | Status | Description |
 |-----------|--------|-------------|
@@ -430,13 +430,13 @@ scripts/test/                    # Integration test scripts (✅ Completed)
 | Multi-user concurrent scenarios | ✅ Completed | Test multiple users operating simultaneously (using event verification and error tolerance) |
 | Long-running scenarios | ✅ Completed | Test state after long runtime (using event verification and error tolerance) |
 
-#### 2.  E2E Tests (`test/e2e/premium-user-journey.test.ts`)
+#### 2. Early Unstake E2E Tests (`test/e2e/early-unstake-journey.test.ts`)
 
 | Test Case | Status | Description |
 |-----------|--------|-------------|
-| Complete user journey: Deploy -> Add Whitelist -> Stake -> Claim Rewards -> Unstake | ⏳ Pending | Test complete user flow |
-| Whitelist management flow | ⏳ Pending | Test whitelist add, remove, toggle mode |
-| Multi-whitelisted user concurrent scenarios | ⏳ Pending | Test multiple whitelisted users operating simultaneously |
+| Complete early unstake journey: Request -> Wait -> Complete | ⏳ Pending | Test complete early unstake flow |
+| Penalty calculation verification | ⏳ Pending | Test 50% penalty calculation |
+| Waiting period enforcement | ⏳ Pending | Test 7-day waiting period |
 
 #### 3. Emergency Scenario Tests (`test/e2e/emergency-scenarios.test.ts`) ✅
 
@@ -503,7 +503,7 @@ scripts/test/                    # Integration test scripts (✅ Completed)
 
 ```
 test/
-├── normal/                      # Staking unit tests
+├── staking/                     # HSK Staking unit tests
 │   ├── deployment.test.ts
 │   ├── staking.test.ts
 │   ├── rewards.test.ts
@@ -512,17 +512,14 @@ test/
 │   ├── config.test.ts
 │   ├── emergency.test.ts
 │   └── edge-cases.test.ts
-├── premium/                     #  unit tests
-│   ├── deployment.test.ts
-│   ├── whitelist.test.ts
-│   ├── staking.test.ts
-│   ├── rewards.test.ts
-│   ├── unstaking.test.ts
-│   ├── config.test.ts
-│   └── emergency.test.ts
+├── early-unstake/               # Early unstake unit tests
+│   ├── request.test.ts
+│   ├── complete.test.ts
+│   ├── penalty.test.ts
+│   └── waiting-period.test.ts
 ├── e2e/                         # E2E tests
 │   ├── normal-user-journey.test.ts
-│   ├── premium-user-journey.test.ts
+│   ├── early-unstake-journey.test.ts
 │   └── emergency-scenarios.test.ts
 ├── performance/                 # Performance tests
 │   ├── gas-optimization.test.ts
@@ -599,7 +596,7 @@ test/
    - Test staking after whitelist mode disabled
 
 4. **Reward Functionality Tests** (`/rewards.test.ts`)
-   - Test 16% APY reward calculation
+   - Test 5% base APY reward calculation
    - Test reward accumulation and claiming
 
 5. **Unstaking Functionality Tests** (`/unstaking.test.ts`)
@@ -619,9 +616,9 @@ test/
    - Complete user journey tests
    - Multi-user concurrent scenarios
 
-2. ** E2E Tests** (`test/e2e/premium-user-journey.test.ts`)
-   - Complete user journey tests (including whitelist management)
-   - Whitelist management flow
+2. **Early Unstake E2E Tests** (`test/e2e/early-unstake-journey.test.ts`)
+   - Complete early unstake journey tests
+   - Penalty calculation and waiting period tests
 
 3. **Emergency Scenario Tests** (`test/e2e/emergency-scenarios.test.ts`)
    - Emergency mode flow
@@ -688,7 +685,7 @@ Implement test files one by one according to test case mapping table:
 ### Step 5: Implement E2E Tests
 
 1. `test/e2e/normal-user-journey.test.ts`
-2. `test/e2e/premium-user-journey.test.ts`
+2. `test/e2e/early-unstake-journey.test.ts`
 3. `test/e2e/emergency-scenarios.test.ts`
 
 ### Step 6: Implement Performance Tests
@@ -706,7 +703,7 @@ Add test-related npm scripts:
   "scripts": {
     "test": "hardhat test",
     "test:normal": "hardhat test test/staking",
-    "test:premium": "hardhat test ",
+    "test:early-unstake": "hardhat test test/early-unstake/",
     "test:e2e": "hardhat test test/e2e",
     "test:performance": "hardhat test test/performance",
     "test:coverage": "hardhat coverage"

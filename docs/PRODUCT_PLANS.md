@@ -1,22 +1,22 @@
-# Single-Tier Staking Product Plan
+# HSK Staking Product Plan
 
 ## I. Product Overview
 
-This plan is based on the Whale Staking contract architecture, providing two independent product schemes targeting different user groups:
+This plan is based on the Whale Staking contract architecture, providing a single staking pool for all users:
 
-- **Staking (Delegated Staking)**: For general users, low threshold, stable returns
-- ** ()**: For whales/institutions, high threshold, high returns
+- **HSK Staking**: Single pool, open to all users, stable returns
 
 ---
 
-## II. Product 1: Staking (Delegated Staking)
+## II. Product Configuration
 
 ### Product Positioning
-Delegated staking product for general users, lowering participation threshold, providing stable staking returns.
+Single staking pool product for all users, providing stable staking returns with low participation threshold.
 
 ### Target Users
-- General retail investors
-- Small capital holders
+- All users (no whitelist required by default)
+- Retail investors
+- Small and large capital holders
 - Users seeking stable returns
 
 ### Core Parameters
@@ -24,21 +24,29 @@ Delegated staking product for general users, lowering participation threshold, p
 | Parameter | Configuration | Notes |
 |-----------|---------------|-------|
 | **Minimum Stake Threshold** | 1 HSK | Minimum amount per user stake |
-| **Annual Yield Rate** | 5% | Fixed annual yield rate (configured at deployment) |
+| **Base Annual Yield Rate** | 5% | Base APY (contract real-time settlement) |
+| **Total Expected APY** | Up to 8% | Frontend display (includes loyalty bonus 1%-3%) |
 | **Lock Period** | 365 days | Fixed 365-day lock period |
-| **Whitelist Mode** | Disabled | All users can freely participate in staking |
+| **Whitelist Mode** | Disabled by default | All users can freely participate in staking |
 | **Maximum Total Staked** | 30,000,000 HSK | Upper limit for entire product pool (upper limit for sum of all users' staking amounts, not per-transaction limit) |
+| **Staking Window** | Approximately 7 days | Can only stake within specified time window |
 
 ### Product Mechanisms
 
 #### 1. Participation Mechanism
-- **Open Participation**: No approval required, any user can participate in staking
-- **Staking Time Window**: Can only stake within specified time window (start and end times set by admin)
+- **Open Participation**: No approval required, any user can participate in staking (whitelist disabled by default)
+- **Staking Time Window**: Approximately 7 days, can only stake within specified time window (start and end times set by admin)
 - **Fixed Lock Period**: Lock period fixed at 365 days (no need to choose)
 - **Multiple Stakes**: Same user can stake multiple times, creating multiple staking positions
 
 #### 2. Reward Mechanism
-- **Fixed Annual Yield**: All lock period options unified to 5% annual yield rate
+- **Base Annual Yield**: 5% base APY (contract real-time settlement)
+- **Total Expected APY**: Up to 8% (frontend display, includes loyalty bonus 1%-3%)
+- **Loyalty Bonus**: 1%-3% (off-chain distribution, not in contract)
+  - ≥ 1 month and < 6 months: +1% APY
+  - ≥ 6 months and < 12 months: +2% APY
+  - 12 months (full 365 days): +3% APY
+  - **Distribution**: After staking activity ends, proportional distribution based on users' stake amounts in total staking, only for users who completed full staking period (365 days)
 - **Per-Second Interest**: Rewards accumulate continuously per actual staking seconds, precise to the second
 - **Reward Cap**: Rewards only calculated up to end of lock period, extra staking time does not increase rewards
 
@@ -67,6 +75,7 @@ Delegated staking product for general users, lowering participation threshold, p
 
 **Withdrawal Amounts**:
 - **Reward Claim**: Only claim accumulated reward amount
+- **Early Unstake**: Principal + 50% of rewards (50% penalty goes to penalty pool)
 - **Unstake**: Principal + all accumulated rewards (including unclaimed rewards)
 - **Emergency Withdrawal**: Principal only, no rewards
 
@@ -86,138 +95,29 @@ Delegated staking product for general users, lowering participation threshold, p
 - **Promotion Strategy**: Emphasize low threshold, stable returns, attract general users to participate
 - **User Education**: Focus on explaining lock period and return calculation methods
 - **Reward Pool Management**: Need to regularly deposit to reward pool, ensure sufficient funds to pay rewards
-- **Whale DID Reminder**: When staking amount reaches 50,000 HSK, remind users to mint Whale DID
 
 ---
 
-## III. Product 2:  ()
+## III. Penalty Pool Distribution Mechanism
 
-### Product Positioning
-Premium staking product for whales and institutions, providing high returns but requiring high capital threshold and approval mechanism.
+### Penalty Pool Source
+- All penalties from early unstake (50% of rewards) go to penalty pool
+- Penalty pool accumulates in the contract
 
-### Target Users
-- Whale investors
-- Institutional investors
-- High-net-worth users
+### Distribution Rules
+- **Distribution Time**: After staking activity ends, when all stakes have matured
+- **Distribution Method**: Off-chain calculation, one-time distribution
+- **Distribution Rule**: Proportional distribution based on users' stake amounts in total staking
+- **Distribution Condition**: Only users who completed full staking period (365 days) are eligible
+- **Early Unstake Users**: Cannot receive penalty pool distribution
 
-### Core Parameters
-
-| Parameter | Configuration | Notes |
-|-----------|---------------|-------|
-| **Minimum Stake Threshold** | 500,000 HSK | Minimum amount per user stake (500K HSK) |
-| **Annual Yield Rate** | 16% | Fixed annual yield rate (configured at deployment, calculated automatically on-chain) |
-| **Lock Period** | 365 days | Fixed 365-day lock period |
-| **Whitelist Mode** | Enabled | Only approved users can participate in staking |
-| **Maximum Total Staked** | 30,000,000 HSK | Upper limit for entire product pool (upper limit for sum of all users' staking amounts, not per-transaction limit) |
-
-### Product Mechanisms
-
-#### 1. Participation Mechanism
-- **Whitelist Approval**: Users need to apply to join whitelist first, can only participate after approval
-- **Staking Time Window**: Can only stake within specified time window (start and end times set by admin)
-- **High Threshold Setting**: Minimum staking amount is 500K HSK, ensures participating users have sufficient capital strength
-- **Fixed Lock Period**: Lock period fixed at 365 days, encourages long-term staking
-
-#### 2. Reward Mechanism
-
-**Reward Rules**:
-- **Fixed Annual Yield**: All lock period options unified to 16% annual yield rate (calculated automatically on-chain)
-- **Per-Second Interest**: Rewards accumulate continuously per actual staking seconds, precise to the second
-- **Reward Cap**: Rewards only calculated up to end of lock period, extra staking time does not increase rewards
-
-#### 3. Withdrawal Mechanism
-
-**Unlock Rules**:
-- **Lock Period Restriction**: During lock period (365 days) cannot unstake, can only claim rewards
-- **Unlock Condition**: Can unstake after lock period ends (after 365 days)
-- **Unlock Time Calculation**: Unlock time = Staking time + 365 days (e.g., stake on 2026-11-01, unlock time 2027-11-01)
-
-**Withdrawal Methods**:
-1. **Reward Claim** (during lock period):
-   - Can claim accumulated rewards at any time
-   - After claiming rewards, staking position remains
-   - Principal continues to be locked, continues to earn rewards
-
-2. **Unstake** (after lock period ends):
-   - After lock period ends, can unstake
-   - When unstaking, automatically claim principal + all accumulated rewards
-   - After unstaking, staking position closes, no longer earns rewards
-
-3. **Emergency Withdrawal** (under special circumstances):
-   - Only available after admin enables emergency mode
-   - Can withdraw at any time, not subject to lock period restrictions
-   - Can only withdraw principal, giving up all rewards
-
-**Withdrawal Amounts**:
-- **Reward Claim**: Only claim accumulated reward amount
-- **Unstake**: Principal + all accumulated rewards
-- **Emergency Withdrawal**: Principal only, no rewards
-
-#### 4. Risk Control
-- **Whitelist Approval**: Strict user approval mechanism, ensures fund security
-- **High Threshold Restriction**: Filters qualified investors through high threshold (minimum amount per stake)
-- **Maximum Total Staked Limit**: Upper limit for entire product pool (upper limit for sum of all users' staking amounts), controls product scale, ensures system stability
-- **Reward Pool Balance Check**: Contract checks if reward pool balance is sufficient to pay all pending rewards, ensures system stability
-- **Emergency Withdrawal Mechanism**: Admin can enable emergency mode under special circumstances, users can withdraw principal at any time (giving up rewards)
-
-### Use Cases
-✅ Suitable for users with larger capital  
-✅ Investors pursuing high returns  
-✅ Users willing to lock long-term  
-✅ Approved institutional investors  
-
-### Operational Recommendations
-- **Promotion Strategy**: Emphasize high returns (16% annual), high threshold, attract quality whales and institutions
-- **Whitelist Management**: Establish complete approval process, ensure whitelist user quality
-- **Reward Pool Management**:
-  - Need sufficient reward pool fund support (16% APY requires more funds)
-  - Regularly monitor reward pool balance, ensure sufficient funds to pay rewards
-- **User Communication**: Timely communication with whales, provide exclusive services
-- **Whale DID Reminder**:  users all meet Whale DID conditions (minimum threshold 500K HSK), timely remind users to mint Whale DID
-
----
-
-## IV. Product Comparison
-
-| Feature | Staking |  |
-|---------|---------------|----------------|
-| **Target Users** | General users | Whales/Institutions |
-| **Minimum Stake** | 1 HSK | 500,000 HSK |
-| **Annual Yield** | 5% | 16% |
-| **Lock Period** | 365 days | 365 days |
-| **Participation Method** | Open (no approval required) | Whitelist (requires approval) |
-| **Maximum Total Staked** | 30,000,000 HSK (pool limit) | 30,000,000 HSK (pool limit) |
-| **Return Level** | Stable | High returns |
-
----
-
-## V. Product Design Logic
-
-### Why Design Two Products?
-
-1. **User Segmentation**: Users with different capital amounts have different needs and risk tolerance
-2. **Return Differentiation**: Attract different user groups through different return levels
-3. **Risk Control**: High-return products need higher thresholds and stricter approval
-4. **Fund Management**: Better manage funds of different scales through product segmentation
-
-### Why is Staking 5%?
-
-- **Market Positioning**: 5% is a stable return level, suitable for general users
-- **Controllable Risk**: Lower returns mean lower risk and fund requirements
-- **User Acceptance**: General users more easily accept stable return levels
-
-### Why is  16%?
-
-- **High Threshold Compensation**: High threshold needs relatively higher returns to attract users
-- **Long-Term Locking**: Encourages users to lock funds long-term
-- **Risk Premium**: Returns cover higher risks and capital costs
-- **Market Positioning**: 16% is a reasonable return level, suitable for whale and institutional investors
-
-### Why Does  Need Whitelist?
-
-- **Fund Security**: High-return products need to ensure quality of participating users
-- **Risk Control**: Filter qualified investors through approval mechanism
-- **Compliance Requirements**: May need to meet certain compliance requirements
+### Example
+- Penalty pool total: 100,000 HSK
+- User A staked: 1,000,000 HSK (completed full 365 days)
+- User B staked: 500,000 HSK (completed full 365 days)
+- Total completed staking: 10,000,000 HSK
+- User A distribution: 100,000 × (1,000,000 / 10,000,000) = 10,000 HSK
+- User B distribution: 100,000 × (500,000 / 10,000,000) = 5,000 HSK
 
 ---
 
@@ -263,35 +163,27 @@ Premium staking product for whales and institutions, providing high returns but 
 
 ### 3. Whitelist Mechanism
 
-**Staking**:
-- Whitelist mode: Disabled
+**Configuration**:
+- Whitelist mode: Disabled by default
 - All users can freely participate
 - No approval required
-
-****:
-- Whitelist mode: Enabled
-- Only whitelisted users can stake
-- Requires admin approval to add
+- Admin can enable whitelist mode if needed
 
 **Operational Recommendations**:
-- Establish whitelist approval standards
+- If whitelist enabled, establish whitelist approval standards
 - Regularly review whitelist users
 - Promptly add/remove whitelist users
 
 ### 4. Reward Pool Management
 
-**Independent Reward Pools**:
-- Both products have independent reward pools
-- Need to manage and deposit separately
-- Cannot be used interchangeably
-
 **Reward Pool Requirements**:
-- **Staking**: Calculate required rewards based on 5% APY
-- ****: Calculate required rewards based on 16% APY (needs more funds)
+- Calculate required rewards based on 5% base APY
+- Need sufficient reward pool fund support
+- Contract checks if reward pool balance is sufficient before allowing new stakes
 
 **Operational Recommendations**:
 - Regularly check reward pool balance
-- Ensure sufficient funds to pay fixed annual rewards (16% APY)
+- Ensure sufficient funds to pay fixed annual rewards (5% base APY)
 - Plan reward pool deposit schedule in advance
 
 ### 5. Emergency Withdrawal Mechanism
@@ -339,15 +231,17 @@ Premium staking product for whales and institutions, providing high returns but 
 
 ## VII. Operational Strategy Recommendations
 
-### Staking Operational Strategy
+### Operational Strategy
 
 1. **User Acquisition**
    - Emphasize low threshold (can participate with 1 HSK)
-   - Highlight stable returns (5% annual)
-   - Reduce participation difficulty (no approval required)
+   - Highlight stable returns (5% base APY, up to 8% total expected APY)
+   - Reduce participation difficulty (no approval required by default)
+   - Promote loyalty bonus (1%-3% additional APY)
 
 2. **User Retention**
    - Lock period is 365 days
+   - Support early unstake (with penalty)
    - Regularly publish return reports
    - Build user community
 
@@ -355,23 +249,17 @@ Premium staking product for whales and institutions, providing high returns but 
    - Regularly monitor reward pool balance
    - Plan deposit schedule in advance
    - Ensure timely reward distribution
+   - Calculate based on 5% base APY
 
-###  Operational Strategy
+4. **Penalty Pool Management**
+   - Monitor penalty pool accumulation
+   - Plan distribution after activity ends
+   - Ensure fair distribution to full staking users
 
-1. **User Acquisition**
-   - Targeted invitations to whales and institutions
-   - Emphasize high returns (16% annual)
-   - Provide exclusive services
-
-2. **User Approval**
-   - Establish approval standards
-   - Verify user qualifications
-   - Regularly review whitelist
-
-3. **Reward Pool Management**
-   - High returns require more fund support (16% APY)
-   - Need stricter fund management
-   - Regularly assess reward pool sufficiency
+5. **Loyalty Bonus Management**
+   - Monitor loyalty bonus calculation
+   - Plan distribution after activity ends (same as penalty pool)
+   - Ensure fair distribution to full staking users based on stake amounts
 
 ---
 
@@ -384,26 +272,20 @@ Premium staking product for whales and institutions, providing high returns but 
 - **Average Staking Amount**: Understand user staking scale
 - **Reward Pool Balance**: Ensure sufficient funds to pay rewards
 - **Total Pending Rewards**: Monitor totalPendingRewards, ensure reward pool balance is sufficient
-
-###  Monitoring Metrics
-
-- **Total Staked**: Monitor total staking amount for product
-- **Whitelist User Count**: Count authorized users
-- **Average Staking Amount**: Understand whale staking scale
-- **Reward Pool Balance**: Ensure sufficient funds to pay rewards (needs more)
-- **Total Pending Rewards**: Monitor totalPendingRewards, ensure reward pool balance is sufficient
+- **Penalty Pool Balance**: Monitor penalty pool accumulation
+- **Early Unstake Requests**: Track number of early unstake requests
 
 ---
 
 ## IX. Operational Notes
 
 ### 1. Reward Pool Management
-- ✅ Both products need independent reward pools
+- ✅ Product needs reward pool
 - ✅ Regularly check reward pool balance
 - ✅ Plan deposit schedule in advance
-- ⚠️ Ensure sufficient funds to pay rewards
+- ⚠️ Ensure sufficient funds to pay rewards (based on 5% base APY)
 
-### 2. Whitelist Management
+### 2. Whitelist Management (if enabled)
 - ✅ Establish approval standards
 - ✅ Regularly review whitelist users
 - ✅ Promptly add/remove users
@@ -424,25 +306,15 @@ Premium staking product for whales and institutions, providing high returns but 
 
 ---
 
-## X. Product Additional Features
+## X. Summary
 
-### Whale DID (Decentralized Identity)
+The HSK Staking product plan provides a single staking pool for all users:
 
-**Function Description**:
-- Provides exclusive decentralized identity identifier (DID) for users staking ≥ 50,000 HSK
-- When user staking amount reaches 50,000 HSK, system automatically reminds user to mint Whale DID
-- Users need to actively mint DID, system only provides reminder, does not auto-mint
+- **Single Pool**: Low threshold (1 HSK), stable returns (5% base APY, up to 8% total expected APY), open to all users
+- **Early Unstake**: Supported with 50% penalty and 7-day waiting period
+- **Penalty Pool**: Distributed to users who complete full staking period after activity ends
 
----
-
-## XI. Summary
-
-The single-tier Staking product plan meets needs of different user groups through differentiated product design:
-
-- **Staking**: Low threshold, stable returns, targeting general users
-- ****: High threshold, high returns, targeting whales and institutions
-
-Through reasonable mechanism design, both ensures product security and provides flexible user experience, providing clear operational strategies and monitoring metrics for operations.
+Through reasonable mechanism design, ensures product security and provides flexible user experience, providing clear operational strategies and monitoring metrics for operations.
 
 ---
 

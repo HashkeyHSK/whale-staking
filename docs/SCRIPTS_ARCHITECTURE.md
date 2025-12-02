@@ -2,7 +2,7 @@
 
 ## 📋 Objective
 
-Separate the `scripts/` directory by Staking and  to improve code organization and maintainability.
+Organize the `scripts/` directory for HSK Staking single staking pool to improve code organization and maintainability.
 
 ## ⚠️ Important Notes - Contract Architecture
 
@@ -15,10 +15,10 @@ Before starting, please understand the following key information:
    - `StakingStorage.sol` - Storage layer (inherits Initializable, Ownable2StepUpgradeable)
    - `StakingConstants.sol` - Constant definitions contract
    - `IStake.sol` - Interface definition
-   - `StakingProxy.sol` / `.sol` - Proxy contracts
+   - `StakingProxy.sol` - Proxy contract
 
 2. **Proxy Pattern**: Transparent Proxy (using OpenZeppelin's `TransparentUpgradeableProxy`)
-   - Can independently upgrade Normal and Premium staking pools
+   - Single proxy contract for the staking pool
    - ProxyAdmin used to manage proxy contract upgrades
 
 3. **Native Token**: HSK is the chain's native token (native token), similar to ETH, not an ERC20 token
@@ -28,7 +28,8 @@ Before starting, please understand the following key information:
 4. **Lock Period**: Fixed 365 days (`LOCK_PERIOD = 365 days`), defined in contract constants, cannot be dynamically modified
 
 5. **Reward Rate**: Configured at contract level (`rewardRate` state variable), all positions share the same reward rate
-   - Expressed in basis points (500 = 5%, )
+   - HSK Staking: 500 basis points (5% base APY)
+   - Total Expected APY: Up to 8% (frontend display, includes loyalty bonus 1%-3%)
    - `BASIS_POINTS = 10000` (100% = 10000)
 
 6. **Position Structure**: 
@@ -148,16 +149,16 @@ Before starting, please understand the following key information:
 
 **Parameter Description**:
 - `_minStakeAmount`: Minimum staking amount (wei unit)
-  - Staking: 1 HSK = `1e18` wei
-  - : 500,000 HSK = `500000e18` wei
+  - HSK Staking: 1 HSK = `1e18` wei
 - `_rewardRate`: Annual yield rate (basis points)
-  - Staking: 500 (5% APY)
-  - : 1600 (16% APY)
+  - HSK Staking: 500 (5% base APY)
 - `_stakeStartTime`: Staking start time (Unix timestamp)
 - `_stakeEndTime`: Staking end time (Unix timestamp)
 - `_whitelistMode`: Whitelist mode
-  - ✅ **Staking**: `false` (all users can stake)
-  - ✅ ****: `true` (only whitelisted users can stake)
+  - ✅ **HSK Staking**: `false` (default, all users can stake)
+  - Admin can enable whitelist mode if needed
+- `_maxTotalStaked`: Maximum total staked amount
+  - HSK Staking: 30,000,000 HSK = `30000000e18` wei
 
 **Whitelist Mode Design**:
 
@@ -203,7 +204,7 @@ scripts/
 │       ├── check-stakes.ts
 │       ├── pending-reward.ts
 │       └── pending-reward-any-user.ts
-├── premium/                  # Premium staking scripts (✅ Completed)
+├── early-unstake/            # Early unstake scripts (✅ Completed)
 │   ├── deploy.ts             # Deploy contract
 │   ├── upgrade.ts            # Upgrade contract
 │   ├── stake.ts              # Staking operation (requires whitelist)
@@ -306,44 +307,18 @@ The following table lists script completion status:
 | `scripts/shared/helpers.ts` | ✅ Completed | Helper functions |
 | `scripts/shared/utils.ts` | ✅ Completed | Utility functions |
 
-###  Scripts (✅ Completed)
+### Early Unstake Scripts (✅ Completed)
 
 **Architecture Support Status**: ✅ Completed
-- Shared modules fully support 
-- `PREMIUM_STAKING_CONFIG` defined
-- `getStakingAddress(StakingType.PREMIUM, network)` implemented
-- Test scripts include  test support
+- Early unstake functionality fully supported
+- Test scripts include early unstake test support
 
 **Script Implementation Status**: ✅ Completed
 
 | Script File | Status | Description |
 |------------|--------|-------------|
-| `/deploy.ts` | ✅ Completed | Deploy premium staking contract |
-| `/stake.ts` | ✅ Completed | Staking operation (requires whitelist check) |
-| `/unstake.ts` | ✅ Completed | Unstake |
-| `/claim-rewards.ts` | ✅ Completed | Claim rewards |
-| `/add-rewards.ts` | ✅ Completed | Add reward pool |
-| `/emergency-withdraw.ts` | ✅ Completed | Emergency withdraw principal |
-| `/withdraw-excess.ts` | ✅ Completed | Withdraw excess rewards |
-| `/verify-forge.ts` | ✅ Completed | Verify contract |
-| `/upgrade.ts` | ✅ Completed | Upgrade contract |
-| `/whitelist/add-batch.ts` | ✅ Completed | Batch add whitelist |
-| `/whitelist/remove-batch.ts` | ✅ Completed | Batch remove whitelist |
-| `/whitelist/check-user.ts` | ✅ Completed | Query user whitelist status |
-| `/whitelist/toggle-mode.ts` | ✅ Completed | Toggle whitelist mode |
-| `/config/pause.ts` | ✅ Completed | Pause contract |
-| `/config/unpause.ts` | ✅ Completed | Resume contract |
-| `/config/set-start-time.ts` | ✅ Completed | Set start time |
-| `/config/set-end-time.ts` | ✅ Completed | Set end time |
-| `/config/set-min-stake.ts` | ✅ Completed | Set minimum staking amount |
-| `/config/enable-emergency.ts` | ✅ Completed | Enable emergency mode |
-| `/config/transfer-ownership.ts` | ✅ Completed | Step 1: Initiate ownership transfer |
-| `/config/accept-ownership.ts` | ✅ Completed | Step 2: Accept ownership transfer |
-| `/query/check-status.ts` | ✅ Completed | Query contract status |
-| `/query/check-stakes.ts` | ✅ Completed | Query staking information |
-| `/query/pending-reward.ts` | ✅ Completed | Query pending rewards (for own positions) |
-| `/query/pending-reward-any-user.ts` | ✅ Completed | Query pending rewards for any user/position |
-| `/query/check-whitelist.ts` | ✅ Completed | Query whitelist configuration |
+| `/request-early-unstake.ts` | ✅ Completed | Request early unstake |
+| `/complete-early-unstake.ts` | ✅ Completed | Complete early unstake after waiting period |
 
 ### Development Scripts (✅ Completed)
 
@@ -390,11 +365,9 @@ The following table lists script completion status:
 - ✅ Query scripts: 5 scripts (check-status, check-stakes, pending-reward, pending-reward-any-user, check-whitelist)
 
 **Architecture Support Status**:
-- ✅  configuration defined (`PREMIUM_STAKING_CONFIG`)
-- ✅  address management implemented (`getStakingAddress`)
-- ✅  type definitions implemented (`StakingType.PREMIUM`)
-- ✅  test support implemented (`fixtures.ts`)
-- ✅  all scripts implemented (23 scripts)
+- ✅ Early unstake functionality implemented
+- ✅ Test support implemented (`fixtures.ts`)
+- ✅ All scripts implemented
 
 ---
 
@@ -428,21 +401,17 @@ General utility functions are located in `scripts/shared/utils.ts`.
 
 ---
 
-### Step 3: Implement  Scripts (✅ Completed)
+### Step 3: Implement Early Unstake Scripts (✅ Completed)
 
-Premium staking scripts are similar to normal staking but require additional whitelist management functionality. Completed by referencing Staking implementation.
+Early unstake scripts handle the early unstake functionality with 7-day waiting period and 50% penalty.
 
-#### 1. `/deploy.ts` (✅ Completed)
+#### 1. `/request-early-unstake.ts` (✅ Completed)
 
-Similar to `scripts/staking/deploy.ts`, uses `PREMIUM_STAKING_CONFIG`, and enables whitelist mode.
+Request early unstake for a position.
 
-#### 2. `/whitelist/add-batch.ts` (✅ Completed)
+#### 2. `/complete-early-unstake.ts` (✅ Completed)
 
-#### 3. `/whitelist/remove-batch.ts` (✅ Completed)
-
-#### 4. `/whitelist/toggle-mode.ts` (✅ Completed)
-
-#### 5. `/whitelist/check-user.ts` (✅ Completed)
+Complete early unstake after 7-day waiting period.
 
 ---
 
@@ -577,18 +546,18 @@ After completion, please verify the following:
 
 ### Staking Operation Verification
 
-- [ ] Staking staking script executes correctly
-- [ ]  staking script executes correctly
+- [ ] Staking script executes correctly
+- [ ] Early unstake scripts execute correctly
 - [ ] Unstaking script works correctly
 - [ ] Reward claiming script works correctly
 - [ ] Add rewards script works correctly
 
-### Whitelist Management Verification (Premium Exclusive)
+### Early Unstake Verification
 
-- [ ] Batch add users to whitelist works correctly
-- [ ] Batch remove users works correctly
-- [ ] Query user whitelist status works correctly
-- [ ] Toggle whitelist mode works correctly
+- [ ] Request early unstake works correctly
+- [ ] Complete early unstake after waiting period works correctly
+- [ ] Penalty calculation is correct (50% of rewards)
+- [ ] Waiting period enforcement works correctly
 
 ### Configuration Management Verification
 

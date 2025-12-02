@@ -1,197 +1,233 @@
-# 单层 Staking 产品方案
+# HSK Staking 产品文档
 
-基于现有合约架构，通过部署一个独立的合约实例来实现一套不同的产品方案。
+基于现有合约架构，HSKStaking 合约可以通过不同的配置参数部署，创建不同的质押实例。
 
-## 📋 产品方案概览
+## 📋 产品概览
 
-### 产品 1: Staking（委托质押）
-- **目标用户**: 普通用户
-- **最小质押门槛**: 1 HSK
-- **年化收益率**: 5%（部署时配置）
-- **锁定期**: 365天（固定）
-- **白名单模式**: 关闭（所有用户可自由质押）
+HSKStaking 是具有固定配置的单一质押池：
 
-### 产品 2: （高级质押）
-- **目标用户**: 大户/机构
-- **最小质押门槛**: 500,000 HSK
-- **年化收益率**: 16%（部署时配置）
-- **锁定期**: 365天（固定）
-- **白名单模式**: 启用（需要管理员授权）
+- **合约类型**：HSKStaking（单一合约实现）
+- **锁定期**：365 天（固定，合约常量定义）
+- **最小质押**：1 HSK
+- **基础年化收益率**：5%（500 basis points）
+- **总预期年化**：Up to 8%（前端展示，包含忠诚度补贴 1%-3%）
+- **最大总质押量**：30,000,000 HSK（3000 万 HSK）
+- **白名单模式**：默认禁用
+- **质押时间窗口**：约 7 天（管理员可配置）
+- **提前解除质押**：支持（50% 罚金，7 天等待期）
 
 ## 🚀 部署方式
 
-### 方式一：分别部署（推荐）
+### 部署质押合约实例
 
-#### 部署Staking
 ```bash
-# 部署到测试网（需要提供时间戳）
+# 部署到测试网（需要时间戳）
 STAKE_START_TIME="1735689600" STAKE_END_TIME="1767225600" npm run deploy:testnet
 
 # 部署到主网
 STAKE_START_TIME="1735689600" STAKE_END_TIME="1767225600" npm run deploy
 ```
 
-#### 部署 
-```bash
-# 部署到测试网（需要提供时间戳）
-STAKE_START_TIME="1735689600" STAKE_END_TIME="1767225600" npm run deploy:premium:testnet
+**注意**：每次部署都会创建一个独立的合约实例，包含自己的代理合约和配置。您可以部署多个具有不同参数的实例。
 
-# 部署到主网
-STAKE_START_TIME="1735689600" STAKE_END_TIME="1767225600" npm run deploy:premium
-```
+## 📝 配置参数
 
-**注意**：一个产品需要分别部署，每个产品都有独立的代理合约和配置。
+### 初始化参数
 
-## 📝 部署后配置
+部署时，合约通过以下参数进行初始化：
 
-### 1. 为  添加白名单用户
+| 参数 | 说明 | 示例 |
+|-----------|-------------|---------|
+| `minStakeAmount` | 最小质押金额（以 wei 为单位） | 1 HSK = 1 * 10^18 wei |
+| `rewardRate` | 年化奖励率（basis points） | 500 = 5%（基础 APY） |
+| `stakeStartTime` | 质押开始时间戳 | Unix 时间戳 |
+| `stakeEndTime` | 质押结束时间戳 | Unix 时间戳 |
+| `whitelistMode` | 启用白名单模式 | `false` = 开放（默认），`true` = 仅白名单 |
+| `maxTotalStaked` | 最大总质押金额 | 30,000,000 HSK = 30M * 10^18 wei |
 
- 产品启用了白名单模式，需要手动添加授权用户：
+### 部署后配置
+
+#### 1. 白名单管理（如果启用了白名单模式）
 
 ```bash
 # 批量添加白名单（最多100个地址）
-WHITELIST_ADDRESSES="0x123...,0x456..." npm run whitelist:add-batch:premium:testnet
+WHITELIST_ADDRESSES="0x123...,0x456..." npm run whitelist:add-batch:testnet
 
 # 批量移除白名单
-WHITELIST_ADDRESSES="0x123...,0x456..." npm run whitelist:remove-batch:premium:testnet
+WHITELIST_ADDRESSES="0x123...,0x456..." npm run whitelist:remove-batch:testnet
 ```
 
-### 2. 向奖励池充值
-
-一个产品需要独立的奖励池，需要分别充值：
+#### 2. 向奖励池充值
 
 ```bash
-# 为Staking 充值
+# 向奖励池充值
 REWARD_AMOUNT="10000" npm run rewards:add:testnet
-
-# 为  充值
-REWARD_AMOUNT="20000" npm run rewards:add:premium:testnet
 ```
 
-### 3. 验证配置
-
-部署完成后，可以验证一个产品的配置：
+#### 3. 验证配置
 
 ```bash
-# 检查Staking 的配置参数
+# 检查合约配置参数
 npm run query:status:testnet
-
-# 检查  的配置参数
-npm run query:status:premium:testnet
 ```
 
 ## 💡 使用示例
 
-### 普通用户质押（Staking）
+### 用户质押
 
 ```bash
-# 使用 stake 脚本（锁定期固定365天）
+# 质押代币（固定 365 天锁定期）
 STAKE_AMOUNT="2000" npm run stake:testnet
 ```
 
-**说明**: V2版本使用固定365天锁定期，无需指定锁定期参数。
+**注意**：HSKStaking 使用固定 365 天锁定期，无需指定锁定期参数。
 
-### 大户质押（）
+### 提前解除质押（如需要）
 
 ```bash
-# 使用 stake 脚本（锁定期固定365天）
-STAKE_AMOUNT="600000" npm run stake:premium:testnet
+# 申请提前解除质押
+POSITION_ID="1" npm run request-early-unstake:testnet
+
+# 完成提前解除质押（7 天等待期后）
+POSITION_ID="1" npm run complete-early-unstake:testnet
 ```
 
-**说明**: V2版本使用固定365天锁定期，无需指定锁定期参数。需要先被添加到白名单才能质押。
+**注意**：提前解除质押会产生 50% 的罚金。罚金转入罚金池，分配给完成完整质押周期的用户。
 
 ## 🔧 管理员操作
 
 ### 设置质押时间窗口
 
 **设置质押开始时间**：
-
 ```bash
-START_TIME="1735689600" npm run config:set-start-time:testnet
+NEW_START_TIME="1735689600" npm run admin:set-start-time:testnet
 ```
 
-**说明**：
-- 部署脚本默认设置开始时间为部署后7天
-- 用户只能在开始时间之后进行质押
-- 管理员可以随时调整开始时间
-
-**设置质押截止时间**：
-
+**设置质押结束时间**：
 ```bash
-END_TIME="1767225600" npm run config:set-end-time:testnet
+NEW_END_TIME="1767225600" npm run admin:set-end-time:testnet
 ```
 
-**说明**：
-- 用户只能在 `stakeStartTime` 到 `stakeEndTime` 之间进行质押
-- 结束时间必须是未来的时间
+### 白名单管理
 
-### 注意事项
-
-**重要**：HSKStaking 采用固定锁定期设计（365天），不支持修改锁定期。
-
-如需提供不同的锁定期或收益率配置，请部署新的合约实例。
-
-### 调整最大质押量
-
+**批量添加白名单**：
 ```bash
-NEW_MAX_TOTAL_STAKED="15000000" npm run config:set-max-total-staked:testnet
+WHITELIST_ADDRESSES="0x123...,0x456..." npm run whitelist:add-batch:testnet
 ```
 
-## 📊 产品对比
+**批量移除白名单**：
+```bash
+WHITELIST_ADDRESSES="0x123...,0x456..." npm run whitelist:remove-batch:testnet
+```
 
-| 特性 | Staking |  |
-|------|-------------|-----------|
-| 目标用户 | 普通用户 | 大户/机构 |
-| 最小质押 | 1 HSK | 500,000 HSK |
-| 年化收益 | 5%（部署时配置） | 16%（部署时配置） |
-| 白名单 | 否 | 是 |
-| 锁定期 | 365天（固定） | 365天（固定） |
-| 最大总质押量 | 30,000,000 HSK（池子上限） | 30,000,000 HSK（池子上限） |
+**切换白名单模式**：
+```bash
+# 启用白名单模式
+ENABLED="true" npm run admin:set-whitelist-mode:testnet
 
-## ⚠️ 重要提醒
+# 禁用白名单模式
+ENABLED="false" npm run admin:set-whitelist-mode:testnet
+```
 
-1. **质押时间窗口**: 部署时必须提供 `STAKE_START_TIME` 和 `STAKE_END_TIME` 环境变量（Unix 时间戳，秒级）。管理员可以通过 `setStakeStartTime` 和 `setStakeEndTime` 函数调整质押时间窗口
-2. **独立部署**: 一个产品是完全独立的合约实例，互不影响
-3. **独立奖励池**: 每个产品需要独立的奖励池，需要分别管理和充值
-4. **白名单管理**:  产品启用白名单，需要管理员手动添加授权用户
-5. **参数配置**: 部署后可以通过管理员函数调整参数，但已存在的质押位置不受影响
-6. **奖励计算**: 奖励计算逻辑相同，但收益率不同（5% vs 16%）
+### 奖励池管理
 
-## 🔍 监控和查询
+**向奖励池充值**：
+```bash
+REWARD_AMOUNT="10000" npm run rewards:add:testnet
+```
 
-### 查询用户质押情况
+**提取超额奖励**：
+```bash
+AMOUNT="5000" npm run admin:withdraw-excess-rewards:testnet
+```
+
+### 紧急模式
+
+**启用紧急模式**：
+```bash
+npm run admin:enable-emergency:testnet
+```
+
+**注意**：紧急模式下，用户只能提取本金，放弃所有奖励。
+
+### 暂停/恢复合约
+
+**暂停合约**：
+```bash
+npm run admin:pause:testnet
+```
+
+**恢复合约**：
+```bash
+npm run admin:unpause:testnet
+```
+
+## 📊 查询功能
+
+### 查询用户质押信息
 
 ```bash
-# 查询用户质押情况
-npm run query:stakes:testnet
+# 查询用户的所有质押位置ID
+USER_ADDRESS="0x123..." npm run query:user-positions:testnet
 
-# 查询指定用户的质押情况
-USER_ADDRESS="0x..." npm run query:stakes:testnet
+# 查询指定位置的详细信息
+POSITION_ID="1" npm run query:position-info:testnet
+
+# 查询待提取奖励
+POSITION_ID="1" npm run query:pending-reward:testnet
 ```
 
 ### 查询合约状态
 
 ```bash
-# 查询合约状态
+# 查询合约配置参数
 npm run query:status:testnet
 
-# 查询  合约状态
-npm run query:status:premium:testnet
+# 查询奖励池余额
+npm run query:reward-pool:testnet
 ```
+
+## ⚠️ 重要注意事项
+
+1. **质押时间窗口**：用户只能在管理员设置的时间窗口内进行质押
+2. **锁定期**：固定为 365 天，无法修改
+3. **奖励池**：管理员必须定期向奖励池充值，确保有足够资金支付奖励
+4. **提前解除质押**：会产生 50% 罚金，罚金转入罚金池
+5. **罚金池分配**：活动结束后，按比例分配给完成完整质押周期的用户
+6. **白名单**：默认禁用，管理员可以启用
+
+## 🔍 故障排查
+
+### 常见问题
+
+1. **无法质押**
+   - 检查是否在质押时间窗口内
+   - 检查是否启用了白名单模式（如果启用，需要先添加到白名单）
+   - 检查是否达到最大总质押量上限
+
+2. **无法提取奖励**
+   - 检查奖励池余额是否充足
+   - 检查合约是否处于暂停状态
+   - 检查是否处于紧急模式
+
+3. **无法解除质押**
+   - 检查锁定期是否已结束
+   - 检查是否申请了提前解除质押（需要完成提前解除质押流程）
+   - 检查合约是否处于暂停状态
+
+---
 
 ## 📚 相关文档
 
 - [主 README](../README.md)
-- [合约架构说明](./CONTRACT_ARCHITECTURE.md) - **合约架构详解（开发必读）**
-- [产品方案详细文档](./PRODUCT_PLANS.md) - **运营文档（推荐）**
-- [产品方案执行摘要](./PRODUCT_SUMMARY.md) - 快速了解
+- [产品方案文档](./PRODUCT_PLANS.md) - **运营文档（推荐）**
+- [产品摘要](./PRODUCT_SUMMARY.md) - 快速了解
 - [产品开发文档](./PRODUCT_PLANS_DEV.md) - 开发团队文档
 - [快速开始指南](./QUICK_START_DUAL_TIER.md) - 快速部署指南
-- [技术常见问题](./TECHNICAL_FAQ.md) - 技术机制说明
+- [技术 FAQ](./TECHNICAL_FAQ.md) - 技术机制说明
 - [错误处理指南](./ERROR_HANDLING.md) - 常见错误处理
 
 ---
 
-**文档版本**: 1.0.0  
+**文档版本**: 2.0.0  
 **维护者**: HashKey 技术团队
-

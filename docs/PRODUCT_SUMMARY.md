@@ -2,13 +2,18 @@
 
 ## 🎯 Product Overview
 
-HSKStaking is a single staking contract type that supports flexible configuration through initialization parameters. The contract can be deployed with different configurations to create different staking instances.
+HSKStaking is a single staking pool with fixed configuration parameters. All users participate in the same staking pool.
 
 | Feature | Description |
 |---------|-------------|
 | **Contract Type** | HSKStaking (single contract implementation) |
 | **Lock Period** | 365 days (fixed, contract constant) |
-| **Configurable Parameters** | Minimum stake amount, reward rate, whitelist mode, max total staked, staking time window |
+| **Minimum Stake** | 1 HSK |
+| **Annual Yield Rate** | 5% (base APY, contract real-time settlement) |
+| **Total Expected APY** | Up to 8% (frontend display, includes loyalty bonus 1%-3%) |
+| **Maximum Total Staked** | 30,000,000 HSK (30 million HSK) |
+| **Whitelist Mode** | Disabled by default (open to all users) |
+| **Staking Window** | Approximately 7 days (configurable by admin) |
 | **Early Unstake** | Supported with 50% penalty and 7-day waiting period |
 | **Reward Calculation** | Linear, per-second accumulation |
 
@@ -17,13 +22,17 @@ HSKStaking is a single staking contract type that supports flexible configuratio
 ## 📋 Core Mechanisms
 
 ### Participation Method
-- ✅ Configurable minimum stake amount (set at deployment)
-- ✅ Optional whitelist mode (can be enabled/disabled at deployment)
-- ✅ Staking time window: Can only stake within the time range set by admin
+- ✅ Minimum stake amount: 1 HSK
+- ✅ Whitelist mode: Disabled by default (open to all users)
+- ✅ Staking time window: Approximately 7 days (can only stake within the time range set by admin)
 - ✅ Fixed lock period of 365 days
+- ✅ Maximum total staked: 30,000,000 HSK (pool limit)
 
 ### Reward Rules
-- ✅ Configurable annual yield rate (set at deployment, in basis points)
+- ✅ Base annual yield rate: 5% (contract real-time settlement)
+- ✅ Total expected APY: Up to 8% (frontend display, includes loyalty bonus 1%-3%)
+- ✅ Loyalty bonus: 1%-3% (off-chain distribution, not in contract)
+- ✅ Loyalty bonus distribution: After staking activity ends, proportional distribution based on users' stake amounts in total staking, only for users who completed full staking period (365 days)
 - ✅ Rewards calculated based on actual staking seconds
 - ✅ Can claim rewards separately during lock period
 - ✅ Rewards only calculated up to the end of lock period (365 days)
@@ -48,9 +57,9 @@ HSKStaking is a single staking contract type that supports flexible configuratio
 - ⚠️ **Requires admin**: Admin must enable emergency mode first
 
 ### Risk Control
-- ✅ Maximum total staked: Configurable pool limit (set at deployment, 0 means unlimited)
+- ✅ Maximum total staked: 30,000,000 HSK (fixed pool limit)
 - ✅ Reward pool balance check: Contract checks if reward pool balance is sufficient to pay all pending rewards
-- ✅ Optional whitelist mechanism: Can be enabled at deployment
+- ✅ Whitelist mechanism: Disabled by default (can be enabled by admin if needed)
 - ✅ Emergency mode: Can only withdraw principal in special circumstances
 - ✅ Pause function: Admin can pause/unpause contract
 
@@ -100,10 +109,10 @@ HSKStaking is a single staking contract type that supports flexible configuratio
 ### 4. Whitelist Mechanism
 
 **Configuration**:
-- Whitelist mode can be enabled/disabled at deployment
+- Whitelist mode: Disabled by default (open to all users)
+- Admin can enable whitelist mode after deployment if needed
 - If enabled: Only whitelisted users can stake
 - If disabled: All users can stake freely
-- Admin can toggle whitelist mode after deployment
 
 ### 5. Reward Pool Management
 
@@ -116,9 +125,12 @@ HSKStaking is a single staking contract type that supports flexible configuratio
 ### 6. Penalty Pool Distribution
 
 **Mechanism**:
-- Penalties from early unstake go to penalty pool
+- Penalties from early unstake (50% of rewards) go to penalty pool
 - Penalty pool accumulates in the contract
-- The distribution mechanism is managed separately and not part of the core staking contract
+- **Distribution Time**: After staking activity ends, when all stakes have matured
+- **Distribution Method**: Off-chain calculation, one-time distribution
+- **Distribution Rule**: Proportional distribution based on users' stake amounts in total staking
+- **Distribution Condition**: Only users who completed full staking period (365 days) are eligible
 
 ### 7. Emergency Withdrawal Mechanism
 
@@ -207,13 +219,18 @@ HSKStaking is a single staking contract type that supports flexible configuratio
 
 | Feature | Description |
 |---------|-------------|
+| **Minimum Stake** | 1 HSK |
 | **Lock Period** | 365 days (fixed) |
-| **Early Unstake** | Supported with 50% penalty |
+| **Base APY** | 5% (contract real-time settlement) |
+| **Total Expected APY** | Up to 8% (frontend display) |
+| **Maximum Total Staked** | 30,000,000 HSK |
+| **Whitelist** | Disabled by default |
+| **Staking Window** | Approximately 7 days |
+| **Early Unstake** | Supported with 50% penalty, 7-day waiting period |
 | **Reward Calculation** | Per-second, linear accumulation |
-| **Whitelist** | Optional, configurable |
 | **Emergency Mode** | Supported |
 | **Pause Function** | Supported |
-| **Penalty Pool** | Distributed to full staking users |
+| **Penalty Pool** | Distributed to full staking users after activity ends |
 
 ---
 

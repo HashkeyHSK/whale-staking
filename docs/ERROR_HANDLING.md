@@ -44,7 +44,7 @@ Error: Not whitelisted
 
 **Solution**:
 - Check whitelist mode status: `await staking.onlyWhitelistCanStake()`
-- If it's , contact admin to be added to whitelist
+- If it's enabled, contact admin to be added to whitelist
 - Use script to check whitelist status:
   ```bash
   npx hardhat run scripts/checkWhitelist.ts --network <network> \
@@ -548,7 +548,7 @@ console.log(`Lock period: ${LOCK_PERIOD / 86400} days`); // 365 days
 
 // Query annual yield rate
 const rewardRate = await staking.rewardRate();
-console.log(`Annual yield rate: ${rewardRate: 500 = 5%, 
+console.log(`Annual yield rate: ${rewardRate} basis points (${rewardRate / 100}%)`); // 500 = 5%
 
 // Query staking time window
 const stakeStartTime = await staking.stakeStartTime();

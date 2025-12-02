@@ -4,16 +4,17 @@ Based on the existing contract architecture, the HSKStaking contract can be depl
 
 ## 📋 Product Overview
 
-HSKStaking is a single staking contract type that supports flexible configuration through initialization parameters:
+HSKStaking is a single staking pool with fixed configuration:
 
 - **Contract Type**: HSKStaking (single contract implementation)
 - **Lock Period**: 365 days (fixed, defined in contract constant)
-- **Configurable Parameters**:
-  - Minimum stake amount (`minStakeAmount`)
-  - Annual yield rate (`rewardRate` in basis points)
-  - Whitelist mode (`whitelistMode` - enables/disables whitelist requirement)
-  - Maximum total staked (`maxTotalStaked` - pool limit, 0 means unlimited)
-  - Staking time window (`stakeStartTime`, `stakeEndTime`)
+- **Minimum Stake**: 1 HSK
+- **Base Annual Yield Rate**: 5% (500 basis points)
+- **Total Expected APY**: Up to 8% (frontend display, includes loyalty bonus 1%-3%)
+- **Maximum Total Staked**: 30,000,000 HSK (30 million HSK)
+- **Whitelist Mode**: Disabled by default
+- **Staking Time Window**: Approximately 7 days (configurable by admin)
+- **Early Unstake**: Supported with 50% penalty and 7-day waiting period
 
 ## 🚀 Deployment Method
 
@@ -38,11 +39,11 @@ When deploying, the contract is initialized with the following parameters:
 | Parameter | Description | Example |
 |-----------|-------------|---------|
 | `minStakeAmount` | Minimum stake amount (in wei) | 1 HSK = 1 * 10^18 wei |
-| `rewardRate` | Annual reward rate in basis points | 500 = 5%, 1600 = 16% |
+| `rewardRate` | Annual reward rate in basis points | 500 = 5% (base APY) |
 | `stakeStartTime` | Timestamp when staking begins | Unix timestamp |
 | `stakeEndTime` | Timestamp when staking ends | Unix timestamp |
-| `whitelistMode` | Enable whitelist mode | `false` = open, `true` = whitelist only |
-| `maxTotalStaked` | Maximum total staked amount (0 = unlimited) | 30,000,000 HSK = 30M * 10^18 wei |
+| `whitelistMode` | Enable whitelist mode | `false` = open (default), `true` = whitelist only |
+| `maxTotalStaked` | Maximum total staked amount | 30,000,000 HSK = 30M * 10^18 wei |
 
 ### Post-Deployment Configuration
 
