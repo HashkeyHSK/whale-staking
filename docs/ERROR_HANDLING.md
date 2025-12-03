@@ -218,6 +218,39 @@ await staking.completeEarlyUnstake(positionId);
 
 ---
 
+### 3e. "Contract is in emergency mode" - Cannot Complete Early Unstake in Emergency Mode
+
+**Error Message**:
+```
+Error: Contract is in emergency mode
+```
+
+**Cause**:
+- Attempting to complete early unstake while contract is in emergency mode
+- `emergencyMode == true` means contract is in emergency mode
+- In emergency mode, `completeEarlyUnstake()` is blocked by `whenNotEmergency` modifier
+
+**Solution**:
+- Wait for admin to disable emergency mode (if possible)
+- Use `emergencyWithdraw()` instead to withdraw principal only (no rewards)
+- Query emergency mode: `const emergencyMode = await staking.emergencyMode();`
+
+**Example**:
+```typescript
+const emergencyMode = await staking.emergencyMode();
+if (emergencyMode) {
+  console.log("Contract is in emergency mode");
+  console.log("Use emergencyWithdraw() to withdraw principal only");
+  // Use emergencyWithdraw instead
+  await staking.emergencyWithdraw(positionId);
+} else {
+  // Can complete early unstake normally
+  await staking.completeEarlyUnstake(positionId);
+}
+```
+
+---
+
 ### 3e. "Lock period already ended" - Cannot Request Early Unstake After Lock Period
 
 **Error Message**:

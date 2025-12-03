@@ -28,6 +28,17 @@ async function main() {
   // Connect to contract
   const staking = await ethers.getContractAt("HSKStaking", stakingAddress);
 
+  // Check emergency mode
+  const emergencyMode = await staking.emergencyMode();
+  if (emergencyMode) {
+    throw new Error(
+      "Contract is in emergency mode.\n" +
+      "completeEarlyUnstake() is not available in emergency mode.\n" +
+      "Use emergencyWithdraw() instead to withdraw principal only (no rewards).\n" +
+      "Command: npm run emergency-withdraw:testnet"
+    );
+  }
+
   // Query and validate position information
   console.log("\nQuerying position information...");
   const position = await validatePosition(staking, positionId, await user.getAddress());

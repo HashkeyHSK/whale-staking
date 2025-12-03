@@ -209,6 +209,7 @@ Complete early unstake after 7-day waiting period
   - Early unstake requested (`earlyUnstakeRequestTime[positionId] > 0`)
   - Waiting period completed (`block.timestamp >= requestTime + 7 days`)
   - Contract not paused (`whenNotPaused`)
+  - Not in emergency mode (`whenNotEmergency`)
 - **Errors**:
   - `AlreadyUnstaked()` - If position is already unstaked (cannot complete twice)
   - `"Early unstake not requested"` - If no early unstake request exists

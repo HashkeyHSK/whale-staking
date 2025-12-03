@@ -218,6 +218,39 @@ await staking.completeEarlyUnstake(positionId);
 
 ---
 
+### 3e. "Contract is in emergency mode" - 紧急模式下无法完成提前解除质押
+
+**错误信息**：
+```
+Error: Contract is in emergency mode
+```
+
+**原因**：
+- 尝试在合约处于紧急模式时完成提前解除质押
+- `emergencyMode == true` 表示合约处于紧急模式
+- 紧急模式下，`completeEarlyUnstake()` 被 `whenNotEmergency` 修饰符阻止
+
+**解决方法**：
+- 等待管理员解除紧急模式（如果可能）
+- 使用 `emergencyWithdraw()` 代替，仅提取本金（无奖励）
+- 查询紧急模式：`const emergencyMode = await staking.emergencyMode();`
+
+**示例**：
+```typescript
+const emergencyMode = await staking.emergencyMode();
+if (emergencyMode) {
+  console.log("合约处于紧急模式");
+  console.log("使用 emergencyWithdraw() 仅提取本金");
+  // 使用 emergencyWithdraw 代替
+  await staking.emergencyWithdraw(positionId);
+} else {
+  // 可以正常完成提前解除质押
+  await staking.completeEarlyUnstake(positionId);
+}
+```
+
+---
+
 ### 3e. "Lock period already ended" - 锁定期结束后无法申请提前解除质押
 
 **错误信息**：

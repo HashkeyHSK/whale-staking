@@ -239,7 +239,7 @@ contract HSKStaking is
      * If user has claimed more than 50% of rewards, excess is deducted from principal
      * @param positionId The position ID to complete early unstake for
      */
-    function completeEarlyUnstake(uint256 positionId) external override nonReentrant whenNotPaused validPosition(positionId) {
+    function completeEarlyUnstake(uint256 positionId) external override nonReentrant whenNotPaused whenNotEmergency validPosition(positionId) {
         Position storage position = positions[positionId];
         
         if (position.isUnstaked) revert AlreadyUnstaked();
