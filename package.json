@@ -90,6 +90,8 @@
     "config:set-min-stake:testnet": "hardhat run scripts/staking/config/set-min-stake.ts --network hashkeyTestnet",
     "config:set-max-total-staked": "hardhat run scripts/staking/config/set-max-total-staked.ts --network hashkeyMainnet",
     "config:set-max-total-staked:testnet": "hardhat run scripts/staking/config/set-max-total-staked.ts --network hashkeyTestnet",
+    "config:set-reward-rate": "hardhat run scripts/staking/config/set-reward-rate.ts --network hashkeyMainnet",
+    "config:set-reward-rate:testnet": "hardhat run scripts/staking/config/set-reward-rate.ts --network hashkeyTestnet",
     "config:enable-emergency": "hardhat run scripts/staking/config/enable-emergency.ts --network hashkeyMainnet",
     "config:enable-emergency:testnet": "hardhat run scripts/staking/config/enable-emergency.ts --network hashkeyTestnet",
     "config:transfer-ownership": "hardhat run scripts/staking/config/transfer-ownership.ts --network hashkeyMainnet",
