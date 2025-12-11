@@ -43,6 +43,7 @@ abstract contract StakingStorage is Initializable, Ownable2StepUpgradeable {
     uint256[50] private __gap;
 
     event RewardPoolUpdated(uint256 newBalance);
+    event RewardRateUpdated(uint256 oldRate, uint256 newRate);
 
     /**
      * @dev Initializes the storage contract with basic settings

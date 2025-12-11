@@ -37,6 +37,7 @@ contract HSKStaking is
     event WhitelistModeChanged(bool oldMode, bool newMode);
     event PenaltyPoolContractUpdated(address indexed oldContract, address indexed newContract);
     event PenaltyDeposited(uint256 penaltyAmount, uint256 timestamp);
+    // RewardRateUpdated event is defined in StakingStorage.sol (inherited)
     error AlreadyUnstaked();
     error StillLocked();
     error NoReward();
@@ -372,6 +373,19 @@ contract HSKStaking is
         uint256 oldAmount = maxTotalStaked;
         maxTotalStaked = newAmount;
         emit MaxTotalStakedUpdated(oldAmount, newAmount);
+    }
+
+    /**
+     * @dev Set reward rate (APY)
+     * Only owner can call this
+     * @param newRewardRate New reward rate in basis points (e.g., 513 for 5.13%, 500 for 5%)
+     */
+    function setRewardRate(uint256 newRewardRate) external onlyOwner whenNotEmergency {
+        require(newRewardRate > 0 && newRewardRate <= 10000, "Invalid reward rate");
+        
+        uint256 oldRate = rewardRate;
+        rewardRate = newRewardRate;
+        emit RewardRateUpdated(oldRate, newRewardRate);
     }
 
     function setStakeStartTime(uint256 newStartTime) external onlyOwner {
