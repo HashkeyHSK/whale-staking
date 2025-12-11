@@ -37,7 +37,7 @@ contract HSKStaking is
     event WhitelistModeChanged(bool oldMode, bool newMode);
     event PenaltyPoolContractUpdated(address indexed oldContract, address indexed newContract);
     event PenaltyDeposited(uint256 penaltyAmount, uint256 timestamp);
-    event RewardRateUpdated(uint256 oldRate, uint256 newRate);
+    // RewardRateUpdated event is defined in StakingStorage.sol (inherited)
     error AlreadyUnstaked();
     error StillLocked();
     error NoReward();
